@@ -97,6 +97,11 @@ class OtaCreate(BaseModel):
     commission_pct: Optional[float] = Field(default=None, ge=0, le=100)
 
 
+class OtaUpdate(BaseModel):
+    booking_id: Optional[int] = None
+    status: Optional[str] = None
+
+
 @router.post("")
 def create_ota(body: OtaCreate,
                 db: Session = Depends(get_db),
@@ -138,6 +143,26 @@ def create_ota(body: OtaCreate,
         created_by=current_user.user_id,
     )
     db.add(r); db.commit(); db.refresh(r)
+    return _to_dict(r)
+
+
+@router.put("/{ota_id}")
+def update_ota(ota_id: int,
+               body: OtaUpdate,
+               db: Session = Depends(get_db),
+               current_user=Depends(require_admin),
+               lodge_id: int = Depends(resolve_lodge_scope)):
+    r = (db.query(OtaReservation)
+         .filter(OtaReservation.ota_id == ota_id,
+                 OtaReservation.lodge_id == lodge_id).first())
+    if not r:
+        raise HTTPException(status_code=404, detail="OTA reservation not found")
+    if body.booking_id is not None:
+        r.booking_id = body.booking_id
+    if body.status is not None:
+        r.status = body.status
+    db.commit()
+    db.refresh(r)
     return _to_dict(r)
 
 

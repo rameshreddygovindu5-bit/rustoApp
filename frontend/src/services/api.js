@@ -398,6 +398,7 @@ export const otaAPI = {
   list:   params => axiosInst.get("/ota", { params }),
   stats:  ()     => axiosInst.get("/ota/stats"),
   create: body   => axiosInst.post("/ota", body),
+  update: (id, body) => axiosInst.put(`/ota/${id}`, body),
   delete: id     => axiosInst.delete(`/ota/${id}`),
 };
 
