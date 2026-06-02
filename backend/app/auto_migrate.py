@@ -164,15 +164,21 @@ def _ensure_default_lodge(engine):
         try:
             conn.execute(text(
                 "INSERT INTO lodges (lodge_id, code, name, is_active, is_published) "
-                "VALUES (1, 'rusto', :n, 1, 0)"
+                "VALUES (1, 'rusto', :n, true, false)"
             ), {"n": display_name})
         except Exception:
             # Fall back to a column-discovery + dynamic INSERT for safety
             # if some future column also lacks a SQL-level default.
-            cols = conn.execute(text("PRAGMA table_info(lodges)")).fetchall()
-            col_names = [c[1] for c in cols]
+            if engine.url.get_backend_name() == "sqlite":
+                cols = conn.execute(text("PRAGMA table_info(lodges)")).fetchall()
+                col_names = [c[1] for c in cols]
+            else:
+                cols = conn.execute(text(
+                    "SELECT column_name FROM information_schema.columns WHERE table_name = 'lodges'"
+                )).fetchall()
+                col_names = [c[0] for c in cols]
             values = {"lodge_id": 1, "code": "rusto", "name": display_name,
-                       "is_active": 1, "is_published": 0}
+                       "is_active": True, "is_published": False}
             insert_cols = [c for c in col_names if c in values]
             placeholders = ", ".join(f":{c}" for c in insert_cols)
             conn.execute(text(
@@ -206,13 +212,19 @@ def _seed_rk_lodge(engine):
         try:
             conn.execute(text(
                 "INSERT INTO lodges (code, name, is_active, is_published) "
-                "VALUES ('rk', 'RK Lodge', 1, 0)"
+                "VALUES ('rk', 'RK Lodge', true, false)"
             ))
         except Exception:
-            cols = conn.execute(text("PRAGMA table_info(lodges)")).fetchall()
-            col_names = [c[1] for c in cols]
+            if engine.url.get_backend_name() == "sqlite":
+                cols = conn.execute(text("PRAGMA table_info(lodges)")).fetchall()
+                col_names = [c[1] for c in cols]
+            else:
+                cols = conn.execute(text(
+                    "SELECT column_name FROM information_schema.columns WHERE table_name = 'lodges'"
+                )).fetchall()
+                col_names = [c[0] for c in cols]
             values = {"code": "rk", "name": "RK Lodge",
-                       "is_active": 1, "is_published": 0}
+                       "is_active": True, "is_published": False}
             insert_cols = [c for c in col_names if c in values]
             placeholders = ", ".join(f":{c}" for c in insert_cols)
             conn.execute(text(

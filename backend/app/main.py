@@ -79,15 +79,38 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting Rusto...")
-    Base.metadata.create_all(bind=engine)
-    # Add any columns introduced by a new release to pre-existing tables.
-    # Safe (additive-only) and idempotent — see app/auto_migrate.py.
+    
+    from sqlalchemy import text
+    is_postgres = "postgresql" in engine.url.drivername
+    lock_conn = None
+    if is_postgres:
+        try:
+            lock_conn = engine.connect()
+            # Session-level advisory lock using a custom key (123456)
+            lock_conn.execute(text("SELECT pg_advisory_lock(123456)"))
+            logger.info("Acquired Postgres startup advisory lock.")
+        except Exception as e:
+            logger.warning("Failed to acquire Postgres advisory lock: %s", e)
+
     try:
-        from .auto_migrate import run_additive_migrations
-        run_additive_migrations(engine)
-    except Exception as e:
-        logger.error("Auto-migration failed: %s", e)
-    seed_initial_data()
+        Base.metadata.create_all(bind=engine)
+        # Add any columns introduced by a new release to pre-existing tables.
+        # Safe (additive-only) and idempotent — see app/auto_migrate.py.
+        try:
+            from .auto_migrate import run_additive_migrations
+            run_additive_migrations(engine)
+        except Exception as e:
+            logger.error("Auto-migration failed: %s", e)
+        seed_initial_data()
+    finally:
+        if lock_conn:
+            try:
+                lock_conn.execute(text("SELECT pg_advisory_unlock(123456)"))
+                lock_conn.close()
+                logger.info("Released Postgres startup advisory lock.")
+            except Exception as e:
+                logger.warning("Failed to release Postgres advisory lock: %s", e)
+
     # v2.6 — seed default email templates for every lodge (idempotent).
     try:
         from .database import SessionLocal
@@ -142,7 +165,7 @@ def seed_initial_data():
                 {"room_number": "301", "floor": 3, "room_type": "house", "has_ac": True, "base_tariff": 2500, "max_occupancy": 6, "amenities": '["TV","WiFi","AC","Geyser","Kitchen","Living Room","Balcony"]'},
             ]
             for r in rooms_data:
-                db.add(Room(**r, status=RoomStatus.available))
+                db.add(Room(**r, lodge_id=1, status=RoomStatus.available))
             logger.info(f"Seeded {len(rooms_data)} rooms")
 
         if db.query(Setting).count() == 0:
@@ -203,13 +226,14 @@ def seed_initial_data():
                  "Master toggle for the AI agent", False),
             ]
             for key, val, group, desc, sensitive in settings_data:
-                db.add(Setting(setting_key=key, setting_value=val,
+                db.add(Setting(lodge_id=1, setting_key=key, setting_value=val,
                                setting_group=group, description=desc, is_sensitive=sensitive))
             logger.info(f"Seeded {len(settings_data)} settings")
 
         if db.query(User).count() == 0:
             admin_pass = os.getenv("DEFAULT_ADMIN_PASSWORD", "Admin@1234")
             admin = User(
+                lodge_id=1,
                 username="admin",
                 password_hash=get_password_hash(admin_pass),
                 full_name="System Administrator",
