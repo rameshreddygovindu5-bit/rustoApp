@@ -1,0 +1,30 @@
+# Expo
+.expo/
+.expo-shared/
+dist/
+web-build/
+
+# Native build artifacts (after `expo prebuild`)
+ios/
+android/
+
+# Dependencies
+node_modules/
+
+# Local env
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*

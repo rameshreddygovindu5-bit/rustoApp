@@ -1,0 +1,34 @@
+# Local secrets and DBs - NEVER ship into the image
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+udumulas_lms.db
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Logs and runtime artifacts
+logs/
+backups/
+*.log
+
+# Local uploads (use a docker volume in production)
+uploads/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

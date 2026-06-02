@@ -1,0 +1,179 @@
+name: Deploy to EC2
+
+on:
+  push:
+    # Trigger on either branch name in case the default differs across forks
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & deploy to EC2
+    runs-on: ubuntu-latest
+
+    env:
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_USER: ${{ secrets.EC2_USER }}
+      APP_DIR: /opt/lodge-lms
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${EC2_HOST}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      # ─── Sync code to EC2 ────────────────────────────────────────────
+      - name: Fix permissions on EC2
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              "${EC2_USER}@${EC2_HOST}" \
+              "sudo mkdir -p ${APP_DIR} && sudo chown -R ${EC2_USER}:${EC2_USER} ${APP_DIR}"
+
+      - name: Sync code to EC2
+        run: |
+          # Exclude noise; keep .env.production (server-side only) safe
+          rsync -avz --delete \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='__pycache__/' \
+            --exclude='*.pyc' \
+            --exclude='backend/uploads/' \
+            --exclude='backend/logs/' \
+            --exclude='backend/backups/' \
+            --exclude='.env' \
+            --exclude='.env.local' \
+            --exclude='.env.production' \
+            --exclude='*.db' \
+            --exclude='*.sqlite' \
+            --exclude='*.pem' \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            ./ "${EC2_USER}@${EC2_HOST}:${APP_DIR}/"
+
+      - name: Ensure runtime directories exist on EC2
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              "${EC2_USER}@${EC2_HOST}" \
+              "mkdir -p ${APP_DIR}/nginx/conf.d ${APP_DIR}/nginx/certs"
+
+      # ─── Bring up the new stack ─────────────────────────────────────
+      - name: Restart application on EC2
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              "${EC2_USER}@${EC2_HOST}" "
+            set -e
+            cd ${APP_DIR}
+
+            # Sanity-check the production env file BEFORE touching anything
+            if [ ! -f .env.production ]; then
+              echo '✗ FATAL: .env.production missing on EC2.'
+              echo '   Run ec2-bootstrap.sh once, or copy .env.production.example.'
+              exit 1
+            fi
+
+            # Stop host nginx if it is running (we use a containerized one)
+            sudo systemctl stop nginx 2>/dev/null || true
+            sudo systemctl disable nginx 2>/dev/null || true
+
+            # Take the old stack down BEFORE pruning so volumes are released
+            docker compose -f docker-compose.prod.yml --env-file .env.production down --remove-orphans || true
+
+            # Aggressive cleanup — extracting the new backend image needs
+            # several GB of free space; -af removes *all* unused images
+            # (not just dangling) and the full buildkit cache. Named
+            # volumes (lms_pgdata, etc.) are NOT touched by default.
+            echo '--- Disk before prune ---'
+            df -h /
+            docker system prune -af
+            docker builder prune -af
+            # Clean apt caches and truncate system logs to maximize host space
+            sudo apt-get clean
+            sudo journalctl --vacuum-size=50M || true
+            echo '--- Disk after prune ---'
+            df -h /
+
+            # Refuse to build if there isn't enough headroom to *extract*
+            # the resulting backend image. ~1.2 GB for the new image plus
+            # buildkit scratch space, so require 2.0 GB free as a sane
+            # minimum. Failing here is way better than dying after a 100s
+            # pip install with 'no space left on device'.
+            FREE_KB=\$(df -P / | awk 'NR==2{print \$4}')
+            FREE_MB=\$((FREE_KB / 1024))
+            echo \"Free space on /: \${FREE_MB} MB\"
+            if [ \"\$FREE_MB\" -lt 2000 ]; then
+              echo \"✗ Only \${FREE_MB} MB free on /. Need at least 2000 MB to safely build + extract the backend image.\"
+              echo \"   Grow the EBS root volume to 30 GB and run:  sudo growpart /dev/xvda 1 && sudo resize2fs /dev/xvda1\"
+              exit 1
+            fi
+
+            # Build & start
+            set -a; . ./.env.production; set +a
+            docker compose -f docker-compose.prod.yml --env-file .env.production build --pull
+            docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+
+            # Wait for DB then run idempotent migrations
+            echo 'Waiting 15s for DB to be ready...'
+            sleep 15
+            echo '--- Running DB migrations ---'
+            docker compose -f docker-compose.prod.yml exec -T db \
+              psql -U lms -d lodge_lms -f /migrate.sql || echo 'Migration note: non-fatal'
+
+            echo '--- Container status ---'
+            docker compose -f docker-compose.prod.yml --env-file .env.production ps
+          "
+
+      # ─── Health check ────────────────────────────────────────────────
+      - name: Wait for backend to become healthy (internal)
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              "${EC2_USER}@${EC2_HOST}" "
+            cd ${APP_DIR}
+            for i in \$(seq 1 18); do
+              status=\$(docker inspect --format='{{.State.Health.Status}}' lodge_lms_backend 2>/dev/null || echo 'unknown')
+              if [ \"\$status\" = 'healthy' ]; then
+                echo \"✓ Backend healthy after \$((i*5))s\"
+                exit 0
+              fi
+              echo \"attempt \$i/18: backend status = \$status, waiting 5s ...\"
+              sleep 5
+            done
+            echo '✗ Backend never reported healthy.'
+            echo '--- Backend logs ---'
+            docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 backend || true
+            echo '--- DB logs ---'
+            docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=80 db || true
+            exit 1
+          "
+
+      - name: External health check
+        run: |
+          echo "Probing http://${EC2_HOST}/api/health ..."
+          for i in $(seq 1 15); do
+            if curl -fsS --max-time 5 "http://${EC2_HOST}/api/health" > /tmp/health.json; then
+              echo '--- /api/health response ---'
+              cat /tmp/health.json
+              echo
+              echo "✓ Deployed successfully"
+              exit 0
+            fi
+            echo "attempt $i/15: not ready yet, waiting 6s ..."
+            sleep 6
+          done
+          echo "✗ External health check failed after 90s."
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              "${EC2_USER}@${EC2_HOST}" "
+            cd ${APP_DIR}
+            echo '--- nginx logs ---'
+            docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=80 nginx || true
+            echo '--- backend logs ---'
+            docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 backend || true
+          "
+          exit 1

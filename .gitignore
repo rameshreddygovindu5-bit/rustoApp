@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+
+# Env / secrets
+.env
+.env.local
+.env.production
+*.pem
+*.key
+ec2_key
+
+# DB / runtime
+*.db
+*.sqlite
+*.db-shm
+*.db-wal
+backend/uploads/
+backend/logs/
+backend/backups/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+.zencoder/

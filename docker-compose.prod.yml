@@ -1,0 +1,138 @@
+# ════════════════════════════════════════════════════════════════════
+# Production docker-compose for EC2.
+# Reads env from .env.production (DATABASE_URL, JWT_SECRET_KEY, etc.)
+# Run automatically by the GitHub Actions workflow on every push to main.
+#
+# Manual run:
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+# ════════════════════════════════════════════════════════════════════
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: udumulas_lms_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env.production}
+      POSTGRES_DB: ${POSTGRES_DB:-udumulas_lms}
+    volumes:
+      - lms_pgdata:/var/lib/postgresql/data
+      # init.sql runs once when the data dir is empty; safe to re-deploy
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # Migration script — run via psql on every deploy
+      - ./migrate.sql:/migrate.sql:ro
+    expose:
+      - "5432"
+    ports:
+      # Expose securely; ensure your AWS EC2 Security Group restricts Port 5432 to your local IP
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lms} -d ${POSTGRES_DB:-udumulas_lms}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: udumulas_lms_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Database — must be a real Postgres URL inside the docker network
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-lms}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-udumulas_lms}}
+      # Auth
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set in .env.production}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_HOURS: "8"
+      # CORS / first-boot admin
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:80}
+      DEFAULT_ADMIN_USERNAME: ${DEFAULT_ADMIN_USERNAME:-admin}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-Admin@1234}
+      # Optional AI agent keys
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AGENT_PROVIDER: ${AGENT_PROVIDER:-auto}
+      # Misc
+      TZ: ${TZ:-Asia/Kolkata}
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - lms_uploads:/app/uploads
+      - lms_logs:/app/logs
+      - lms_backups:/app/backups
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    container_name: udumulas_lms_frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "--tries=1", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    image: nginx:alpine
+    container_name: udumulas_lms_nginx
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certs:/etc/letsencrypt:ro
+      - lms_uploads:/var/www/uploads:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  lms_pgdata:
+  lms_uploads:
+  lms_logs:
+  lms_backups:

@@ -1,0 +1,2530 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ════════════════════════════════════════════════════════════════════
+   BASE — typography, focus rings, page chrome.
+   ──────────────────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    font-family: var(--font-stack);
+    background-color: #F9FAFB;
+    color: #111827;
+    font-size: var(--font-body);
+    line-height: 1.5;
+    /* Tabular numerals make financial UIs look professional. */
+    font-variant-numeric: tabular-nums;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-stack);
+    color: #111827;
+  }
+  h1, .text-h1 {
+    font-size: var(--font-h1);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+  }
+  h2, .text-h2 {
+    font-size: var(--font-h2);
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.25;
+  }
+  h3, .text-h3 {
+    font-size: var(--font-h3);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.3;
+  }
+  h4, .text-h4 {
+    font-size: var(--font-h4);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.4;
+  }
+  /* Gold focus ring — replaces browser default. Consistent across every
+     input + button. Respects users who tab around with the keyboard. */
+  *:focus-visible {
+    outline: 2px solid #C9A84C;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Respect reduced motion preferences — disable our richer animations
+     for users with vestibular disorders. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   COMPONENTS — semantic classes ("btn-primary" not "px-4 py-2.5 bg…").
+   Using @apply keeps Tailwind in charge but gives us a vocabulary the
+   rest of the codebase can re-use without long class strings.
+   ──────────────────────────────────────────────────────────────────── */
+@layer components {
+
+  /* ── Buttons ───────────────────────────────────────────────────── */
+  .btn-primary {
+    @apply relative bg-navy text-white px-5 py-2.5 rounded-xl font-semibold text-sm
+           shadow-soft transition-all duration-200
+           hover:bg-navy-light hover:shadow-lifted hover:-translate-y-0.5
+           active:bg-navy-dark active:translate-y-0 active:shadow-soft
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none;
+  }
+  /* The gold CTA — used only for THE primary action (max one per surface).
+     Hover triggers a sheen sweep across the button. */
+  .btn-gold {
+    @apply relative overflow-hidden bg-gradient-to-br from-gold to-gold-dark text-white
+           px-5 py-2.5 rounded-xl font-semibold text-sm shadow-soft
+           transition-all duration-200
+           hover:shadow-gold-glow hover:-translate-y-0.5
+           active:translate-y-0
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none;
+  }
+  .btn-gold::after {
+    content: '';
+    @apply absolute inset-0 opacity-0 pointer-events-none
+           bg-gradient-to-r from-transparent via-white/30 to-transparent
+           bg-shimmer transition-opacity duration-300;
+    background-size: 200% 100%;
+  }
+  .btn-gold:hover::after {
+    @apply opacity-100;
+    animation: sheen 1.2s ease-out;
+  }
+  .btn-outline {
+    @apply border-2 border-navy text-navy bg-white px-5 py-2 rounded-xl
+           font-semibold text-sm transition-all duration-200
+           hover:bg-navy hover:text-white hover:shadow-soft
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply text-ink-600 px-4 py-2 rounded-xl font-medium text-sm
+           transition-all duration-150
+           hover:bg-ink-100 hover:text-navy
+           active:bg-ink-200;
+  }
+  .btn-danger {
+    @apply bg-red-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm
+           shadow-soft transition-all duration-200
+           hover:bg-red-700 hover:shadow-lifted hover:-translate-y-0.5
+           active:translate-y-0
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-icon {
+    @apply p-2 rounded-lg text-ink-500 transition-colors duration-150
+           hover:bg-ink-100 hover:text-navy
+           active:bg-ink-200;
+  }
+
+  /* ── Surfaces ──────────────────────────────────────────────────── */
+  .card {
+    @apply bg-white rounded-2xl shadow-card border border-ink-100 p-6
+           transition-all duration-200;
+  }
+  /* Interactive cards lift slightly on hover — invites clicking. */
+  .card-interactive {
+    @apply card cursor-pointer hover:shadow-lifted hover:-translate-y-0.5
+           hover:border-gold/30;
+  }
+  /* Premium card with gold edge halo on hover. */
+  .card-lux {
+    @apply relative bg-white rounded-2xl shadow-card border border-ink-100 p-6
+           transition-all duration-300 overflow-hidden;
+  }
+  .card-lux::before {
+    content: '';
+    @apply absolute -inset-px rounded-2xl opacity-0 pointer-events-none
+           transition-opacity duration-300;
+    background: linear-gradient(135deg, rgba(201,168,76,0.4), rgba(201,168,76,0));
+  }
+  .card-lux:hover::before { @apply opacity-100; }
+  .card-lux:hover { @apply shadow-lux -translate-y-0.5; }
+
+  /* ── Inputs ────────────────────────────────────────────────────── */
+  .input-field {
+    @apply w-full bg-white border-2 border-ink-200 rounded-xl px-3.5 py-2.5 text-sm
+           text-navy placeholder-ink-400
+           transition-all duration-150
+           focus:outline-none focus:border-gold focus:ring-4 focus:ring-gold/10
+           hover:border-ink-300
+           disabled:bg-ink-50 disabled:cursor-not-allowed;
+  }
+  .input-error {
+    @apply border-red-400 focus:border-red-500 focus:ring-red-500/10;
+  }
+  .label {
+    @apply block text-2xs font-bold uppercase tracking-eyebrow text-ink-600 mb-1.5;
+  }
+
+  /* Glassify inputs in back-office PMS layout to prevent bright white boxes */
+  .pms-layout .input-field,
+  .pms-layout select.input-field,
+  .pms-layout textarea.input-field,
+  .pms-layout input[type="tel"],
+  .pms-layout input[type="text"],
+  .pms-layout input[type="number"],
+  .pms-layout input[type="date"],
+  .pms-layout textarea,
+  .pms-layout select {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: #FFFFFF !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+  .pms-layout .input-field::placeholder,
+  .pms-layout input::placeholder,
+  .pms-layout textarea::placeholder {
+    color: rgba(255, 255, 255, 0.4) !important;
+  }
+  .pms-layout .input-field:focus,
+  .pms-layout select:focus,
+  .pms-layout textarea:focus,
+  .pms-layout input:focus {
+    border-color: var(--brand-copper, #D69A80) !important;
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 0 0 4px rgba(214, 154, 128, 0.15) !important;
+  }
+  .pms-layout option {
+    background-color: #0B252C !important;
+    color: #FFFFFF !important;
+  }
+
+  /* Glassify Tape Chart elements in back-office PMS layout */
+  .pms-layout .overflow-auto.bg-white {
+    background-color: rgba(255, 255, 255, 0.02) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+  }
+  .pms-layout table th.bg-ink-50 {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    color: #FFFFFF !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+  }
+  .pms-layout table td.bg-white {
+    background-color: #0c111d !important; /* Obsidian base card background */
+    color: #FFFFFF !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+  }
+  .pms-layout table th {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+  }
+  .pms-layout table td {
+    border-color: rgba(255, 255, 255, 0.04) !important;
+  }
+  .pms-layout button.bg-white {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    color: rgba(255, 255, 255, 0.4) !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+  }
+  .pms-layout button.bg-white:hover {
+    border-color: var(--brand-copper, #D69A80) !important;
+    background-color: rgba(255, 255, 255, 0.06) !important;
+  }
+  .pms-layout button.bg-blue-100\/80 {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    color: #93C5FD !important;
+    border-color: rgba(59, 130, 246, 0.3) !important;
+  }
+  .pms-layout button.bg-emerald-100\/80 {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    color: #34D399 !important;
+    border-color: rgba(16, 185, 129, 0.3) !important;
+  }
+  .pms-layout button.bg-red-100\/80 {
+    background-color: rgba(239, 68, 68, 0.15) !important;
+    color: #F87171 !important;
+    border-color: rgba(239, 68, 68, 0.3) !important;
+  }
+  .pms-layout span.bg-white {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+  .pms-layout span.bg-blue-100\/80 {
+    background-color: rgba(59, 130, 246, 0.2) !important;
+    border-color: rgba(59, 130, 246, 0.4) !important;
+  }
+  .pms-layout span.bg-emerald-100\/80 {
+    background-color: rgba(16, 185, 129, 0.2) !important;
+    border-color: rgba(16, 185, 129, 0.4) !important;
+  }
+  .pms-layout span.bg-red-100\/80 {
+    background-color: rgba(239, 68, 68, 0.2) !important;
+    border-color: rgba(239, 68, 68, 0.4) !important;
+  }
+
+  /* ── Badges (status pills, semantic colors) ───────────────────── */
+  .badge {
+    @apply inline-flex items-center gap-1 text-2xs font-bold uppercase tracking-eyebrow
+           px-2 py-1 rounded-md;
+  }
+  .badge-available    { @apply badge bg-green-50  text-green-700  ring-1 ring-inset ring-green-200; }
+  .badge-occupied     { @apply badge bg-red-50    text-red-700    ring-1 ring-inset ring-red-200; }
+  .badge-maintenance  { @apply badge bg-ink-100   text-ink-600    ring-1 ring-inset ring-ink-200; }
+  .badge-checkout_due { @apply badge bg-amber-50  text-amber-700  ring-1 ring-inset ring-amber-200; }
+  .badge-blocked      { @apply badge bg-red-50    text-red-700    ring-1 ring-inset ring-red-200; }
+  .badge-gold         { @apply badge bg-gold-50   text-gold-700   ring-1 ring-inset ring-gold/30; }
+  .badge-navy         { @apply badge bg-navy/5    text-navy       ring-1 ring-inset ring-navy/20; }
+  .badge-info         { @apply badge bg-blue-50   text-blue-700   ring-1 ring-inset ring-blue-200; }
+
+  /* Live-status badge — pulses softly to indicate "now". */
+  .badge-live {
+    @apply badge bg-green-50 text-green-700 ring-1 ring-inset ring-green-200;
+  }
+  .badge-live::before {
+    content: '';
+    @apply w-1.5 h-1.5 rounded-full bg-green-500 mr-0.5;
+    animation: pulseSoft 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* ── KPI cards (dashboard) ────────────────────────────────────── */
+  .kpi-card {
+    @apply relative bg-white rounded-2xl shadow-card border border-ink-100 p-5
+           transition-all duration-200 overflow-hidden
+           hover:shadow-lifted hover:-translate-y-0.5;
+  }
+  .kpi-card-clickable {
+    @apply kpi-card cursor-pointer hover:border-gold/30;
+  }
+  /* Gold rail on the left — brightens on hover. */
+  .kpi-rail {
+    @apply absolute top-0 left-0 w-1 h-full bg-ink-200 transition-colors;
+  }
+  .kpi-card:hover .kpi-rail { @apply bg-gold; }
+  .kpi-rail-accent { @apply absolute top-0 left-0 w-1 h-full bg-gold; }
+  .kpi-rail-warn   { @apply absolute top-0 left-0 w-1 h-full bg-red-400; }
+
+  /* ── Semantic helpers ─────────────────────────────────────────── */
+  .eyebrow {
+    @apply text-2xs uppercase tracking-eyebrow font-bold text-ink-500;
+  }
+  /* Gold-on-navy headline — used in the hero. */
+  .display-hero {
+    @apply font-display font-bold text-white tracking-tight;
+  }
+
+  /* ── Skeleton loader — animated shimmer bar ───────────────────── */
+  .skeleton {
+    @apply bg-ink-100 rounded-md relative overflow-hidden;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 bg-shimmer bg-shimmer;
+    animation: shimmerBar 1.8s ease-in-out infinite;
+  }
+
+  /* ── Hero panel — used on Dashboard, Login, page headers ──────── */
+  .hero-panel {
+    @apply relative overflow-hidden bg-hero rounded-3xl shadow-lux text-white;
+  }
+  /* Decorative atmospheric layers that any hero can opt into. */
+  .hero-orb {
+    @apply absolute rounded-full bg-gold/15 blur-3xl pointer-events-none;
+    animation: float 8s ease-in-out infinite;
+  }
+  .hero-orb-slow {
+    @apply absolute rounded-full bg-gold/10 blur-3xl pointer-events-none;
+    animation: float 12s ease-in-out infinite;
+  }
+  .hero-dotgrid {
+    @apply absolute inset-0 opacity-20 pointer-events-none bg-dot-grid bg-dot-grid;
+  }
+
+  /* ── Gold sparkle on success (used on toasts / confirmations) ── */
+  .gold-spark {
+    @apply inline-block text-gold;
+    animation: spark 0.8s ease-out both;
+  }
+
+  /* ── Lantern glow — for tape-chart "live" cells ───────────────── */
+  .lantern-glow {
+    animation: lantern 3s ease-in-out infinite;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   SCROLLBARS
+   ──────────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #D0D5DD;
+  border-radius: 10px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #C9A84C;
+  background-clip: padding-box;
+  border: 3px solid transparent;
+}
+
+/* Dark scrollbar inside the navy sidebar. */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border: none;
+  border-radius: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(201,168,76,0.50);
+}
+
+/* Hide the scrollbar entirely for snappy horizontal scrollers. */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ════════════════════════════════════════════════════════════════════
+   TOASTS (react-toastify overrides)
+   ──────────────────────────────────────────────────────────────────── */
+.Toastify__toast {
+  border-radius: 14px !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-weight: 500;
+  box-shadow: 0 12px 32px -8px rgba(16, 24, 40, 0.18) !important;
+  padding: 14px 18px !important;
+}
+.Toastify__toast--success {
+  background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%) !important;
+  color: #064E3B !important;
+  border-left: 4px solid #10B981;
+}
+.Toastify__toast--error {
+  background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%) !important;
+  color: #7F1D1D !important;
+  border-left: 4px solid #EF4444;
+}
+.Toastify__toast--warning {
+  background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%) !important;
+  color: #78350F !important;
+  border-left: 4px solid #F59E0B;
+}
+.Toastify__toast--info {
+  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%) !important;
+  color: #1E3A8A !important;
+  border-left: 4px solid #3B82F6;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   TABLES — financial UI staple. Borders, hover state, sticky header.
+   ──────────────────────────────────────────────────────────────────── */
+.data-table { @apply w-full text-sm; }
+.data-table th {
+  @apply bg-ink-50 text-ink-600 text-left px-4 py-3 text-2xs font-bold
+         uppercase tracking-eyebrow border-b border-ink-200;
+}
+.data-table td { @apply px-4 py-3 border-b border-ink-100 transition-colors; }
+.data-table tr { @apply transition-colors duration-150; }
+.data-table tr:hover td { @apply bg-gold/5; }
+
+.table-responsive {
+  @apply overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MODALS — animated backdrop + box.
+   ──────────────────────────────────────────────────────────────────── */
+.modal-backdrop {
+  @apply fixed inset-0 bg-navy-dark/70 backdrop-blur-md z-50
+         flex items-center justify-center p-4;
+  animation: fadeIn 0.2s ease-out both;
+}
+.modal-box {
+  @apply bg-white rounded-2xl shadow-lux w-full max-w-2xl max-h-[90vh] overflow-y-auto;
+  animation: slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   UNIVERSAL MODAL viewport HEIGHT GUARDRAILS
+   Prevents any backdrop-anchored card overlay from clipping or overflowing.
+   ──────────────────────────────────────────────────────────────────── */
+div[class*="fixed inset-0"][class*="flex"][class*="justify-center"] > div,
+div[class*="fixed inset-0"][class*="flex"][class*="items-center"] > div,
+.modal-backdrop > div,
+.modal-box {
+  max-height: 82vh !important;
+  max-height: 82dvh !important;
+  min-height: 0 !important; /* Fix flexbox min-height shrink bug */
+  overflow-y: auto !important;
+  box-sizing: border-box;
+  margin: auto !important; /* Centering helper safe for all viewports */
+}
+
+/* Make sure that forms directly inside constrained modals behave nicely */
+div[class*="fixed inset-0"][class*="flex"][class*="justify-center"] > div > form,
+div[class*="fixed inset-0"][class*="flex"][class*="items-center"] > div > form,
+.modal-backdrop > div > form {
+  max-height: 100% !important;
+  overflow-y: auto;
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   ROOM CARDS — color-coded by status, subtle hover lift.
+   ──────────────────────────────────────────────────────────────────── */
+.room-card {
+  @apply relative bg-white rounded-2xl border cursor-pointer p-4 overflow-hidden
+         transition-all duration-200
+         hover:shadow-lifted hover:-translate-y-1;
+}
+.room-card::before {
+  content: '';
+  @apply absolute inset-0 opacity-0 pointer-events-none
+         bg-gradient-to-br from-transparent via-transparent to-gold/10
+         transition-opacity duration-300;
+}
+.room-card:hover::before { @apply opacity-100; }
+.room-available    { @apply border-green-200 hover:border-green-400; }
+.room-occupied     { @apply border-red-200    hover:border-red-400; }
+.room-checkout_due { @apply border-amber-300  hover:border-amber-500; }
+.room-maintenance  { @apply border-ink-200    cursor-not-allowed opacity-60; }
+
+/* When a room flips to occupied (right after a checkin), play a door-swing. */
+.room-just-occupied { animation: doorSwing 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* ════════════════════════════════════════════════════════════════════
+   AGENT PANEL — slides in from the right.
+   ──────────────────────────────────────────────────────────────────── */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0.4; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.animate-slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ════════════════════════════════════════════════════════════════════
+   STAGGERED ENTRANCES — for KPI grids, room lists, etc.
+   Apply via inline style="animation-delay:Xms" or use these helpers.
+   ──────────────────────────────────────────────────────────────────── */
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+.stagger-6 { animation-delay: 300ms; }
+.stagger-7 { animation-delay: 350ms; }
+.stagger-8 { animation-delay: 400ms; }
+
+/* ════════════════════════════════════════════════════════════════════
+   GOLD-TEXT GRADIENT — used on hero headlines and big-money KPIs.
+   ──────────────────────────────────────────────────────────────────── */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #E2C470 0%, #C9A84C 50%, #A8873C 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+/* Drifting variant — gold catches "light" across the text. */
+.text-gold-drift {
+  background: linear-gradient(90deg, #A8873C 0%, #E2C470 25%, #FDFAF1 50%, #E2C470 75%, #A8873C 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: goldDrift 6s linear infinite;
+}
+
+/* Drifting variant — copper rose-gold catches "light" across the text with subtle neon atmospheric glow */
+.text-copper-glow {
+  background: linear-gradient(90deg, #D69A80 0%, #F3B39E 25%, #FFEBE3 50%, #F3B39E 75%, #D69A80 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: goldDrift 6s linear infinite;
+  filter: drop-shadow(0 2px 8px rgba(214, 154, 128, 0.2)) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   GLASS PANEL — frosted overlay used on hero stats.
+   ──────────────────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.glass-dark {
+  background: rgba(15, 27, 51, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   CUSTOMER PAGES — premium hospitality components.
+   These classes are used across the Rusto consumer-facing site:
+   RustoHome, RustoSearch, RustoLodgeDetail, RustoCheckout, RustoAccount.
+   ──────────────────────────────────────────────────────────────────── */
+
+/* ── Glassy nav (scroll-aware) ──────────────────────────────────── */
+.rusto-nav {
+  background: rgba(32, 58, 67, 0.45) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+.rusto-nav-scrolled {
+  background: rgba(32, 58, 67, 0.75) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.16) !important;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* ── Hero composition ───────────────────────────────────────────── */
+.hero-cinema {
+  position: relative;
+  overflow: hidden;
+  background: transparent !important; /* Fully transparent to showcase the immersive misty forest background! */
+}
+.hero-cinema::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: 0 0, 16px 16px;
+  opacity: 0.5;
+  pointer-events: none;
+}
+.hero-cinema::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 70%, #F9FAFB 100%);
+  pointer-events: none;
+}
+
+/* Stars / sparkle layer for hero — pure CSS, no asset */
+.hero-stars {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(2px 2px at 12% 18%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 65% 35%, rgba(201, 168, 76, 0.6), transparent),
+    radial-gradient(1px 1px at 25% 70%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(2px 2px at 85% 80%, rgba(201, 168, 76, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 90% 15%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 45% 90%, rgba(201, 168, 76, 0.5), transparent);
+  background-size: 500px 500px;
+  animation: twinkle 12s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+
+.search-panel {
+  background: rgba(15, 27, 40, 0.45) !important;
+  border-radius: 24px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35) !important;
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+.search-panel:hover {
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 12px 40px 0 rgba(233, 177, 81, 0.08), 0 8px 32px 0 rgba(0, 0, 0, 0.35) !important;
+  transform: translateY(-2px) !important;
+}
+.search-field {
+  position: relative;
+  padding: 14px 16px;
+  transition: background 0.2s;
+  border-radius: 14px;
+}
+.search-field:hover,
+.search-field:focus-within {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+.search-field + .search-field {
+  border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+@media (max-width: 768px) {
+  .search-field + .search-field {
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+}
+
+/* ── Premium lodge cards (search results, featured) ────────────── */
+.lodge-card-lux {
+  position: relative;
+  background: rgba(15, 27, 40, 0.45) !important;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35) !important;
+  transition: all 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  isolation: isolate;
+}
+.lodge-card-lux:hover {
+  transform: translateY(-6px);
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 12px 40px 0 rgba(233, 177, 81, 0.10), 0 8px 32px 0 rgba(0, 0, 0, 0.35) !important;
+}
+.lodge-card-lux .lodge-card-img {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4/3;
+  background: linear-gradient(135deg, #1B2A4A 0%, #243557 100%);
+}
+.lodge-card-lux .lodge-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lodge-card-lux:hover .lodge-card-img img {
+  transform: scale(1.08);
+}
+.lodge-card-lux .lodge-card-img::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 50%, rgba(15, 27, 51, 0.55) 100%);
+  pointer-events: none;
+}
+.lodge-card-lux .lodge-card-price {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 14px;
+  color: #1B2A4A;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.15);
+}
+.lodge-card-lux .lodge-card-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: linear-gradient(135deg, #E2C470 0%, #C9A84C 100%);
+  color: #1B2A4A;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  box-shadow: 0 4px 12px -2px rgba(201, 168, 76, 0.5);
+}
+
+/* ── Destination tiles (homepage cities) ───────────────────────── */
+.destination-tile {
+  position: relative;
+  aspect-ratio: 4/5;
+  border-radius: 24px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1A2A2E, #0d1618);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  isolation: isolate;
+}
+.destination-tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 30% 20%, rgba(255, 179, 71, 0.25), transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(26, 42, 46, 0.6), transparent 50%);
+  transition: all 0.6s ease-out;
+  z-index: 1;
+}
+.destination-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 30%, rgba(26, 42, 46, 0.9) 100%);
+  z-index: 2;
+}
+.destination-tile:hover {
+  transform: translateY(-4px) scale(1.02);
+  border-color: rgba(255, 179, 71, 0.2) !important;
+  box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.5), 0 0 12px rgba(255, 179, 71, 0.1);
+}
+.destination-tile:hover::before {
+  transform: scale(1.15) rotate(10deg);
+}
+.destination-tile-content {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  color: white;
+}
+
+/* ── Trust strip with animated underline ─────────────────────── */
+.trust-marker {
+  position: relative;
+  padding-bottom: 4px;
+  cursor: default;
+}
+.trust-marker::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #C9A84C, transparent);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.trust-marker:hover::after {
+  transform: scaleX(1);
+}
+
+/* ── Filter pills (search results) ─────────────────────────────── */
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1.5px solid #E5E8EE;
+  background: white;
+  color: #475467;
+  cursor: pointer;
+  transition: all 0.18s ease-out;
+}
+.filter-pill:hover {
+  border-color: #C9A84C;
+  color: #1B2A4A;
+}
+.filter-pill-active {
+  background: #1B2A4A;
+  border-color: #1B2A4A;
+  color: white;
+}
+.filter-pill-active:hover {
+  background: #0F1B33;
+  border-color: #0F1B33;
+  color: white;
+}
+
+/* ── Booking sidebar (lodge detail) — sticky + lifted ──────────── */
+.booking-sidebar {
+  position: sticky;
+  top: 96px;
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 8px 32px -8px rgba(15, 27, 51, 0.15),
+              0 0 0 1px rgba(229, 232, 238, 0.6);
+  transition: box-shadow 0.3s;
+}
+.booking-sidebar:hover {
+  box-shadow: 0 12px 40px -8px rgba(15, 27, 51, 0.2),
+              0 0 0 1px rgba(201, 168, 76, 0.2);
+}
+
+/* ── Gallery thumbs ─────────────────────────────────────────────── */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 8px;
+  height: 480px;
+  border-radius: 24px;
+  overflow: hidden;
+}
+.gallery-grid > :first-child {
+  grid-row: span 2;
+}
+.gallery-tile {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #243557, #1B2A4A);
+  cursor: pointer;
+  transition: opacity 0.25s;
+}
+.gallery-tile:hover { opacity: 0.92; }
+.gallery-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.gallery-tile:hover img { transform: scale(1.05); }
+@media (max-width: 768px) {
+  .gallery-grid {
+    height: 280px;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+  }
+  .gallery-grid > :first-child { grid-row: span 1; }
+  .gallery-grid > :nth-child(n+4) { display: none; }
+}
+
+/* ── Animated stat tile (homepage) ─────────────────────────────── */
+.stat-tile {
+  position: relative;
+  padding: 24px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85));
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  text-align: center;
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.stat-tile:hover { transform: translateY(-4px); }
+
+/* ── Step indicator (checkout) ─────────────────────────────────── */
+.checkout-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+.checkout-step-bubble {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  border: 2px solid #E5E8EE;
+  background: white;
+  color: #98A2B3;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.checkout-step-bubble-active {
+  border-color: #C9A84C;
+  background: linear-gradient(135deg, #E2C470, #C9A84C);
+  color: #1B2A4A;
+  box-shadow: 0 0 0 4px rgba(201, 168, 76, 0.15);
+  transform: scale(1.1);
+}
+.checkout-step-bubble-done {
+  border-color: #10B981;
+  background: #10B981;
+  color: white;
+}
+.checkout-step-connector {
+  height: 2px;
+  flex: 1;
+  background: #E5E8EE;
+  position: relative;
+  overflow: hidden;
+}
+.checkout-step-connector-active::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #C9A84C, #10B981);
+  animation: connectorFill 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes connectorFill {
+  from { transform: scaleX(0); transform-origin: left; }
+  to   { transform: scaleX(1); transform-origin: left; }
+}
+
+/* ── Booking timeline (account) ────────────────────────────────── */
+.timeline-item {
+  position: relative;
+  padding-left: 32px;
+}
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, #E5E8EE, transparent);
+}
+.timeline-item:last-child::before {
+  background: transparent;
+}
+.timeline-dot {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  border: 3px solid #C9A84C;
+  z-index: 1;
+}
+
+/* ── Scroll-triggered reveal (IntersectionObserver) ───────────── */
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal-on-scroll.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Promo banner (between sections) ───────────────────────────── */
+.promo-banner {
+  position: relative;
+  padding: 32px;
+  border-radius: 24px;
+  background:
+    radial-gradient(ellipse at top right, rgba(226, 196, 112, 0.15), transparent 50%),
+    linear-gradient(135deg, #0F1B33 0%, #1B2A4A 100%);
+  color: white;
+  overflow: hidden;
+  isolation: isolate;
+}
+.promo-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(rgba(201, 168, 76, 0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
+  z-index: -1;
+}
+
+/* ── Footer rich gradient ──────────────────────────────────────── */
+.rusto-footer {
+  background:
+    radial-gradient(ellipse at top left, rgba(201, 168, 76, 0.08) 0%, transparent 50%),
+    linear-gradient(180deg, #0A1224 0%, #0F1B33 100%);
+}
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+  /* Strip animations & shadows for clean printing. */
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    box-shadow: none !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RUSTO ADVANCED THEME — QUIET LUXURY & MISTY NATURE
+   ──────────────────────────────────────────────────────────────────── */
+:root {
+  /* Ultra-modern color palette */
+  --space-dark: #061519;
+  --space-surface: #0b252c;
+  --space-card: rgba(11, 37, 44, 0.65);
+  
+  --accent-sun: #D69A80;
+  --accent-glow: rgba(214, 154, 128, 0.15);
+  
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
+  --text-dark: #061519;
+  
+  /* System status indicators */
+  --status-ready: #10B981;
+  --status-occupied: #EF4444;
+  --status-cleaning: #3B82F6;
+  
+  /* Smooth curves */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+
+  --misty-dark: #0B252C; /* Luxury Deep Teal */
+  --amber-glow: #D69A80; /* Elegant Rose Gold / Copper */
+  --glass-white: rgba(255, 255, 255, 0.10); /* Enhanced opacity glass for high visibility */
+  --glass-border: rgba(255, 255, 255, 0.16);
+
+  /* 🎨 RUSTO Premium Dual-Tone Color System */
+  
+  /* Brand Core Accents */
+  --brand-teal-dark: #07171C;      /* Deep Ambient Base */
+  --brand-teal-light: #0B252C;     /* Misty Deep Teal */
+  --brand-copper: #D69A80;         /* Rose Gold / Coppery Glow */
+  --brand-amber: #E9B151;          /* Cozy Amber Glow */
+  
+  /* Layout Base Backgrounds */
+  --traveler-bg-start: #0B252C;
+  --traveler-bg-end: #051216;
+  --pms-bg-start: #0c1220;
+  --pms-bg-end: #030712;
+  
+  /* Component Surfaces */
+  --surface-glass-dark: rgba(15, 27, 40, 0.45);
+  --surface-panel-obsidian: #0C111D;
+  
+  /* High-Contrast Semantic UI Colors (Optimized Muted-Glow for Dark Mode) */
+  --color-success-bg: rgba(16, 185, 129, 0.12);
+  --color-success-text: #34D399;
+  --color-success-border: rgba(16, 185, 129, 0.25);
+  
+  --color-occupied-bg: rgba(239, 68, 68, 0.12);
+  --color-occupied-text: #F87171;
+  --color-occupied-border: rgba(239, 68, 68, 0.25);
+  
+  --color-checkout-bg: rgba(59, 130, 246, 0.12);
+  --color-checkout-text: #93C5FD;
+  --color-checkout-border: rgba(59, 130, 246, 0.25);
+  
+  --color-maintenance-bg: rgba(245, 158, 11, 0.12);
+  --color-maintenance-text: #FBBF24;
+  --color-maintenance-border: rgba(245, 158, 11, 0.25);
+
+  /* Mathematically Sound Fluid Typography Scales (Viewport bounds: 375px to 1440px) */
+  --font-h1: clamp(28px, 1.13rem + 2.63vw, 56px); /* Desktop: 48px-56px, Mobile: 28px-32px */
+  --font-h2: clamp(20px, 0.9rem + 1.5vw, 36px);    /* Desktop: 32px-36px, Mobile: 20px-22px */
+  --font-h3: clamp(16px, 0.74rem + 1.13vw, 28px);  /* Desktop: 24px-28px, Mobile: 16px-18px */
+  --font-h4: clamp(15px, 0.83rem + 0.47vw, 20px);  /* Desktop: 18px-20px, Mobile: 14px-16px */
+  --font-body: clamp(14px, 0.83rem + 0.19vw, 16px);/* Desktop: 14px-16px, Mobile: 14px */
+  --font-micro: clamp(11px, 0.65rem + 0.1vw, 12px); /* Desktop: 11px-12px, Mobile: 10px-12px */
+  --font-badge: clamp(10px, 0.58rem + 0.1vw, 12px); /* Mobile Action/Badge: 10px-12px */
+
+  /* Global Fluid Typography Engine CSS Variables */
+  --fs-h1: clamp(28px, 1.13rem + 2.63vw, 56px);
+  --fs-h2: clamp(20px, 0.9rem + 1.5vw, 36px);
+  --fs-h3: clamp(16px, 0.74rem + 1.13vw, 28px);
+  --fs-h4: clamp(15px, 0.83rem + 0.47vw, 20px);
+  --fs-body: clamp(14px, 0.83rem + 0.19vw, 16px);
+
+  /* System Font Stack Code */
+  --font-stack: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-display: 'Outfit', 'Plus Jakarta Sans', 'Inter', sans-serif;
+}
+
+/* Isolate body style to the customer-facing layout with ambient light fields twilight deep-space glow */
+body,
+.rusto-layout {
+  background-image: 
+    radial-gradient(circle at 15% 25%, rgba(214, 154, 128, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 85% 75%, rgba(11, 37, 44, 0.25) 0%, transparent 50%),
+    linear-gradient(135deg, #0B252C 0%, #06151A 100%) !important;
+  background-attachment: fixed !important;
+  background-size: cover !important;
+  color: #FFFFFF !important;
+  font-family: var(--font-stack) !important;
+}
+
+/* Glass Panels */
+.glass-panel-lux {
+  background: rgba(15, 27, 40, 0.45) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35) !important;
+  transition: all 0.3s ease !important;
+}
+.glass-panel-lux:hover {
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 12px 40px 0 rgba(233, 177, 81, 0.08), 0 8px 32px 0 rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Customized inputs for glass panel style */
+.glass-input {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+  border-radius: 12px !important;
+  transition: all 0.2s ease !important;
+}
+.glass-input:focus {
+  border-color: var(--amber-glow) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 0 12px rgba(255, 179, 71, 0.15) !important;
+}
+
+/* Playfair display fallback to unified sans-serif brand stack */
+.font-serif-luxury {
+  font-family: var(--font-stack) !important;
+}
+
+/* Buttons in Glass layout */
+.btn-amber-glow {
+  background: #FFFFFF !important;
+  color: #1A2A2E !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  transition: all 0.3s ease !important;
+}
+.btn-amber-glow:hover {
+  background: var(--amber-glow) !important;
+  color: #1A2A2E !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 24px rgba(255, 179, 71, 0.4) !important;
+}
+
+.text-amber-glow {
+  color: var(--amber-glow) !important;
+}
+
+.border-amber-glow {
+  border-color: var(--amber-glow) !important;
+}
+
+.bg-misty-dark {
+  background-color: var(--misty-dark) !important;
+}
+
+/* ── Isolated Traveler Rules inside .rusto-layout ───────────────── */
+
+/* Force all text fields inside rusto-layout to use beautiful frosted inputs */
+.rusto-layout input:not([type="checkbox"]):not([type="radio"]),
+.rusto-layout select,
+.rusto-layout textarea {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #FFFFFF !important;
+  border-radius: 12px !important;
+  transition: all 0.2s ease !important;
+}
+
+.rusto-layout input:not([type="checkbox"]):not([type="radio"]):focus,
+.rusto-layout select:focus,
+.rusto-layout textarea:focus {
+  border-color: var(--amber-glow) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 0 12px rgba(255, 179, 71, 0.2) !important;
+  outline: none !important;
+}
+
+/* Input labels and placeholders */
+.rusto-layout ::placeholder {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+
+/* Comprehensive dark-theme text overrides to eliminate invisible dark text */
+.rusto-layout .text-navy,
+.rusto-layout .text-navy-dark,
+.rusto-layout .text-slate-900,
+.rusto-layout .text-gray-900,
+.rusto-layout .text-ink-800,
+.rusto-layout .text-ink-900,
+.rusto-layout .text-slate-800,
+.rusto-layout .text-gray-800,
+.rusto-layout h1,
+.rusto-layout h2,
+.rusto-layout h3,
+.rusto-layout h4,
+.rusto-layout h5,
+.rusto-layout h6 {
+  color: #FFFFFF !important;
+}
+
+.rusto-layout .text-ink-700,
+.rusto-layout .text-ink-600,
+.rusto-layout .text-ink-500,
+.rusto-layout .text-gray-700,
+.rusto-layout .text-slate-700,
+.rusto-layout .text-gray-600,
+.rusto-layout .text-slate-600,
+.rusto-layout .text-gray-500,
+.rusto-layout .text-slate-500 {
+  color: rgba(255, 255, 255, 0.70) !important; /* Premium Secondary — 70% Opacity */
+}
+
+.rusto-layout .text-ink-400,
+.rusto-layout .text-gray-400,
+.rusto-layout .text-slate-400,
+.rusto-layout .text-ink-300,
+.rusto-layout .text-gray-300,
+.rusto-layout .text-slate-300 {
+  color: rgba(255, 255, 255, 0.48) !important; /* Premium Tertiary — 48% Opacity */
+}
+
+/* Glass panel overrides for light-mode background classes */
+.rusto-layout .bg-white,
+.rusto-layout .bg-white\/95,
+.rusto-layout .bg-white\/90,
+.rusto-layout .bg-white\/80,
+.rusto-layout header.bg-white\/95,
+.rusto-layout .card,
+.rusto-layout .kpi-card,
+.rusto-layout .room-card,
+.rusto-layout .booking-sidebar,
+.rusto-layout .glass-panel-lux {
+  background: rgba(15, 27, 40, 0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Premium date-picker icon styling for traveler dark mode */
+.rusto-layout input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1) sepia(100%) saturate(1000%) hue-rotate(340deg) !important;
+  cursor: pointer;
+}
+
+.rusto-layout .border-ink-100,
+.rusto-layout .border-ink-200,
+.rusto-layout .border-gray-200,
+.rusto-layout .border-slate-100,
+.rusto-layout .border-slate-200 {
+  border-color: var(--glass-border) !important;
+}
+
+.rusto-layout .bg-ink-50,
+.rusto-layout .bg-gray-50,
+.rusto-layout .bg-slate-100 {
+  background: transparent !important;
+}
+
+/* Premium dynamic alert style mappings */
+.rusto-layout .bg-red-50,
+.rusto-layout .bg-red-100 {
+  background: rgba(220, 38, 38, 0.15) !important;
+  border-color: rgba(220, 38, 38, 0.3) !important;
+}
+
+.rusto-layout .text-red-700,
+.rusto-layout .text-red-800 {
+  color: #FCA5A5 !important;
+}
+
+/* High-contrast solid dark elements mapped to white text buttons with gold glows */
+.rusto-layout .bg-slate-900 {
+  background: #FFFFFF !important;
+  color: #1A2A2E !important;
+  border: none !important;
+}
+
+.rusto-layout .bg-slate-900 * {
+  color: #1A2A2E !important;
+}
+
+.rusto-layout .bg-slate-900:hover {
+  background: var(--amber-glow) !important;
+  color: #1A2A2E !important;
+  box-shadow: 0 8px 24px rgba(255, 179, 71, 0.4) !important;
+}
+
+.rusto-layout .bg-slate-900:hover * {
+  color: #1A2A2E !important;
+}
+
+/* Clean up solid dark navy and bright white gradient bands to sync up UI globally */
+.rusto-layout .bg-gradient-to-br.from-navy.via-navy-light.to-navy-dark,
+.rusto-layout .bg-gradient-to-br.from-navy-light.to-navy,
+.rusto-layout .bg-gradient-to-r.from-navy.to-navy-light,
+.rusto-layout .bg-gradient-to-br.from-navy.to-navy-light,
+.rusto-layout .bg-navy,
+.rusto-layout .bg-navy-dark,
+.rusto-layout .bg-navy-light {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Navy buttons inside traveler layout become glassy outline buttons instead of disappearing */
+.rusto-layout a.bg-navy,
+.rusto-layout button.bg-navy,
+.rusto-layout a.bg-navy-dark,
+.rusto-layout button.bg-navy-dark {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #FFFFFF !important;
+  transition: all 0.2s ease !important;
+}
+
+.rusto-layout a.bg-navy:hover,
+.rusto-layout button.bg-navy:hover,
+.rusto-layout a.bg-navy-dark:hover,
+.rusto-layout button.bg-navy-dark:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Turn container divs that had navy gradients into rich frosted glass cards */
+.rusto-layout div.bg-gradient-to-br.from-navy.via-navy-light.to-navy-dark,
+.rusto-layout div.bg-gradient-to-br.from-navy-light.to-navy,
+.rusto-layout div.bg-navy,
+.rusto-layout div.bg-navy-dark {
+  background: var(--glass-white) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid var(--glass-border) !important;
+}
+
+/* Make light gradient sections (like Rusto Gateway and Trust strips) fully transparent */
+.rusto-layout .bg-gradient-to-b.from-ink-50.to-white,
+.rusto-layout .bg-gradient-to-br.from-ink-50.to-white,
+.rusto-layout section.bg-white,
+.rusto-layout div.bg-white {
+  background: transparent !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Solid CTA button overrides to prevent white-on-white text visibility issue */
+.rusto-layout .btn-gold,
+.rusto-layout .btn-amber-glow,
+.rusto-layout button.bg-white,
+.rusto-layout a.bg-white,
+.rusto-layout button.btn-gold,
+.rusto-layout a.btn-gold,
+.rusto-layout .bg-gradient-to-br.from-gold.to-gold-dark {
+  background: #FFFFFF !important;
+  color: #1A2A2E !important;
+  font-weight: 700 !important;
+  border-radius: 12px !important;
+  border: none !important;
+  opacity: 1 !important;
+  transition: all 0.3s ease !important;
+}
+
+/* Enforce dark text color for all child text and icons inside solid buttons */
+.rusto-layout .btn-gold *,
+.rusto-layout .btn-amber-glow *,
+.rusto-layout button.bg-white *,
+.rusto-layout a.bg-white *,
+.rusto-layout button.btn-gold *,
+.rusto-layout a.btn-gold *,
+.rusto-layout .bg-gradient-to-br.from-gold.to-gold-dark * {
+  color: #1A2A2E !important;
+}
+
+/* Hover effects for solid CTA buttons — premium warm amber glow */
+.rusto-layout .btn-gold:hover,
+.rusto-layout .btn-amber-glow:hover,
+.rusto-layout button.bg-white:hover,
+.rusto-layout a.bg-white:hover,
+.rusto-layout button.btn-gold:hover,
+.rusto-layout a.btn-gold:hover,
+.rusto-layout .bg-gradient-to-br.from-gold.to-gold-dark:hover {
+  background: var(--amber-glow) !important;
+  color: #1A2A2E !important;
+  box-shadow: 0 8px 24px rgba(255, 179, 71, 0.4) !important;
+  transform: translateY(-2px) !important;
+}
+
+.rusto-layout .btn-gold:hover *,
+.rusto-layout .btn-amber-glow:hover *,
+.rusto-layout button.bg-white:hover *,
+.rusto-layout a.bg-white:hover *,
+.rusto-layout button.btn-gold:hover *,
+.rusto-layout a.btn-gold:hover *,
+.rusto-layout .bg-gradient-to-br.from-gold.to-gold-dark:hover * {
+  color: #1A2A2E !important;
+}
+
+.rusto-layout .text-gold,
+.rusto-layout .text-gold-700,
+.rusto-layout .text-gold-800 {
+  color: var(--amber-glow) !important;
+}
+.rusto-layout .bg-gold-50 {
+  background: rgba(214, 154, 128, 0.12) !important;
+  border-color: rgba(214, 154, 128, 0.22) !important;
+}
+.rusto-layout .bg-gold-50\/40 {
+  background: rgba(214, 154, 128, 0.05) !important;
+}
+.rusto-layout .border-gold,
+.rusto-layout .border-gold\/40 {
+  border-color: rgba(214, 154, 128, 0.25) !important;
+}
+.rusto-layout .from-gold-50 {
+  --tw-gradient-from: rgba(214, 154, 128, 0.12) !important;
+  --tw-gradient-to: rgba(214, 154, 128, 0) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+.rusto-layout .to-gold-100 {
+  --tw-gradient-to: rgba(214, 154, 128, 0.25) !important;
+}
+
+/* Global Onboarding & Traveler Heading typography override for modern display & sans-serif fonts */
+.rusto-layout h1,
+.rusto-layout h2,
+.rusto-layout h3,
+.font-display {
+  font-family: var(--font-display) !important;
+}
+
+.rusto-layout h4,
+.rusto-layout h5,
+.rusto-layout h6 {
+  font-family: var(--font-stack) !important;
+}
+
+/* Sleek, ultra-premium back to home button design */
+.btn-back-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-family: var(--font-stack) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.12em !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+.btn-back-home:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: var(--amber-glow) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 20px rgba(233, 177, 81, 0.25), 0 0 14px rgba(255, 179, 71, 0.15) !important;
+  transform: translateY(-2px) !important;
+}
+
+.btn-back-home svg {
+  color: var(--amber-glow) !important;
+  transition: transform 0.3s ease !important;
+}
+
+.btn-back-home:hover svg {
+  transform: translateX(-3px) !important;
+}
+
+/* Light theme variation of the back to home button */
+.btn-back-home-light {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px !important;
+  background: rgba(15, 27, 40, 0.04) !important;
+  border: 1px solid rgba(15, 27, 40, 0.08) !important;
+  color: #475467 !important;
+  font-family: var(--font-stack) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.12em !important;
+  border-radius: 9999px !important;
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+.btn-back-home-light:hover {
+  background: rgba(15, 27, 40, 0.08) !important;
+  border-color: #1A2A2E !important;
+  color: #1A2A2E !important;
+  transform: translateY(-2px) !important;
+}
+
+.btn-back-home-light svg {
+  color: #1A2A2E !important;
+  transition: transform 0.3s ease !important;
+}
+
+.btn-back-home-light:hover svg {
+  transform: translateX(-3px) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PMS PREMIUM THEME — OBSIDIAN GLASS (STATE-OF-THE-ART OPERATIONAL PMS)
+   ──────────────────────────────────────────────────────────────────── */
+
+/* Deep obsidian background with very subtle, elegant dark nature accents */
+.pms-layout {
+  background: radial-gradient(circle at 10% 20%, #0c1220 0%, #030712 100%) !important;
+  color: #F8FAFC !important;
+  font-family: var(--font-stack) !important;
+}
+
+/* Glass panel overrides for back-office cards & headers */
+.pms-layout .card,
+.pms-layout .kpi-card,
+.pms-layout .room-card,
+.pms-layout .glass-panel-lux,
+.pms-layout header.bg-white\/95,
+.pms-layout .bg-white {
+  background: rgba(17, 24, 39, 0.72) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.3) !important;
+  color: #F8FAFC !important;
+}
+
+/* Header context and sidebar borders */
+.pms-layout header.bg-white\/95 {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2) !important;
+}
+.pms-layout aside {
+  background: #090e18 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Comprehensive text overrides inside .pms-layout for high readability */
+.pms-layout h1,
+.pms-layout h2,
+.pms-layout h3,
+.pms-layout h4,
+.pms-layout h5,
+.pms-layout h6,
+.pms-layout .text-navy,
+.pms-layout .text-navy-dark,
+.pms-layout .text-slate-900,
+.pms-layout .text-gray-900,
+.pms-layout .text-gray-800,
+.pms-layout .text-slate-800,
+.pms-layout .text-ink-900,
+.pms-layout .text-ink-800 {
+  color: #FFFFFF !important;
+}
+
+/* Secondary muted labels, gray descriptions become soft slate gray for contrast */
+.pms-layout .text-gray-500,
+.pms-layout .text-gray-600,
+.pms-layout .text-gray-700,
+.pms-layout .text-slate-500,
+.pms-layout .text-slate-600,
+.pms-layout .text-slate-700,
+.pms-layout .text-ink-500,
+.pms-layout .text-ink-600,
+.pms-layout .text-ink-700 {
+  color: rgba(241, 245, 249, 0.70) !important; /* Premium Secondary — 70% Opacity */
+}
+
+.pms-layout .text-gray-400,
+.pms-layout .text-slate-400,
+.pms-layout .text-ink-400 {
+  color: rgba(241, 245, 249, 0.48) !important; /* Premium Tertiary — 48% Opacity */
+}
+
+/* Table overrides to ensure tables are extremely professional and readable */
+.pms-layout table {
+  background: transparent !important;
+  border-collapse: collapse !important;
+  width: 100% !important;
+}
+
+.pms-layout thead th {
+  background: rgba(255, 255, 255, 0.03) !important;
+  color: #94A3B8 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+}
+
+.pms-layout tbody tr {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  transition: background 0.2s ease !important;
+}
+.pms-layout tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+
+.pms-layout td {
+  color: #E2E8F0 !important;
+}
+
+/* High contrast table links */
+.pms-layout td a,
+.pms-layout a.text-indigo-600,
+.pms-layout a.text-blue-600,
+.pms-layout a.text-gold {
+  color: #E9B151 !important; /* Soft Amber gold */
+  font-weight: 600 !important;
+  text-decoration: none !important;
+  transition: all 0.2s ease !important;
+}
+.pms-layout td a:hover,
+.pms-layout a.text-indigo-600:hover,
+.pms-layout a.text-blue-600:hover,
+.pms-layout a.text-gold:hover {
+  color: #F59E0B !important;
+  text-decoration: underline !important;
+}
+
+/* Input elements - glassy fields that glow on focus */
+.pms-layout input:not([type="checkbox"]):not([type="radio"]),
+.pms-layout select,
+.pms-layout textarea {
+  background: rgba(15, 23, 42, 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #FFFFFF !important;
+  border-radius: 12px !important;
+  transition: all 0.2s ease-out !important;
+}
+.pms-layout input:not([type="checkbox"]):not([type="radio"]):focus,
+.pms-layout select:focus,
+.pms-layout textarea:focus {
+  border-color: #E9B151 !important;
+  background: rgba(15, 23, 42, 0.8) !important;
+  box-shadow: 0 0 14px rgba(233, 177, 81, 0.18) !important;
+  outline: none !important;
+}
+
+/* Primary operational buttons inside .pms-layout */
+.pms-layout .btn-primary,
+.pms-layout button.bg-navy,
+.pms-layout button.btn-primary {
+  background: linear-gradient(135deg, #1E40AF 0%, #1D4ED8 100%) !important; /* Premium Blue */
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25) !important;
+  border: none !important;
+  transition: all 0.2s ease !important;
+}
+.pms-layout .btn-primary:hover,
+.pms-layout button.bg-navy:hover,
+.pms-layout button.btn-primary:hover {
+  background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%) !important;
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Outline buttons */
+.pms-layout .btn-outline,
+.pms-layout button.border-2 {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.15) !important;
+  color: #FFFFFF !important;
+  transition: all 0.2s ease !important;
+}
+.pms-layout .btn-outline:hover,
+.pms-layout button.border-2:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+/* Tab/Header list navigation inside back-office pages (e.g. Settings tabs) */
+.pms-layout .bg-gray-50,
+.pms-layout .bg-gray-100,
+.pms-layout .bg-gray-200,
+.pms-layout .bg-ink-50,
+.pms-layout .bg-ink-100,
+.pms-layout .bg-ink-200 {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* Active tab navigation inside PMS layout with premium Rose Gold active tracking */
+.pms-layout button.bg-white[class*="text-navy"],
+.pms-layout button.bg-white[class*="shadow-sm"],
+.pms-layout [class*="bg-gray-100"] button.bg-white {
+  background: var(--brand-copper) !important;
+  color: #030712 !important;
+  border-color: transparent !important;
+}
+
+.pms-layout button.bg-white[class*="text-navy"] *,
+.pms-layout button.bg-white[class*="shadow-sm"] *,
+.pms-layout [class*="bg-gray-100"] button.bg-white * {
+  color: #030712 !important;
+}
+
+/* Star rating and KPI card highlights */
+.pms-layout .kpi-rail {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+.pms-layout .kpi-card:hover .kpi-rail {
+  background: #E9B151 !important;
+}
+
+/* Pulse states for status badges */
+.pms-layout .badge-available {
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #34D399 !important;
+  border: 1px solid rgba(16, 185, 129, 0.25) !important;
+}
+.pms-layout .badge-occupied {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #F87171 !important;
+  border: 1px solid rgba(239, 68, 68, 0.25) !important;
+}
+.pms-layout .badge-checkout_due {
+  background: rgba(245, 158, 11, 0.12) !important;
+  color: #FBBF24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.25) !important;
+}
+
+/* Gold CTA buttons sheen effect & dynamic glows */
+.pms-layout .btn-gold,
+.pms-layout .btn-amber-glow,
+.pms-layout button.btn-gold {
+  background: linear-gradient(135deg, #E2C470 0%, #C9A84C 100%) !important;
+  color: #0F172A !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 14px rgba(201, 168, 76, 0.3) !important;
+}
+.pms-layout .btn-gold:hover,
+.pms-layout .btn-amber-glow:hover,
+.pms-layout button.btn-gold:hover {
+  background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45) !important;
+  transform: translateY(-1px) !important;
+}
+.pms-layout .btn-gold *,
+.pms-layout .btn-amber-glow *,
+.pms-layout button.btn-gold * {
+  color: #0F172A !important;
+}
+
+/* Staggered entrance animations */
+.pms-layout .animate-fade-in {
+  animation: pmsFadeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes pmsFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Smooth micro-interactions */
+.pms-layout .card,
+.pms-layout .kpi-card,
+.pms-layout .room-card {
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+.pms-layout .card:hover,
+.pms-layout .kpi-card:hover,
+.pms-layout .room-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 16px 40px 0 rgba(0, 0, 0, 0.4) !important;
+  border-color: rgba(233, 177, 81, 0.2) !important;
+}
+
+/* ── PMS Premium Overrides for Operational Tape Chart & SVG Charts ────── */
+
+/* Tape Chart Sticky Header & Overrides in Obsidian Dark Mode */
+.pms-layout .overflow-auto {
+  background: rgba(17, 24, 39, 0.72) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.pms-layout th.sticky,
+.pms-layout td.sticky {
+  background-color: #090e18 !important;
+  color: #FFFFFF !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.pms-layout thead tr {
+  background-color: #090e18 !important;
+}
+
+.pms-layout thead th {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.pms-layout tbody tr td {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Translucent Tape Chart cells for perfect aesthetic and readable balance */
+.pms-layout button.bg-white {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #E2E8F0 !important;
+}
+
+.pms-layout button.bg-white:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(233, 177, 81, 0.3) !important;
+}
+
+.pms-layout button.bg-blue-100\/80 {
+  background: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+  color: #93C5FD !important;
+}
+
+.pms-layout button.bg-emerald-100\/80 {
+  background: rgba(16, 185, 129, 0.15) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+  color: #6EE7B7 !important;
+}
+
+.pms-layout button.bg-red-100\/80 {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #FCA5A5 !important;
+}
+
+/* Operational Pulse animations for live back-office components */
+.pms-layout .badge-live::before {
+  animation: pmsPulseGreen 2s infinite !important;
+}
+@keyframes pmsPulseGreen {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.pms-layout .badge-available::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #10B981;
+  margin-right: 6px;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.pms-layout .badge-occupied::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #EF4444;
+  margin-right: 6px;
+  animation: pmsPulseRed 2s infinite;
+}
+@keyframes pmsPulseRed {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  70% { transform: scale(1); box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.pms-layout .badge-checkout_due::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #F59E0B;
+  margin-right: 6px;
+  animation: pmsPulseAmber 2s infinite;
+}
+@keyframes pmsPulseAmber {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+  70% { transform: scale(1); box-shadow: 0 0 0 5px rgba(245, 158, 11, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+/* State-of-the-art Recharts SVG overlays skinning */
+.pms-layout .recharts-cartesian-grid line {
+  stroke: rgba(255, 255, 255, 0.08) !important;
+}
+
+.pms-layout .recharts-cartesian-axis-line {
+  stroke: rgba(255, 255, 255, 0.12) !important;
+}
+
+.pms-layout .recharts-cartesian-axis-tick-value {
+  fill: #94A3B8 !important;
+}
+
+.pms-layout .recharts-legend-item-text {
+  color: #E2E8F0 !important;
+}
+
+.pms-layout .recharts-tooltip-cursor {
+  fill: rgba(255, 255, 255, 0.03) !important;
+}
+
+.pms-layout .recharts-default-tooltip {
+  background-color: #0c1220 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Staggered entrance slides */
+.pms-layout .stagger-1 { animation-delay: 40ms; }
+.pms-layout .stagger-2 { animation-delay: 80ms; }
+.pms-layout .stagger-3 { animation-delay: 120ms; }
+.pms-layout .stagger-4 { animation-delay: 160ms; }
+.pms-layout .stagger-5 { animation-delay: 200ms; }
+.pms-layout .stagger-6 { animation-delay: 240ms; }
+.pms-layout .stagger-7 { animation-delay: 280ms; }
+.pms-layout .stagger-8 { animation-delay: 320ms; }
+
+/* ── RUSTO REDESIGN BLUEPRINT OVERRIDES ── */
+
+/* Fullscreen Mechanical Transition overlay */
+.shutter-layer {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at center, #0B252C 0%, #030712 100%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.shutter-layer.active {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+/* High-tech scanning grid */
+.shutter-grid {
+  position: absolute;
+  inset: 0;
+  background-size: 40px 40px;
+  background-image: linear-gradient(to right, rgba(214, 154, 128, 0.05) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(214, 154, 128, 0.05) 1px, transparent 1px);
+  opacity: 0;
+  transform: scale(0.9) rotate(-3deg);
+  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.shutter-layer.active .shutter-grid {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
+/* Laser sweep bar */
+.shutter-laser {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #D69A80, transparent);
+  box-shadow: 0 0 12px rgba(214, 154, 128, 0.8);
+  opacity: 0;
+}
+
+.shutter-layer.active .shutter-laser {
+  opacity: 1;
+  animation: laserSweep 1.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes laserSweep {
+  0% { top: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* Portal Switcher styling */
+.portal-switcher {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 3px;
+  border-radius: 9999px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.portal-switcher:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(214, 154, 128, 0.3);
+  box-shadow: 0 4px 20px rgba(214, 154, 128, 0.15);
+}
+
+.portal-switcher-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.6);
+  z-index: 10;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.portal-switcher-btn.active {
+  color: #030712 !important;
+}
+
+.portal-switcher-btn.active * {
+  color: #030712 !important;
+}
+
+.portal-switcher-slider {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #F3B39E 0%, #D69A80 100%);
+  box-shadow: 0 2px 10px rgba(214, 154, 128, 0.5), 0 0 8px rgba(214, 154, 128, 0.3);
+  z-index: 1;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Floating Glassmorphic Pill Search Bar */
+.search-panel-pill {
+  background: rgba(11, 37, 44, 0.45) !important;
+  border-radius: 9999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.35) !important;
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1) !important;
+  transform-origin: center;
+}
+
+.search-panel-pill:hover,
+.search-panel-pill:focus-within {
+  transform: translateY(-2px) scale(1.01) !important;
+  border-color: rgba(214, 154, 128, 0.25) !important;
+  box-shadow: 0 20px 50px 0 rgba(214, 154, 128, 0.1), 0 12px 40px 0 rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Discover by Mood Vibe Selector */
+.vibe-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.vibe-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  cursor: pointer;
+  overflow: hidden;
+  user-select: none;
+}
+
+.vibe-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(214, 154, 128, 0.35);
+  color: #FFFFFF;
+  transform: translateY(-1px);
+}
+
+.vibe-chip.active {
+  background: rgba(214, 154, 128, 0.15) !important;
+  border-color: #D69A80 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 20px rgba(214, 154, 128, 0.25), 0 0 12px rgba(214, 154, 128, 0.15) !important;
+}
+
+.vibe-chip-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(214, 154, 128, 0.2) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.vibe-chip.active .vibe-chip-glow {
+  opacity: 1;
+}
+
+/* Neon pulsers for back-office rooms */
+.pms-layout .room-card.room-available:hover {
+  border-color: #10B981 !important;
+  box-shadow: 0 12px 30px rgba(16, 185, 129, 0.15) !important;
+}
+
+.pms-layout .room-card.room-occupied:hover {
+  border-color: #EF4444 !important;
+  box-shadow: 0 12px 30px rgba(239, 68, 68, 0.15) !important;
+}
+
+.pms-layout .room-card.room-checkout_due {
+  animation: pmsPulseBlueCard 3s infinite !important;
+}
+@keyframes pmsPulseBlueCard {
+  0% { border-color: rgba(59, 130, 246, 0.3); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); }
+  50% { border-color: #3B82F6; box-shadow: 0 4px 25px rgba(59, 130, 246, 0.25); }
+  100% { border-color: rgba(59, 130, 246, 0.3); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); }
+}
+
+.pms-layout .room-card.room-maintenance:hover {
+  border-color: #F59E0B !important;
+  box-shadow: 0 12px 30px rgba(245, 158, 11, 0.15) !important;
+}
+
+/* ── Premium Traveler Onboarding Wizard Overrides ───────────────── */
+.rusto-layout .bg-ink-100 {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+.rusto-layout .bg-ink-200 {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+.rusto-layout .active-toggle-btn {
+  background: var(--amber-glow) !important;
+  color: #1A2A2E !important;
+  box-shadow: 0 4px 15px rgba(214, 154, 128, 0.3) !important;
+}
+.rusto-layout .active-toggle-btn * {
+  color: #1A2A2E !important;
+}
+
+/* ── Premium Semantic Dark Glass Overrides (Sapphire, Emerald, Ruby, Amber) ── */
+
+/* Sapphire (Info / Pending / Blue) */
+.pms-layout .bg-blue-50,
+.pms-layout .bg-blue-100,
+.pms-layout .bg-blue-200,
+.rusto-layout .bg-blue-50,
+.rusto-layout .bg-blue-100,
+.rusto-layout .bg-blue-200 {
+  background: rgba(59, 130, 246, 0.12) !important;
+  border-color: rgba(59, 130, 246, 0.25) !important;
+  color: #93C5FD !important;
+}
+.pms-layout .text-blue-700,
+.pms-layout .text-blue-800,
+.pms-layout .text-blue-600,
+.pms-layout .text-blue-500,
+.rusto-layout .text-blue-700,
+.rusto-layout .text-blue-800,
+.rusto-layout .text-blue-600,
+.rusto-layout .text-blue-500 {
+  color: #93C5FD !important;
+}
+.pms-layout .ring-blue-200,
+.rusto-layout .ring-blue-200 {
+  --tw-ring-color: rgba(59, 130, 246, 0.25) !important;
+}
+
+/* Emerald (Success / Available / Green) */
+.pms-layout .bg-green-50,
+.pms-layout .bg-green-100,
+.pms-layout .bg-green-200,
+.rusto-layout .bg-green-50,
+.rusto-layout .bg-green-100,
+.rusto-layout .bg-green-200 {
+  background: rgba(16, 185, 129, 0.12) !important;
+  border-color: rgba(16, 185, 129, 0.25) !important;
+  color: #34D399 !important;
+}
+.pms-layout .text-green-700,
+.pms-layout .text-green-800,
+.pms-layout .text-green-600,
+.pms-layout .text-green-500,
+.rusto-layout .text-green-700,
+.rusto-layout .text-green-800,
+.rusto-layout .text-green-600,
+.rusto-layout .text-green-500 {
+  color: #34D399 !important;
+}
+.pms-layout .ring-green-200,
+.rusto-layout .ring-green-200 {
+  --tw-ring-color: rgba(16, 185, 129, 0.25) !important;
+}
+
+/* Ruby (Danger / Occupied / Red) */
+.pms-layout .bg-red-50,
+.pms-layout .bg-red-100,
+.pms-layout .bg-red-200,
+.rusto-layout .bg-red-50,
+.rusto-layout .bg-red-100,
+.rusto-layout .bg-red-200 {
+  background: rgba(239, 68, 68, 0.12) !important;
+  border-color: rgba(239, 68, 68, 0.25) !important;
+  color: #F87171 !important;
+}
+.pms-layout .text-red-700,
+.pms-layout .text-red-800,
+.pms-layout .text-red-600,
+.pms-layout .text-red-500,
+.rusto-layout .text-red-700,
+.rusto-layout .text-red-800,
+.rusto-layout .text-red-600,
+.rusto-layout .text-red-500 {
+  color: #F87171 !important;
+}
+.pms-layout .ring-red-200,
+.rusto-layout .ring-red-200 {
+  --tw-ring-color: rgba(239, 68, 68, 0.25) !important;
+}
+
+/* Amber (Warning / Maintenance / Orange/Yellow) */
+.pms-layout .bg-amber-50,
+.pms-layout .bg-amber-100,
+.pms-layout .bg-amber-200,
+.pms-layout .bg-yellow-50,
+.pms-layout .bg-yellow-100,
+.pms-layout .bg-yellow-200,
+.rusto-layout .bg-amber-50,
+.rusto-layout .bg-amber-100,
+.rusto-layout .bg-amber-200,
+.rusto-layout .bg-yellow-50,
+.rusto-layout .bg-yellow-100,
+.rusto-layout .bg-yellow-200 {
+  background: rgba(245, 158, 11, 0.12) !important;
+  border-color: rgba(245, 158, 11, 0.25) !important;
+  color: #FBBF24 !important;
+}
+.pms-layout .text-amber-700,
+.pms-layout .text-amber-800,
+.pms-layout .text-amber-600,
+.pms-layout .text-amber-500,
+.pms-layout .text-yellow-700,
+.pms-layout .text-yellow-800,
+.pms-layout .text-yellow-600,
+.pms-layout .text-yellow-500,
+.rusto-layout .text-amber-700,
+.rusto-layout .text-amber-800,
+.rusto-layout .text-amber-600,
+.rusto-layout .text-amber-500,
+.rusto-layout .text-yellow-700,
+.rusto-layout .text-yellow-800,
+.rusto-layout .text-yellow-600,
+.rusto-layout .text-yellow-500 {
+  color: #FBBF24 !important;
+}
+
+/* ── High-End Mobile Responsive Visual Overrides ────────────────── */
+
+@media (max-width: 640px) {
+  /* 1. Force side-by-side modal grid columns to stack vertically on mobile to prevent squashing */
+  .pms-layout .modal-box .grid-cols-2,
+  .rusto-layout .modal-box .grid-cols-2,
+  .pms-layout div[class*="fixed inset-0"] .grid-cols-2,
+  .rusto-layout div[class*="fixed inset-0"] .grid-cols-2,
+  .pms-layout form .grid-cols-2,
+  .rusto-layout form .grid-cols-2,
+  .pms-layout .grid-cols-2,
+  .rusto-layout .grid-cols-2 {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  /* 2. Transform floating floating-modals into premium native mobile bottom-sheets */
+  .pms-layout .modal-box,
+  .rusto-layout .modal-box,
+  .pms-layout div[class*="fixed inset-0"][class*="flex"] > div,
+  .rusto-layout div[class*="fixed inset-0"][class*="flex"] > div,
+  .pms-layout .modal-backdrop > div,
+  .rusto-layout .modal-backdrop > div {
+    padding: 20px 16px 24px 16px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    margin-top: auto !important; /* Push to the bottom */
+    border-radius: 24px 24px 0 0 !important; /* Rounded top corners only */
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    max-height: 90vh !important;
+    max-height: 90dvh !important;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4) !important;
+  }
+
+  /* 3. Reduce vertical padding inside mobile bottom sheets to maximize visibility */
+  .pms-layout .modal-box form,
+  .rusto-layout .modal-box form,
+  .pms-layout div[class*="fixed inset-0"][class*="flex"] > div form,
+  .rusto-layout div[class*="fixed inset-0"][class*="flex"] > div form {
+    padding: 12px 2px !important;
+    gap: 12px !important;
+  }
+}
+
+/* 4. Compact Brand Login/Onboarding layout on small tablet and mobile screens */
+@media (max-width: 768px) {
+  .rusto-layout.flex-col > aside {
+    padding: 28px 20px !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    min-height: auto !important;
+  }
+  .rusto-layout.flex-col > aside h1 {
+    font-size: 24px !important;
+    margin-bottom: 8px !important;
+    line-height: 1.2 !important;
+  }
+  .rusto-layout.flex-col > aside p.text-base,
+  .rusto-layout.flex-col > aside p.text-lg {
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+  }
+  .rusto-layout.flex-col > main {
+    padding: 16px !important;
+  }
+  .rusto-layout.flex-col > main .w-full.max-w-md {
+    margin-top: 16px !important;
+  }
+}
+
+/* 5. Clean up list dividers in dark glass lists on mobile */
+.pms-layout [class*="divide-gray-"],
+.pms-layout [class*="divide-slate-"],
+.pms-layout [class*="divide-ink-"],
+.rusto-layout [class*="divide-gray-"],
+.rusto-layout [class*="divide-slate-"],
+.rusto-layout [class*="divide-ink-"] {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ── App Text Selection Overrides (Sunset Rose Highlight Blush) ── */
+::selection {
+  background-color: rgba(244, 63, 94, 0.25) !important; /* selection:bg-rose-500/25 equivalent */
+  color: #FFFFFF !important;
+}
+::-moz-selection {
+  background-color: rgba(244, 63, 94, 0.25) !important;
+  color: #FFFFFF !important;
+}
+
+/* ==========================================================================
+   RUSTO ADVANCED DESIGN SYSTEM
+   ========================================================================== */
+
+/* --- Typographic Rules --- */
+h1, h2, h3, .font-display {
+  letter-spacing: -0.02em;
+}
+
+.brand-text {
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+/* ==========================================================================
+   ADVANCED UI COMPONENTS
+   ========================================================================== */
+
+/* 1. Premium Glassmorphism Container */
+.glass-panel {
+  background: var(--space-card);
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-panel:hover {
+  border-color: rgba(214, 154, 128, 0.2);
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* 2. Interactive Booking Selection Bar */
+.search-pill {
+  background: rgba(6, 21, 25, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 100px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.search-pill-item {
+  padding: 8px 16px;
+  border-radius: 100px;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+
+.search-pill-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* 3. High-End Call-to-Action Button */
+.btn-premium {
+  background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 100%);
+  color: var(--text-dark);
+  font-weight: 600;
+  padding: 12px 28px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-premium:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+/* 4. Live Grid Management Badges */
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.status-badge.ready {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--status-ready);
+}
+.status-badge.ready::before { background: var(--status-ready); }
+
+.status-badge.occupied {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--status-occupied);
+}
+.status-badge.occupied::before { background: var(--status-occupied); }
+
+/* 5. Minimalist Input Fields */
+.input-minimal {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  padding: 12px 16px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.input-minimal:focus {
+  border-color: var(--accent-sun);
+  background: rgba(255, 255, 255, 0.05);
+}
+
