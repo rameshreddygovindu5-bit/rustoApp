@@ -114,7 +114,7 @@ export default function RustoLayout() {
             {/* Desktop nav */}
             <nav className="hidden md:flex items-center gap-1">
               {NAV_LINKS.map(l => (
-                <NavLink key={l.to} to={l.to} end
+                <NavLink key={l.label} to={l.to} end
                   className={({ isActive }) => {
                     const base = "relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all";
                     if (isActive) return `${base} text-amber-glow bg-white/10 border border-white/10`;
@@ -208,7 +208,7 @@ export default function RustoLayout() {
           </div>
           <nav className="relative p-5 space-y-2">
             {NAV_LINKS.map((l, i) => (
-              <NavLink key={l.to} to={l.to} end
+              <NavLink key={l.label} to={l.to} end
                 style={{ animationDelay: `${i * 80}ms` }}
                 className={({ isActive }) =>
                   `animate-slide-up block px-5 py-4 rounded-2xl text-lg font-semibold transition-all ${

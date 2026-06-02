@@ -60,7 +60,24 @@ function Auth({ mode }) {
       }
       nav(nextUrl);
     } catch (err) {
-      const errMsg = err.response?.data?.detail || (isSignup ? "Signup failed. Please try again." : "Invalid phone number or password. Please try again.");
+      let errMsg = "";
+      if (err.response?.data?.detail) {
+        const detail = err.response.data.detail;
+        if (typeof detail === "string") {
+          errMsg = detail;
+        } else if (Array.isArray(detail)) {
+          errMsg = detail.map(item => {
+            const field = item.loc ? item.loc[item.loc.length - 1] : "";
+            return `${field ? field + ": " : ""}${item.msg || "Invalid value"}`;
+          }).join(", ");
+        } else if (typeof detail === "object") {
+          errMsg = JSON.stringify(detail);
+        } else {
+          errMsg = String(detail);
+        }
+      } else {
+        errMsg = isSignup ? "Signup failed. Please try again." : "Invalid phone number or password. Please try again.";
+      }
       setError(errMsg);
       toast.error(errMsg);
     } finally { setSubmitting(false); }
