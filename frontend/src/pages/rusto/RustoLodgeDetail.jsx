@@ -361,7 +361,7 @@ export default function RustoLodgeDetail() {
           </Section>
 
           {/* Room types — pick to book */}
-          {availability?.rooms && availability.rooms.length > 0 && (
+          {availability?.rooms && availability.rooms.length > 0 ? (
             <Section title="Choose your room" eyebrow={`${availability.rooms.length} options available`}>
               <div className="space-y-3">
                 {availability.rooms.map((rt, i) => (
@@ -372,6 +372,30 @@ export default function RustoLodgeDetail() {
                 ))}
               </div>
             </Section>
+          ) : (
+            !validDates && lodge.room_types && lodge.room_types.length > 0 && (
+              <Section title="Our Accommodations" eyebrow={`${lodge.room_types.length} room types`}>
+                <div className="mb-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4 text-sm text-[#D4AF37] flex items-center gap-2.5">
+                  <span className="text-lg">📅</span>
+                  <span>Select your stay dates in the sidebar to check real-time availability and confirm booking rates.</span>
+                </div>
+                <div className="space-y-3">
+                  {lodge.room_types.map((rt, i) => (
+                    <RoomTypeCard key={rt.type}
+                                  rt={{
+                                    type: rt.type,
+                                    label: rt.label,
+                                    price_per_night: rt.base_tariff,
+                                    available: rt.total_rooms
+                                  }}
+                                  nights={0}
+                                  isPicked={false}
+                                  onPick={() => toast.info("Please select check-in and check-out dates in the sidebar first.")}
+                                  index={i}/>
+                  ))}
+                </div>
+              </Section>
+            )
           )}
 
           {!availability && validDates && (

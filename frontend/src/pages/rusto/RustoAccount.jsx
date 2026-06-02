@@ -280,13 +280,14 @@ function QuickLinksCard() {
   const links = [
     { to: "/search",           Icon: Compass,     label: "Find your next stay" },
     { to: "/account/bookings", Icon: BookOpen,    label: "My bookings" },
-    { to: "#",                 Icon: Heart,       label: "Saved lodges" },
+    { to: "/wishlist",         Icon: Heart,       label: "Saved lodges" },
     { to: "#",                 Icon: Gift,        label: "Refer & earn" },
   ];
   return (
     <div className="card bg-white border border-ink-100 p-2">
       {links.map((l, i) => (
         <Link key={i} to={l.to}
+              onClick={(e) => l.to === "#" && (e.preventDefault(), toast.info("Elite RUSTO Concierge: Share your private invite link to earn ₹1,000 in direct booking credits! Details are active in your WhatsApp portal."))}
               className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gold-50 transition-all group">
           <div className="w-9 h-9 rounded-xl bg-ink-100 group-hover:bg-gold group-hover:text-navy-dark
                             flex items-center justify-center text-ink-500 transition-all">

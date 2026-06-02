@@ -263,6 +263,9 @@ export default function RustoSearch() {
                                 navigate(`/lodges/${s.code}`);
                               } else {
                                 setEdit(p => ({ ...p, city: s.text }));
+                                const next = new URLSearchParams(params);
+                                next.set("city", s.text);
+                                setParams(next);
                               }
                               setShowSuggestions(false);
                             }}

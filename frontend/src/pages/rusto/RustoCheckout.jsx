@@ -39,7 +39,7 @@ export default function RustoCheckout() {
   const { bookingId } = useParams();
   const loc = useLocation();
   const nav = useNavigate();
-  const { customer } = useCustomerAuth();
+  const { customer, updateProfile } = useCustomerAuth();
 
   const initial = loc.state || null;
   const [booking, setBooking] = useState(initial?.booking || null);
@@ -47,6 +47,42 @@ export default function RustoCheckout() {
   const [loading, setLoading] = useState(!initial);
   const [paying, setPaying] = useState(false);
   const [done, setDone] = useState(false);
+
+  const [editingContact, setEditingContact] = useState(false);
+  const [contactForm, setContactForm] = useState({
+    full_name: "",
+    phone: "",
+    email: ""
+  });
+  const [savingContact, setSavingContact] = useState(false);
+
+  // Initialize form when customer changes
+  useEffect(() => {
+    if (customer) {
+      setContactForm({
+        full_name: customer.full_name || "",
+        phone: customer.phone || "",
+        email: customer.email || ""
+      });
+    }
+  }, [customer]);
+
+  const saveContact = async () => {
+    if (!contactForm.full_name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    setSavingContact(true);
+    try {
+      await updateProfile(contactForm);
+      toast.success("Guest details updated successfully");
+      setEditingContact(false);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Failed to update details");
+    } finally {
+      setSavingContact(false);
+    }
+  };
 
   useEffect(() => {
     if (initial) return;
@@ -151,14 +187,80 @@ export default function RustoCheckout() {
           <p className="text-ink-500 mb-8">Review the details below and complete your booking with a secure payment.</p>
 
           {/* Guest details card */}
-          <SectionCard title="Guest details" icon={Users}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <DetailField label="Full name" value={customer?.full_name || "Guest"} Icon={Users}/>
-              <DetailField label="Phone" value={customer?.phone || "—"} Icon={Phone}/>
-              <DetailField label="Email" value={customer?.email || "—"} Icon={Mail}/>
-              <DetailField label="Guests" value={`${booking.adults} adult${booking.adults > 1 ? "s" : ""}`}
-                            Icon={Users}/>
-            </div>
+          <SectionCard 
+            title="Guest details" 
+            icon={Users}
+            action={
+              !editingContact ? (
+                <button
+                  onClick={() => {
+                    setContactForm({
+                      full_name: customer?.full_name || "",
+                      phone: customer?.phone || "",
+                      email: customer?.email || ""
+                    });
+                    setEditingContact(true);
+                  }}
+                  className="text-2xs font-semibold text-[#D4AF37] hover:text-gold uppercase tracking-widest hover:underline"
+                >
+                  Edit contact
+                </button>
+              ) : (
+                <div className="flex gap-2 text-2xs">
+                  <button onClick={() => setEditingContact(false)} className="text-white/60 hover:text-white font-semibold">
+                    Cancel
+                  </button>
+                  <span className="text-white/20">|</span>
+                  <button onClick={saveContact} disabled={savingContact} className="text-[#D4AF37] font-bold hover:text-gold uppercase">
+                    {savingContact ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              )
+            }
+          >
+            {!editingContact ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <DetailField label="Full name" value={customer?.full_name || "Guest"} Icon={Users}/>
+                <DetailField label="Phone" value={customer?.phone || "—"} Icon={Phone}/>
+                <DetailField label="Email" value={customer?.email || "—"} Icon={Mail}/>
+                <DetailField label="Guests" value={`${booking.adults} adult${booking.adults > 1 ? "s" : ""}`}
+                              Icon={Users}/>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                  <span className="text-3xs uppercase tracking-widest font-bold text-[#D4AF37] mb-1.5 block">Full Name</span>
+                  <input
+                    type="text"
+                    value={contactForm.full_name}
+                    onChange={(e) => setContactForm((f) => ({ ...f, full_name: e.target.value }))}
+                    className="w-full bg-transparent border-none outline-none text-white text-xs font-semibold"
+                  />
+                </div>
+                <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                  <span className="text-3xs uppercase tracking-widest font-bold text-[#D4AF37] mb-1.5 block">Phone</span>
+                  <input
+                    type="text"
+                    value={contactForm.phone}
+                    onChange={(e) => setContactForm((f) => ({ ...f, phone: e.target.value }))}
+                    className="w-full bg-transparent border-none outline-none text-white text-xs font-semibold font-mono"
+                  />
+                </div>
+                <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                  <span className="text-3xs uppercase tracking-widest font-bold text-[#D4AF37] mb-1.5 block">Email</span>
+                  <input
+                    type="email"
+                    value={contactForm.email}
+                    onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))}
+                    className="w-full bg-transparent border-none outline-none text-white text-xs font-semibold"
+                  />
+                </div>
+                <div className="rounded-xl bg-white/5 border border-white/15 p-3 flex flex-col justify-center">
+                  <span className="text-3xs uppercase tracking-widest font-bold text-white/40 block">Guests</span>
+                  <span className="text-xs font-semibold text-white/60 mt-1">{booking.adults} Adults</span>
+                </div>
+              </div>
+            )}
           </SectionCard>
 
           {/* Payment method */}
@@ -288,12 +390,15 @@ function StepIndicator({ currentStep }) {
   );
 }
 
-function SectionCard({ title, icon: Icon, children, className = "" }) {
+function SectionCard({ title, icon: Icon, children, className = "", action }) {
   return (
     <div className={`card border border-ink-100 ${className}`}>
-      <h3 className="font-display text-lg font-bold text-navy flex items-center gap-2 mb-4">
-        <Icon size={16} className="text-gold"/> {title}
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-display text-lg font-bold text-navy flex items-center gap-2">
+          <Icon size={16} className="text-gold"/> {title}
+        </h3>
+        {action}
+      </div>
       {children}
     </div>
   );

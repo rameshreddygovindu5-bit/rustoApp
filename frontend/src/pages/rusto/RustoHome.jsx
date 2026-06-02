@@ -397,7 +397,13 @@ export default function RustoHome() {
                               if (s.type === "lodge") {
                                 navigate(`/lodges/${s.code}`);
                               } else {
-                                setQ(p => ({ ...p, city: s.text }));
+                                const params = new URLSearchParams();
+                                params.set("city", s.text);
+                                if (q.from) params.set("from", q.from);
+                                if (q.to) params.set("to", q.to);
+                                if (q.rooms) params.set("rooms", q.rooms);
+                                if (q.guests) params.set("guests", q.guests);
+                                navigate(`/search?${params.toString()}`);
                               }
                               setShowSuggestions(false);
                             }}
@@ -430,7 +436,13 @@ export default function RustoHome() {
                             key={c.city}
                             type="button"
                             onClick={() => {
-                              setQ(p => ({ ...p, city: c.city }));
+                              const params = new URLSearchParams();
+                              params.set("city", c.city);
+                              if (q.from) params.set("from", q.from);
+                              if (q.to) params.set("to", q.to);
+                              if (q.rooms) params.set("rooms", q.rooms);
+                              if (q.guests) params.set("guests", q.guests);
+                              navigate(`/search?${params.toString()}`);
                               setShowSuggestions(false);
                             }}
                             className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/10 transition-colors flex items-center gap-2"
