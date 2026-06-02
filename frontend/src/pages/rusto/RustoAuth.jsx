@@ -67,10 +67,68 @@ function Auth({ mode }) {
   };
 
   return (
-    <div className="-mt-16 md:-mt-20 min-h-screen grid grid-cols-1 lg:grid-cols-2">
+    <div className="-mt-16 md:-mt-20 min-h-screen grid grid-cols-1 lg:grid-cols-2 relative overflow-hidden">
+      <style>{`
+        .hero-cinema::after {
+          background: linear-gradient(180deg, transparent 75%, #06151A 100%) !important;
+        }
+        @keyframes orb-float-1 {
+          0% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(40px, -60px) scale(1.15); }
+          100% { transform: translate(0, 0) scale(1); }
+        }
+        @keyframes orb-float-2 {
+          0% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(-30px, 40px) scale(0.9); }
+          100% { transform: translate(0, 0) scale(1); }
+        }
+        @keyframes card-glow {
+          0% { box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35); border-color: rgba(255, 255, 255, 0.1); }
+          50% { box-shadow: 0 8px 32px 0 rgba(212, 175, 55, 0.05), 0 0 20px rgba(212, 175, 55, 0.15); border-color: rgba(212, 175, 55, 0.35); }
+          100% { box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35); border-color: rgba(255, 255, 255, 0.1); }
+        }
+        .luxury-glow-card {
+          animation: card-glow 6s infinite ease-in-out !important;
+        }
+        .animated-orb-1 {
+          animation: orb-float-1 20s infinite ease-in-out !important;
+        }
+        .animated-orb-2 {
+          animation: orb-float-2 25s infinite ease-in-out !important;
+        }
+        .breathe-logo {
+          animation: logo-breathe 4s infinite ease-in-out !important;
+        }
+        @keyframes logo-breathe {
+          0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(212, 175, 55, 0.2)); }
+          50% { transform: scale(1.05); filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.5)); }
+        }
+        .btn-amber-glow-animated {
+          background: linear-gradient(135deg, #D4AF37 0%, #AA7C11 100%) !important;
+          color: #081C22 !important;
+          border-radius: 12px !important;
+          font-weight: 700 !important;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .btn-amber-glow-animated:hover {
+          background: linear-gradient(135deg, #F5E7C4 0%, #D4AF37 100%) !important;
+          transform: translateY(-2px) !important;
+          box-shadow: 0 10px 25px rgba(212, 175, 55, 0.45) !important;
+        }
+        .luxury-glow-input:focus {
+          border-color: #D4AF37 !important;
+          box-shadow: 0 0 15px rgba(212, 175, 55, 0.25) !important;
+          background: rgba(255, 255, 255, 0.07) !important;
+        }
+      `}</style>
+
+      {/* Floating background elements */}
+      <div className="absolute top-[15%] left-[5%] w-80 h-80 rounded-full bg-gradient-to-br from-[#D4AF37]/10 to-transparent blur-[100px] pointer-events-none animated-orb-1 z-0" />
+      <div className="absolute bottom-[10%] right-[5%] w-96 h-96 rounded-full bg-gradient-to-br from-[#0B252C]/30 to-transparent blur-[120px] pointer-events-none animated-orb-2 z-0" />
+
       {/* ═════════ LEFT: brand hero ═════════ */}
       <aside className="relative hero-cinema text-white px-8 py-12 lg:py-16 lg:px-16
-                          flex flex-col justify-between overflow-hidden">
+                          flex flex-col justify-between overflow-hidden z-10">
         <div className="hero-stars"/>
         <div className="absolute top-1/3 -right-32 w-96 h-96 rounded-full bg-gold/20 blur-3xl
                           animate-parallax-slow pointer-events-none"/>
@@ -183,7 +241,7 @@ function Auth({ mode }) {
 
           {/* Form card */}
           <form onSubmit={submit}
-                className="glass-panel-lux p-6 md:p-8 space-y-4 animate-rise-scale"
+                className="glass-panel-lux luxury-glow-card p-6 md:p-8 space-y-4 animate-rise-scale"
                 style={{ animationDelay: "100ms" }}>
             {error && (
               <div className="bg-red-500/10 border border-red-500/30 text-red-200 rounded-xl px-4 py-3 text-sm mb-4 flex items-center gap-2.5 animate-fade-in">
@@ -230,7 +288,7 @@ function Auth({ mode }) {
 
             {/* Submit */}
             <button type="submit" disabled={submitting}
-                    className="w-full px-6 py-3.5 btn-amber-glow text-navy font-bold text-base uppercase tracking-eyebrow
+                    className="w-full px-6 py-3.5 btn-amber-glow-animated text-navy font-bold text-base uppercase tracking-eyebrow
                                 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200
                                 disabled:opacity-60 disabled:cursor-wait
                                 flex items-center justify-center gap-2 mt-4 shadow-md">

@@ -86,13 +86,67 @@ export default function Login() {
   const isPremiumTheme = settings.premium_theme_enabled !== 'false'
 
   return (
-    <div className={`${isPremiumTheme ? 'rusto-layout' : ''} min-h-screen flex flex-col md:flex-row bg-ink-50`}>
+    <div className={`${isPremiumTheme ? 'rusto-layout' : ''} min-h-screen flex flex-col md:flex-row bg-ink-50 relative overflow-hidden`}>
+      <style>{`
+        @keyframes orb-float-1 {
+          0% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(40px, -60px) scale(1.15); }
+          100% { transform: translate(0, 0) scale(1); }
+        }
+        @keyframes orb-float-2 {
+          0% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(-30px, 40px) scale(0.9); }
+          100% { transform: translate(0, 0) scale(1); }
+        }
+        @keyframes card-glow {
+          0% { box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35); border-color: rgba(255, 255, 255, 0.1); }
+          50% { box-shadow: 0 8px 32px 0 rgba(212, 175, 55, 0.05), 0 0 20px rgba(212, 175, 55, 0.15); border-color: rgba(212, 175, 55, 0.35); }
+          100% { box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35); border-color: rgba(255, 255, 255, 0.1); }
+        }
+        .luxury-glow-card {
+          animation: card-glow 6s infinite ease-in-out !important;
+        }
+        .animated-orb-1 {
+          animation: orb-float-1 20s infinite ease-in-out !important;
+        }
+        .animated-orb-2 {
+          animation: orb-float-2 25s infinite ease-in-out !important;
+        }
+        .breathe-logo {
+          animation: logo-breathe 4s infinite ease-in-out !important;
+        }
+        @keyframes logo-breathe {
+          0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(212, 175, 55, 0.15)); }
+          50% { transform: scale(1.05); filter: drop-shadow(0 0 12px rgba(212, 175, 55, 0.45)); }
+        }
+        .btn-amber-glow-animated {
+          background: linear-gradient(135deg, #D4AF37 0%, #AA7C11 100%) !important;
+          color: #081C22 !important;
+          border-radius: 12px !important;
+          font-weight: 700 !important;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .btn-amber-glow-animated:hover {
+          background: linear-gradient(135deg, #F5E7C4 0%, #D4AF37 100%) !important;
+          transform: translateY(-2px) !important;
+          box-shadow: 0 10px 25px rgba(212, 175, 55, 0.45) !important;
+        }
+        .luxury-glow-input:focus {
+          border-color: #D4AF37 !important;
+          box-shadow: 0 0 15px rgba(212, 175, 55, 0.25) !important;
+          background: rgba(255, 255, 255, 0.07) !important;
+        }
+      `}</style>
+
+      {/* Floating background elements */}
+      <div className="absolute top-[10%] left-[-5%] w-80 h-80 rounded-full bg-gradient-to-br from-[#D4AF37]/10 to-transparent blur-[100px] pointer-events-none animated-orb-1 z-0" />
+      <div className="absolute bottom-[10%] right-[10%] w-96 h-96 rounded-full bg-gradient-to-br from-[#0B252C]/30 to-transparent blur-[120px] pointer-events-none animated-orb-2 z-0" />
+
       {/* ── LEFT — Brand panel ────────────────────────────────────────── */}
-      <aside className={`relative md:w-[42%] lg:w-[48%] ${isPremiumTheme ? 'bg-transparent' : 'bg-navy-dark'} border-r border-white/5 backdrop-blur-md overflow-hidden flex flex-col justify-between p-8 md:p-12 lg:p-16 text-white`}>
-        {/* Decorative gold orbs — large blurred shapes add depth and now
-            float slowly like chandeliers catching light. */}
-        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-gold/20 blur-3xl pointer-events-none animate-float" />
-        <div className="absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-gold/10 blur-3xl pointer-events-none animate-float-slow" />
+      <aside className={`relative md:w-[42%] lg:w-[48%] ${isPremiumTheme ? 'bg-transparent' : 'bg-navy-dark'} border-r border-white/5 backdrop-blur-md overflow-hidden flex flex-col justify-between p-8 md:p-12 lg:p-16 text-white z-10`}>
+        {/* Decorative gold orbs */}
+        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-gold/20 blur-3xl pointer-events-none animated-orb-1" />
+        <div className="absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-gold/10 blur-3xl pointer-events-none animated-orb-2" />
         {/* Subtle dot grid */}
         <div className="absolute inset-0 opacity-30 pointer-events-none"
              style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)',
@@ -147,7 +201,7 @@ export default function Login() {
         </div>
         <div className="w-full max-w-md animate-fade-in mt-12 md:mt-0">
           {/* Card */}
-          <div className="bg-white rounded-2xl shadow-card border border-ink-100 p-8 md:p-10 glass-panel-lux">
+          <div className="bg-white rounded-2xl shadow-card border border-ink-100 p-8 md:p-10 glass-panel-lux luxury-glow-card">
             {/* Step header */}
             <div className="mb-8">
               <p className="text-2xs uppercase tracking-eyebrow text-gold font-bold mb-2">
@@ -188,12 +242,12 @@ export default function Login() {
                   placeholder="000000" autoFocus
                   value={totpCode}
                   onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  className="w-full bg-ink-50 border-2 border-ink-200 focus:border-gold focus:ring-4 focus:ring-gold/10 text-navy text-center text-3xl font-mono tracking-[0.5em] placeholder-ink-300 rounded-xl py-4 outline-none transition-all"
+                  className="w-full bg-white/5 border border-white/10 focus:border-gold focus:ring-4 focus:ring-gold/10 text-white text-center text-3xl font-mono tracking-[0.5em] placeholder-white/20 rounded-xl py-4 outline-none transition-all luxury-glow-input"
                 />
                 <button
                   type="submit"
                   disabled={loading || totpCode.length !== 6}
-                  className="w-full bg-white text-navy font-bold py-3.5 rounded-xl transition-all duration-200 shadow-soft hover:shadow-lifted disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+                  className="w-full btn-amber-glow-animated text-navy font-bold py-3.5 rounded-xl transition-all duration-200 shadow-soft hover:shadow-lifted disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
                 >
                   {loading ? (
                     <>
@@ -229,7 +283,7 @@ export default function Login() {
                       placeholder="Your username"
                       value={form.username}
                       onChange={e => setForm({ ...form, username: e.target.value })}
-                      className="w-full bg-ink-50 border-2 border-ink-200 focus:border-gold focus:ring-4 focus:ring-gold/10 text-navy placeholder-ink-400 rounded-xl pl-11 pr-4 py-3.5 text-sm outline-none transition-all"
+                      className="w-full bg-white/5 border border-white/10 focus:border-gold focus:ring-4 focus:ring-gold/10 text-white placeholder-white/30 rounded-xl pl-11 pr-4 py-3.5 text-sm outline-none transition-all luxury-glow-input"
                     />
                   </div>
                 </div>
@@ -239,13 +293,13 @@ export default function Login() {
                     Password
                   </label>
                   <div className="relative group">
-                    <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400 group-focus-within:text-gold transition-colors" />
+                    <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-gold transition-colors" />
                     <input
                       type={showPass ? 'text' : 'password'}
                       placeholder="••••••••"
                       value={form.password}
                       onChange={e => setForm({ ...form, password: e.target.value })}
-                      className="w-full bg-ink-50 border-2 border-ink-200 focus:border-gold focus:ring-4 focus:ring-gold/10 text-navy placeholder-ink-400 rounded-xl pl-11 pr-11 py-3.5 text-sm outline-none transition-all"
+                      className="w-full bg-white/5 border border-white/10 focus:border-gold focus:ring-4 focus:ring-gold/10 text-white placeholder-white/30 rounded-xl pl-11 pr-11 py-3.5 text-sm outline-none transition-all luxury-glow-input"
                     />
                     <button
                       type="button"
@@ -260,11 +314,11 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-white text-navy font-bold py-3.5 rounded-xl transition-all duration-200 shadow-soft hover:shadow-lifted disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group mt-2"
+                  className="w-full btn-amber-glow-animated text-navy font-bold py-3.5 rounded-xl transition-all duration-200 shadow-soft hover:shadow-lifted disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group mt-2"
                 >
                   {loading ? (
                     <>
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
                       Signing in
                     </>
                   ) : (
