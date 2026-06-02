@@ -416,7 +416,7 @@ def _seed_lodge_admin_users(engine):
             conn.execute(text(
                 "INSERT INTO users (lodge_id, username, password_hash, full_name, "
                 "role, is_active, failed_attempts) "
-                "VALUES (1, 'admin', :pw, 'Default Administrator', 'admin', 1, 0)"
+                "VALUES (1, 'admin', :pw, 'Default Administrator', 'admin', true, 0)"
             ), {"pw": get_password_hash("Admin@1234")})
             logger.info("Bootstrap: seeded default user 'admin' (password: Admin@1234) for lodge 1")
         # 1) Attach the bootstrap 'admin' user to lodge 1 if it isn't yet.
@@ -434,7 +434,7 @@ def _seed_lodge_admin_users(engine):
         conn.execute(text(
             "INSERT INTO users (lodge_id, username, password_hash, full_name, "
             "role, is_active, failed_attempts) "
-            "VALUES (:lid, 'rkadmin', :pw, 'RK Lodge Administrator', 'admin', 1, 0)"
+            "VALUES (:lid, 'rkadmin', :pw, 'RK Lodge Administrator', 'admin', true, 0)"
         ), {"lid": rk_lid, "pw": get_password_hash("rkadmin123")})
         logger.info("Multi-tenant: seeded user 'rkadmin' (password: rkadmin123) for RK Lodge")
 
@@ -458,7 +458,7 @@ def _seed_super_admin(engine):
             "INSERT INTO users (lodge_id, username, password_hash, full_name, "
             "role, is_active, failed_attempts) "
             "VALUES (NULL, 'superadmin', :pw, 'Super Administrator', "
-            "'super_admin', 1, 0)"
+            "'super_admin', true, 0)"
         ), {"pw": get_password_hash("superadmin123")})
         logger.info("Multi-tenant: seeded user 'superadmin' (password: superadmin123) — change this password immediately")
 
