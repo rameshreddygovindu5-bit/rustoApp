@@ -2528,3 +2528,112 @@ h1, h2, h3, .font-display {
   background: rgba(255, 255, 255, 0.05);
 }
 
+
+/* ════════════════════════════════════════════════════════════════════
+   LUXURY REDESIGN UPGRADES (2026 ELITE EDITION)
+   ──────────────────────────────────────────────────────────────────── */
+:root {
+  --deep-ocean: #081C22;
+  --midnight: #102C34;
+  --gold: #D4AF37;
+  --champagne: #F5E7C4;
+  --ivory: #FCFCFA;
+  --mist: #EEF2F4;
+  --success: #00C48C;
+  
+  /* Reset the display font stack to our new Luxury display font */
+  --font-display: 'Cormorant Garamond', 'Plus Jakarta Sans', serif;
+}
+
+/* Glassmorphism System globally */
+.glass {
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(25px) !important;
+  -webkit-backdrop-filter: blur(25px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Premium Motion bezier cubic ease */
+.transition-lux {
+  transition: all .4s cubic-bezier(.22,.61,.36,1) !important;
+}
+
+/* Smooth zoom-in on card images */
+.hover-zoom img {
+  transition: transform .6s cubic-bezier(.22,.61,.36,1) !important;
+}
+.hover-zoom:hover img {
+  transform: scale(1.05) !important;
+}
+
+/* Lift on hover */
+.hover-lift {
+  transition: all .4s cubic-bezier(.22,.61,.36,1) !important;
+}
+.hover-lift:hover {
+  transform: translateY(-8px) !important;
+  box-shadow: 0 20px 40px -15px rgba(8, 28, 34, 0.5) !important;
+}
+
+/* ── Luxury Redesign Colors & Elements (Deep Ocean, Gold) ── */
+.search-panel-pill {
+  background: rgba(8, 28, 34, 0.5) !important; /* Deep Ocean */
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(30px) !important;
+  -webkit-backdrop-filter: blur(30px) !important;
+}
+
+.search-panel-pill:hover,
+.search-panel-pill:focus-within {
+  border-color: rgba(212, 175, 55, 0.4) !important; /* Gold */
+  box-shadow: 0 20px 50px 0 rgba(212, 175, 55, 0.15), 0 12px 40px 0 rgba(0, 0, 0, 0.4) !important;
+}
+
+.vibe-chip:hover {
+  border-color: rgba(212, 175, 55, 0.4) !important;
+}
+
+.vibe-chip.active {
+  background: rgba(212, 175, 55, 0.15) !important;
+  border-color: #D4AF37 !important;
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.25), 0 0 12px rgba(212, 175, 55, 0.15) !important;
+}
+
+.badge-gold {
+  background: rgba(212, 175, 55, 0.1) !important;
+  color: #D4AF37 !important;
+  border: 1px solid rgba(212, 175, 55, 0.2) !important;
+}
+
+.btn-gold {
+  background: linear-gradient(135deg, #D4AF37 0%, #A8873C 100%) !important;
+  color: #081C22 !important;
+  font-weight: 750 !important;
+}
+
+.btn-gold:hover {
+  box-shadow: 0 8px 24px -4px rgba(212, 175, 55, 0.4) !important;
+}
+
+.text-gold-gradient {
+  background: linear-gradient(135deg, #F5E7C4 0%, #D4AF37 50%, #A8873C 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+.text-gold-drift {
+  background: linear-gradient(90deg, #A8873C 0%, #D4AF37 25%, #FCFCFA 50%, #D4AF37 75%, #A8873C 100%) !important;
+  background-size: 200% 100% !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  animation: goldDrift 6s linear infinite !important;
+}
+
+/* Background Gradients */
+.bg-deep-gradient {
+  background: linear-gradient(180deg, #081C22 0%, #102C34 40%, #081C22 100%) !important;
+}
+
+

@@ -15,8 +15,13 @@ import PortalSwitcher from "../Layout/PortalSwitcher";
  */
 
 const NAV_LINKS = [
-  { to: "/",        label: "Discover" },
-  { to: "/search",  label: "Search lodges" },
+  { to: "/",        label: "Home" },
+  { to: "/search",  label: "Destinations" },
+  { to: "/#experiences", label: "Experiences" },
+  { to: "/search",  label: "Lodges" },
+  { to: "/#offers", label: "Offers" },
+  { to: "/#membership", label: "Membership" },
+  { to: "/#about",  label: "About" },
 ];
 
 export default function RustoLayout() {
@@ -140,11 +145,15 @@ export default function RustoLayout() {
               ) : (
                 <>
                   <Link to="/signin"
-                        className="text-sm font-semibold px-4 py-2 rounded-xl transition-all hidden sm:inline-block text-white/80 hover:text-white hover:bg-white/10">
-                    Sign in
+                        className="text-sm font-semibold px-4 py-2 rounded-xl transition-all hidden lg:inline-block text-white/80 hover:text-white hover:bg-white/10">
+                    Login
                   </Link>
-                  <Link to="/signup" className="btn-amber-glow text-navy text-sm hidden sm:inline-flex px-5 py-2">
-                    Sign up
+                  <Link to="/signup"
+                        className="text-sm font-semibold px-4 py-2 rounded-xl transition-all hidden lg:inline-block text-white/80 hover:text-white hover:bg-white/10">
+                    Register
+                  </Link>
+                  <Link to="/register-lodge" className="btn-gold text-navy text-sm hidden sm:inline-flex px-5 py-2">
+                    Become Host
                   </Link>
                 </>
               )}
@@ -210,9 +219,35 @@ export default function RustoLayout() {
       )}
 
       {/* ── Page content ─────────────────────────────────────── */}
-      <main className={`flex-1 ${transparentNav || isAuthPage ? "" : "pt-16 md:pt-20"}`}>
+      <main className={`flex-1 ${transparentNav || isAuthPage ? "" : "pt-16 md:pt-20"} pb-16 md:pb-0`}>
         <Outlet/>
       </main>
+
+      {/* Mobile Bottom Navigation Bar */}
+      {!isAuthPage && (
+        <div className="md:hidden fixed bottom-0 inset-x-0 h-16 bg-[#081C22]/95 border-t border-white/10 backdrop-blur-xl z-40 flex items-center justify-around text-white">
+          <NavLink to="/" end className={({ isActive }) => `flex flex-col items-center gap-1 text-[9px] uppercase tracking-widest font-bold ${isActive ? "text-[#D4AF37]" : "text-white/60"}`}>
+            <span className="text-lg">🏠</span>
+            <span>Home</span>
+          </NavLink>
+          <NavLink to="/search" className={({ isActive }) => `flex flex-col items-center gap-1 text-[9px] uppercase tracking-widest font-bold ${isActive ? "text-[#D4AF37]" : "text-white/60"}`}>
+            <span className="text-lg">🔍</span>
+            <span>Search</span>
+          </NavLink>
+          <NavLink to="/wishlist" className={({ isActive }) => `flex flex-col items-center gap-1 text-[9px] uppercase tracking-widest font-bold ${isActive ? "text-[#D4AF37]" : "text-white/60"}`}>
+            <span className="text-lg">❤️</span>
+            <span>Wishlist</span>
+          </NavLink>
+          <NavLink to="/account/bookings" className={({ isActive }) => `flex flex-col items-center gap-1 text-[9px] uppercase tracking-widest font-bold ${isActive ? "text-[#D4AF37]" : "text-white/60"}`}>
+            <span className="text-lg">📅</span>
+            <span>Trips</span>
+          </NavLink>
+          <NavLink to="/account" className={({ isActive }) => `flex flex-col items-center gap-1 text-[9px] uppercase tracking-widest font-bold ${isActive ? "text-[#D4AF37]" : "text-white/60"}`}>
+            <span className="text-lg">👤</span>
+            <span>Profile</span>
+          </NavLink>
+        </div>
+      )}
 
       {/* ── Footer ────────────────────────────────────────────── */}
       {!isAuthPage && (

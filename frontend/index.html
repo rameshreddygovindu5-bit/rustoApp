@@ -14,7 +14,7 @@
 
     <link rel="manifest" href="/manifest.webmanifest" />
     
-    <meta name="theme-color" content="#0B252C" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#081C22" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
 
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
@@ -28,13 +28,13 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
       /* Enforcing typography and layout rules for the entire app ecosystem */
       :root {
         --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
-        --font-display: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+        --font-display: 'Cormorant Garamond', 'Plus Jakarta Sans', serif;
       }
       
       html, body {
@@ -43,7 +43,7 @@
         width: 100%;
         height: 100%;
         font-family: var(--font-sans);
-        background-color: #0B252C; /* Stargazer misty deep teal base canvas */
+        background-color: #081C22; /* Deep Ocean */
         color: #F8FAFC;
         overflow-x: hidden;
         -webkit-font-smoothing: antialiased;
@@ -70,7 +70,7 @@
         left: 0;
         width: 100vw;
         height: 100vh;
-        background: #0B252C;
+        background: #081C22; /* Deep Ocean background */
         display: flex;
         justify-content: center;
         align-items: center;
@@ -87,24 +87,29 @@
         align-items: center;
       }
 
-      /* High-end radial spinner on hardware-accelerated stack */
-      .loader-spinner {
+      /* Luxury monogram rotating and pulsing ring */
+      .logo-ring {
         position: absolute;
         width: 100%;
         height: 100%;
         border-radius: 50%;
         border: 2px solid transparent;
-        border-top-color: rgba(214, 154, 128, 0.4);
-        border-right-color: rgba(214, 154, 128, 0.1);
-        border-bottom-color: rgba(214, 154, 128, 0.05);
-        animation: spinHardware 1.2s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
+        border-top-color: #D4AF37; /* Gold */
+        border-right-color: rgba(212, 175, 55, 0.2);
+        border-bottom-color: rgba(212, 175, 55, 0.05);
+        animation: rotate 12s linear infinite, pulse 3s infinite;
         will-change: transform;
-        transform: translateZ(0); /* Force GPU acceleration */
+        transform: translateZ(0);
       }
 
-      @keyframes spinHardware {
+      @keyframes rotate {
         0% { transform: rotate(0deg) translateZ(0); }
         100% { transform: rotate(360deg) translateZ(0); }
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 0.8; }
+        50% { opacity: 1; border-width: 3px; }
       }
 
       .loader-content {
@@ -118,24 +123,22 @@
 
       .loader-brand {
         font-family: var(--font-display);
-        font-size: 26px;
-        font-weight: 800;
-        letter-spacing: 0.15em;
-        text-indent: 0.15em;
-        background: linear-gradient(135deg, #FFFFFF 0%, #D69A80 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-transform: uppercase;
-        margin-bottom: 6px;
+        font-size: 58px;
+        font-weight: 300;
+        color: #D4AF37; /* Gold */
+        text-shadow: 0 0 15px rgba(212, 175, 55, 0.35);
+        margin-bottom: 2px;
+        line-height: 1;
+        letter-spacing: normal;
+        text-indent: 0;
       }
 
       .loader-tagline {
         font-family: var(--font-sans);
-        font-size: 9px;
+        font-size: 8px;
         font-weight: 700;
-        letter-spacing: 0.28em;
-        text-indent: 0.28em;
-        color: rgba(214, 154, 128, 0.7);
+        letter-spacing: 0.3em;
+        color: #F5E7C4; /* Champagne */
         text-transform: uppercase;
         animation: taglineBreathe 2s ease-in-out infinite;
       }
@@ -157,10 +160,10 @@
     
     <div id="app-preloader">
       <div class="loader-container">
-        <div class="loader-spinner"></div>
+        <div class="logo-ring"></div>
         <div class="loader-content">
-          <div class="loader-brand">RUSTO</div>
-          <div class="loader-tagline">TRAVEL & REST</div>
+          <div class="loader-brand">R</div>
+          <div class="loader-tagline">Rusto Elite</div>
         </div>
       </div>
     </div>
