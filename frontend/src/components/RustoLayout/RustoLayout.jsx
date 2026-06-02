@@ -7,6 +7,7 @@ import { useCustomerAuth } from "../../context/CustomerAuthContext";
 import { useSettings } from "../../context/SettingsContext";
 import { RustoMark } from "../RustoLogo/RustoLogo";
 import PortalSwitcher from "../Layout/PortalSwitcher";
+import { toast } from "react-toastify";
 
 /**
  * RustoLayout — chrome for the customer-facing site.
@@ -47,10 +48,27 @@ export default function RustoLayout() {
     setMenuOpen(false);
   }, [location.pathname]);
 
-  // Scroll to top on route change for a "fresh page" feel
+  // Scroll to top or to hash on route change
   useEffect(() => {
+    if (location.hash) {
+      const hashId = location.hash.slice(1);
+      let attempts = 0;
+      const tryScroll = () => {
+        const el = document.getElementById(hashId);
+        if (el) {
+          setTimeout(() => {
+            el.scrollIntoView({ behavior: "smooth" });
+          }, 50);
+        } else if (attempts < 15) {
+          attempts++;
+          setTimeout(tryScroll, 100);
+        }
+      };
+      tryScroll();
+      return;
+    }
     window.scrollTo({ top: 0, behavior: "instant" });
-  }, [location.pathname]);
+  }, [location.pathname, location.hash]);
 
   // Pages that benefit from a transparent overlay nav (hero spans the top)
   const transparentNav = location.pathname === "/" && !scrolled;
@@ -251,7 +269,7 @@ export default function RustoLayout() {
 
       {/* ── Footer ────────────────────────────────────────────── */}
       {!isAuthPage && (
-        <footer className="rusto-footer text-white/70 pt-16 pb-8 mt-20">
+        <footer id="about" className="rusto-footer text-white/70 pt-16 pb-8 mt-20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-12 gap-8 mb-12">
               {/* Brand + tagline */}
@@ -339,6 +357,7 @@ function FooterColumn({ title, links }) {
         {links.map((l, i) => (
           <li key={i}>
             <Link to={l.to}
+                  onClick={(e) => l.to === "#" && (e.preventDefault(), toast.info(`Elite RUSTO Concierge: The "${l.label}" section is available via our 24/7 WhatsApp Concierge.`))}
                   className="text-white/60 hover:text-white transition-colors duration-150
                              inline-block relative group">
               {l.label}

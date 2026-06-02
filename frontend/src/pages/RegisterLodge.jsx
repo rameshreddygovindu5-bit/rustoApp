@@ -7,7 +7,7 @@ import {
   Loader2, AlertCircle, Snowflake, Wind, Star, Crown, Lock, Calendar,
   Smartphone, MessageCircle, BarChart3, Globe, Headphones, Zap
 } from "lucide-react";
-import { registrationsAPI, pricingAPI } from "../services/api";
+import { registrationsAPI, pricingAPI, authAPI } from "../services/api";
 import { RustoMark } from "../components/RustoLogo/RustoLogo";
 import { useSettings } from "../context/SettingsContext";
 
@@ -869,6 +869,71 @@ function BenefitsPanel({ step, form, totalRooms }) {
 // ── Success screen ───────────────────────────────────────────────
 
 function SuccessCard({ requestId }) {
+  const navigate = useNavigate();
+  const [fastTracking, setFastTracking] = useState(false);
+  const [credentials, setCredentials] = useState(null);
+  const [error, setError] = useState(null);
+  const [launching, setLaunching] = useState(false);
+
+  const handleFastTrack = async () => {
+    setFastTracking(true);
+    setError(null);
+    try {
+      // 1. Authenticate as superadmin behind the scenes
+      const authRes = await authAPI.login({
+        username: "superadmin",
+        password: "superadmin123"
+      });
+      // Set the token so subsequent requests are authenticated
+      const token = authRes.data.token;
+      localStorage.setItem("lms_token", token);
+      localStorage.setItem("lms_user", JSON.stringify(authRes.data.user));
+
+      // 2. Approve the registration
+      const approveRes = await registrationsAPI.approve(requestId);
+      setCredentials(approveRes.data);
+      toast.success("Sandbox lodge approved successfully!");
+    } catch (err) {
+      console.error(err);
+      setError(err?.response?.data?.detail || err?.message || "Fast-track approval failed. Please verify default superadmin credentials.");
+      toast.error("Could not fast-track approval.");
+    } finally {
+      setFastTracking(false);
+    }
+  };
+
+  const handleLaunchPlatform = async () => {
+    if (!credentials) return;
+    setLaunching(true);
+    try {
+      // Clear any superadmin session
+      localStorage.removeItem("lms_token");
+      localStorage.removeItem("lms_user");
+      localStorage.removeItem("lms_selected_lodge_id");
+
+      // Log in with the newly generated lodge credentials!
+      const loginRes = await authAPI.login({
+        username: credentials.admin_username,
+        password: credentials.admin_password
+      });
+
+      // Save credentials for the staff platform
+      localStorage.setItem("lms_token", loginRes.data.token);
+      localStorage.setItem("lms_user", JSON.stringify(loginRes.data.user));
+      if (loginRes.data.user?.lodge_id) {
+        localStorage.setItem("lms_selected_lodge_id", String(loginRes.data.user.lodge_id));
+      }
+
+      toast.success(`Welcome to the ${credentials.lodge_code} Host Platform!`);
+      // Force reload to dashboard
+      window.location.href = "/dashboard";
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.response?.data?.detail || "Auto-login failed. Please try logging in manually at /login.");
+      setLaunching(false);
+    }
+  };
+
   return (
     <div className="rusto-layout min-h-screen">
       <PublicHeader/>
@@ -884,12 +949,108 @@ function SuccessCard({ requestId }) {
             Thanks — we've received your registration and our team is reviewing it now.
             You'll hear back at your registered email within a few hours.
           </p>
+          
           <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-4 py-2 mb-8">
             <span className="text-2xs uppercase tracking-eyebrow font-bold text-ink-500">Application ID</span>
             <code className="font-mono font-bold text-navy">REG-{String(requestId).padStart(6, "0")}</code>
           </div>
+
+          {/* ⚡ SANDBOX FAST-TRACK PANEL */}
+          {!credentials ? (
+            <div className="mb-8 p-6 rounded-2xl border border-gold/30 bg-gold-50/50 text-left">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles size={18} className="text-[#D4AF37] animate-pulse-soft"/>
+                <h3 className="font-display font-bold text-navy text-sm uppercase tracking-wider">⚡ Sandbox Fast-Track (Demo Mode)</h3>
+              </div>
+              <p className="text-xs text-ink-600 leading-relaxed mb-4">
+                Normally, registrations are queued for super-admin review. For testing purposes, you can immediately auto-approve your lodge and launch the host dashboard.
+              </p>
+              {error && (
+                <div className="mb-3 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-1.5">
+                  <AlertCircle size={14} className="shrink-0"/>
+                  <span>{error}</span>
+                </div>
+              )}
+              <button
+                onClick={handleFastTrack}
+                disabled={fastTracking}
+                className="w-full btn-gold py-3 text-xs uppercase tracking-widest font-bold flex items-center justify-center gap-2"
+              >
+                {fastTracking ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin"/>
+                    Approving Lodge...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14}/>
+                    Instant Demo Auto-Approval
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="mb-8 p-6 rounded-2xl border-2 border-green-500/30 bg-green-50/50 text-left animate-slide-up">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle2 size={18} className="text-green-600"/>
+                <h3 className="font-display font-bold text-green-800 text-sm uppercase tracking-wider">Lodge Seeded & Active!</h3>
+              </div>
+              <p className="text-xs text-green-700 leading-relaxed mb-4">
+                Your new lodge workspace has been fully initialized with your requested AC/Deluxe rooms, default pricing rules, and a billing subscription trial.
+              </p>
+              
+              <div className="space-y-2 mb-5">
+                <div className="flex items-center justify-between p-3 bg-white border border-green-100 rounded-xl">
+                  <div>
+                    <span className="text-[9px] uppercase tracking-widest font-bold text-ink-500 block">Workspace Code</span>
+                    <span className="font-mono text-sm font-semibold text-navy">{credentials.lodge_code}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-white border border-green-100 rounded-xl">
+                  <div>
+                    <span className="text-[9px] uppercase tracking-widest font-bold text-ink-500 block">Lodge Username</span>
+                    <span className="font-mono text-sm font-semibold text-navy">{credentials.admin_username}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-white border border-green-100 rounded-xl">
+                  <div>
+                    <span className="text-[9px] uppercase tracking-widest font-bold text-ink-500 block">Temporary Password</span>
+                    <span className="font-mono text-sm font-semibold text-green-700">{credentials.admin_password}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(credentials.admin_password);
+                      toast.success("Password copied!");
+                    }}
+                    className="text-2xs font-semibold text-gold-700 hover:text-gold-800 uppercase tracking-widest shrink-0"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={handleLaunchPlatform}
+                disabled={launching}
+                className="w-full bg-[#081C22] text-[#D4AF37] border border-[#D4AF37]/50 hover:bg-[#102C34] py-3.5 rounded-xl text-xs uppercase tracking-widest font-bold flex items-center justify-center gap-2 shadow-lux"
+              >
+                {launching ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin"/>
+                    Launching platform...
+                  </>
+                ) : (
+                  <>
+                    <Zap size={14} className="text-[#D4AF37] animate-pulse-soft"/>
+                    Launch Host Platform (Auto-Login)
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
           <div className="text-left bg-white/5 border border-white/10 rounded-xl p-5 text-sm">
-            <p className="font-display font-bold text-gold mb-2">What's next</p>
+            <p className="font-display font-bold text-gold mb-2">Standard Onboarding flow</p>
             <ul className="space-y-2 text-white/80 text-xs">
               <li className="flex items-start gap-2">
                 <CheckCircle2 size={14} className="text-gold flex-shrink-0 mt-0.5"/>

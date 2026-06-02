@@ -142,6 +142,56 @@ export default function RustoHome() {
     navigate(`/search?ai_q=${encodeURIComponent(aiQuery.trim())}`);
   };
 
+  // Custom message rendering helper that parses markdown links: [Label](url)
+  const renderChatMessage = (text) => {
+    if (!text) return null;
+    const regex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+      const [fullMatch, label, url] = match;
+      const matchIndex = match.index;
+
+      if (matchIndex > lastIndex) {
+        parts.push(text.substring(lastIndex, matchIndex));
+      }
+
+      if (url.startsWith("/") || url.startsWith("#")) {
+        parts.push(
+          <Link
+            key={matchIndex}
+            to={url}
+            className="text-[#D4AF37] font-bold hover:underline underline-offset-2 inline-flex items-center gap-0.5"
+          >
+            {label} <ArrowRight size={10} className="inline shrink-0" />
+          </Link>
+        );
+      } else {
+        parts.push(
+          <a
+            key={matchIndex}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#D4AF37] font-bold hover:underline underline-offset-2 inline-flex items-center gap-0.5"
+          >
+            {label} <ArrowRight size={10} className="inline shrink-0" strokeWidth={3} />
+          </a>
+        );
+      }
+
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : text;
+  };
+
   // AI chat send handler
   const handleSendChatMessage = () => {
     if (!chatInput.trim()) return;
@@ -152,14 +202,32 @@ export default function RustoHome() {
     setTimeout(() => {
       let reply = "I would be delighted to assist you. To browse our curated collection of lodges, please enter a destination like 'Goa', 'Kerala', or 'Leh' in standard search, or use my Trip Planner tab to sketch a day-by-day luxury itinerary.";
       const input = chatInput.toLowerCase();
-      if (input.includes("goa")) {
-        reply = "Ah, Goa. The pearl of the Orient. I recommend staying at the 'Rusto Palms Retreat' in North Goa. It features deluxe AC suites (from ₹1,800/night) with a private beach cove, standard Wi-Fi, and complete pool access. Would you like me to show you available rooms?";
-      } else if (input.includes("kerala")) {
-        reply = "Kerala backwaters offer pure serenity. I recommend our 'Vembanad Lake House' featuring traditional spice-wood houseboats, Ayurvedic wellness spa packages, and fresh backwater cuisine. Truly an unforgettable escape.";
-      } else if (input.includes("coorg")) {
-        reply = "For Coorg, the misty coffee hills, I recommend 'The Golden Leaf Lodge'. It features cozy mountain villas with private fireplaces, estate trekking tours, and plantation-fresh coffee tasting experiences.";
-      } else if (input.includes("budget") || input.includes("price") || input.includes("cheap")) {
-        reply = "Rusto Elite guarantees the best direct-booking rates. Our Smart Boutique stays start from just ₹800/night, while our Premium Haveli collection spans ₹1,800 to ₹3,500/night. No commission fees are ever added.";
+      
+      let matchedLodge = null;
+      if (featured && featured.length > 0) {
+        matchedLodge = featured.find(
+          (l) =>
+            input.includes((l.city || "").toLowerCase()) ||
+            input.includes((l.name || "").toLowerCase()) ||
+            input.includes((l.state || "").toLowerCase())
+        );
+      }
+
+      if (matchedLodge) {
+        const rating = matchedLodge.avg_rating || "4.8";
+        const price = matchedLodge.starting_tariff || 2500;
+        const locationStr = matchedLodge.city + (matchedLodge.state ? `, ${matchedLodge.state}` : "");
+        reply = `I highly recommend **${matchedLodge.name}** in ${locationStr}. It has an exceptional guest rating of ${rating}/5 ★, features verified premium amenities, and direct starting tariffs begin at just ₹${price.toLocaleString("en-IN")}/night. \n\nWould you like to explore it? You can [View & book ${matchedLodge.name} directly](/lodges/${matchedLodge.code}) here.`;
+      } else {
+        if (input.includes("goa")) {
+          reply = "Ah, Goa! Savor the gorgeous sandy beaches and direct beach retreat suites starting from ₹1,800/night. Savor standard WiFi and pool access. You can search our current [Goa Stays](/search?city=Goa) directly.";
+        } else if (input.includes("kerala")) {
+          reply = "Kerala offers pure serene luxury. Savor traditional backwater houseboats, wellness spa packages, and premium host hospitality. Discover our [Kerala Stays](/search?city=Kerala) here.";
+        } else if (input.includes("coorg")) {
+          reply = "For Coorg's misty hills, we offer spectacular estates with mountain villa suites, trekking, and fresh coffee tastings. Explore our [Coorg Hills Stays](/search?city=Coorg).";
+        } else if (input.includes("budget") || input.includes("price") || input.includes("cheap")) {
+          reply = "Rusto Elite guarantees the best direct-booking rates. Our Smart Boutique stays start from just ₹800/night, while our Premium Haveli collection spans ₹1,800 to ₹3,500/night. No commission fees are ever added. Explore [All Lodges](/search) here.";
+        }
       }
 
       setChatMessages((prev) => [...prev, { sender: "bot", text: reply }]);
@@ -177,6 +245,15 @@ export default function RustoHome() {
       const days = parseInt(plannerForm.days) || 3;
       const budget = plannerForm.budget;
 
+      let matchedLodge = null;
+      if (featured && featured.length > 0) {
+        matchedLodge = featured.find(
+          (l) =>
+            (l.city || "").toLowerCase().includes(dest.toLowerCase()) ||
+            dest.toLowerCase().includes((l.city || "").toLowerCase())
+        );
+      }
+
       let plan = {
         title: `Bespoke ${days}-Day Itinerary: ${dest}`,
         meta: `Curated for: ${budget} · 2 Guests`,
@@ -190,9 +267,16 @@ export default function RustoHome() {
             activity: `Morning check-in at our handpicked boutique lodge. Experience a traditional welcome drink and a customized orientation of the local area. Spend the afternoon relaxing at the infinity pool, followed by an evening sunset stroll.`
           });
         } else if (i === days) {
+          let activityText = `Indulge in a late-morning Ayurvedic massage or private yoga session. Savor a final gourmet champagne brunch. Late check-out arranged. Premium direct private airport transfer included in your Elite package.`;
+          
+          if (matchedLodge) {
+            const startTariff = matchedLodge.starting_tariff || 2500;
+            activityText += `\n\n🌟 **Rusto Elite Match:** We have paired your travel itinerary with our premier property: **${matchedLodge.name}** in ${matchedLodge.city} (starting at ₹${startTariff.toLocaleString("en-IN")}/night). [Click here to book your stay](/lodges/${matchedLodge.code})!`;
+          }
+
           plan.days.push({
             title: `Day ${i}: Leisure, Spa & Departure`,
-            activity: `Indulge in a late-morning Ayurvedic massage or private yoga session. Savor a final gourmet champagne brunch. Late check-out arranged. Premium direct private airport transfer included in your Elite package.`
+            activity: activityText
           });
         } else {
           plan.days.push({
@@ -668,7 +752,7 @@ export default function RustoHome() {
       </section>
 
       {/* ═════════════════════ SECTION 7: MOBILE APP CTA ═════════════════════ */}
-      <section className="py-24 border-t border-white/10 bg-[#102C34]/10 reveal-on-scroll">
+      <section id="offers" className="py-24 border-t border-white/10 bg-[#102C34]/10 reveal-on-scroll">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="glass rounded-3xl p-8 md:p-12 border border-white/5 relative overflow-hidden grid md:grid-cols-[1fr_200px] items-center gap-8 shadow-lux">
             <div className="absolute top-0 right-0 w-40 h-40 bg-[#D4AF37]/5 blur-3xl"/>
@@ -758,10 +842,10 @@ export default function RustoHome() {
                 <div className="flex flex-col gap-3.5">
                   {chatMessages.map((m, i) => (
                     <div key={i} className={`flex flex-col max-w-[85%] ${m.sender === "user" ? "self-end items-end" : "self-start"}`}>
-                      <div className={`p-3 rounded-2xl text-xs leading-relaxed ${
+                      <div className={`p-3 rounded-2xl text-xs leading-relaxed whitespace-pre-line ${
                         m.sender === "user" ? "bg-gradient-to-r from-[#D4AF37] to-[#A8873C] text-[#081C22] font-semibold" : "glass border border-white/5 text-white/90"
                       }`}>
-                        {m.text}
+                        {renderChatMessage(m.text)}
                       </div>
                       <span className="text-[8px] text-white/40 uppercase tracking-widest mt-1 font-bold">
                         {m.sender === "user" ? "Guest" : "Concierge"}
@@ -852,7 +936,7 @@ export default function RustoHome() {
                         {itineraryResult.days.map((d, i) => (
                           <div key={i} className="glass p-3 rounded-2xl border border-white/5">
                             <h5 className="font-sans font-bold text-[#D4AF37] text-xs">{d.title}</h5>
-                            <p className="text-[11px] text-white/80 mt-1 leading-relaxed font-light">{d.activity}</p>
+                            <p className="text-[11px] text-white/80 mt-1 leading-relaxed font-light whitespace-pre-line">{renderChatMessage(d.activity)}</p>
                           </div>
                         ))}
                       </div>
