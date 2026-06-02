@@ -93,7 +93,7 @@ export default function Reports() {
       a.href = url;
       // R8e: friendlier filename for daily reports.
       // Daily (from==to)  → "daily_report_07-May-2026.xlsx"
-      // Range            → "udumulas-revenue-2026-05-01-to-2026-05-07.xlsx"
+      // Range            → "rusto-revenue-2026-05-01-to-2026-05-07.xlsx"
       const ext = type === "excel" ? "xlsx" : "pdf";
       let fname;
       if (dateRange.from === dateRange.to && dateRange.from) {
@@ -103,10 +103,10 @@ export default function Reports() {
           const pretty = `${String(d.getDate()).padStart(2,"0")}-${months[d.getMonth()]}-${d.getFullYear()}`;
           fname = `daily_${reportType}_${pretty}.${ext}`;
         } else {
-          fname = `udumulas-${reportType}-${dateRange.from}.${ext}`;
+          fname = `rusto-${reportType}-${dateRange.from}.${ext}`;
         }
       } else {
-        fname = `udumulas-${reportType}-${dateRange.from}-to-${dateRange.to}.${ext}`;
+        fname = `rusto-${reportType}-${dateRange.from}-to-${dateRange.to}.${ext}`;
       }
       a.download = fname;
       a.click();

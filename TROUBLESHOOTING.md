@@ -98,7 +98,7 @@ Or pull from logs on EC2:
 
 ```bash
 ssh ubuntu@your-ec2
-cd /opt/udumulas-lms
+cd /opt/rusto-lms
 docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 backend | grep -A 20 dashboard
 ```
 
@@ -115,7 +115,7 @@ traceback under names like `dashboard.total_rooms`, `dashboard.activity`, etc.
 they have the same name. Force it:
 
 ```bash
-cd /opt/udumulas-lms
+cd /opt/rusto-lms
 docker compose -f docker-compose.prod.yml --env-file .env.production down --remove-orphans
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate
 ```
@@ -133,7 +133,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 
 ⚠ This wipes ALL data. Backup first if you have real data:
 ```bash
-docker exec udumulas_lms_db pg_dump -U lms udumulas_lms > backup.sql
+docker exec rusto_lms_db pg_dump -U lms rusto_lms > backup.sql
 ```
 
 ### c) `.env.production` malformed
@@ -166,7 +166,7 @@ If you get HTML instead of JSON, the outer nginx isn't proxying — check
 
 ```bash
 ssh ubuntu@your-ec2
-cd /opt/udumulas-lms
+cd /opt/rusto-lms
 docker compose -f docker-compose.prod.yml --env-file .env.production down -v --remove-orphans
 docker system prune -af --volumes
 sudo systemctl stop nginx 2>/dev/null

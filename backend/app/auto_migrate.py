@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Tenant-scoped tables (carry lodge_id). The very first time the app starts
 # after the multi-tenant release lands, these all need a lodge_id column
-# added and back-filled with the default lodge (id 1, "Udumulas").
+# added and back-filled with the default lodge (id 1, "Rusto").
 _TENANT_TABLES = (
     "users", "customers", "rooms", "checkins", "invoices", "alerts",
     "settings", "agencies", "agency_api_calls", "bookings",
@@ -137,14 +137,14 @@ def _add_column_if_missing(engine, table, col, ddl_type):
 
 
 def _ensure_default_lodge(engine):
-    """Ensure lodge_id 1 ('Udumulas') exists. All pre-existing rows belong
+    """Ensure lodge_id 1 ('Rusto') exists. All pre-existing rows belong
     to it (by definition — this is the lodge that was running before
     multi-tenant was introduced). Returns the id."""
     with engine.begin() as conn:
         # Table may not exist yet — create_all() will have made it on this
         # same startup, but be defensive.
         try:
-            row = conn.execute(text("SELECT lodge_id FROM lodges WHERE code = 'udumulas'")).first()
+            row = conn.execute(text("SELECT lodge_id FROM lodges WHERE code = 'rusto'")).first()
         except Exception:
             return None
         if row:
@@ -164,14 +164,14 @@ def _ensure_default_lodge(engine):
         try:
             conn.execute(text(
                 "INSERT INTO lodges (lodge_id, code, name, is_active, is_published) "
-                "VALUES (1, 'udumulas', :n, 1, 0)"
+                "VALUES (1, 'rusto', :n, 1, 0)"
             ), {"n": display_name})
         except Exception:
             # Fall back to a column-discovery + dynamic INSERT for safety
             # if some future column also lacks a SQL-level default.
             cols = conn.execute(text("PRAGMA table_info(lodges)")).fetchall()
             col_names = [c[1] for c in cols]
-            values = {"lodge_id": 1, "code": "udumulas", "name": display_name,
+            values = {"lodge_id": 1, "code": "rusto", "name": display_name,
                        "is_active": 1, "is_published": 0}
             insert_cols = [c for c in col_names if c in values]
             placeholders = ", ".join(f":{c}" for c in insert_cols)
@@ -346,7 +346,7 @@ def run_additive_migrations(engine):
 
 def _seed_default_settings_per_lodge(engine):
     """For each lodge, ensure it has the standard set of setting keys.
-    Copies the udumulas lodge's settings into any newly-created lodge as a
+    Copies the rusto lodge's settings into any newly-created lodge as a
     sensible starting point so RK Lodge isn't blank from day one."""
     with engine.begin() as conn:
         lodges = conn.execute(text("SELECT lodge_id, code FROM lodges ORDER BY lodge_id")).all()
@@ -362,7 +362,7 @@ def _seed_default_settings_per_lodge(engine):
 
         # Per-lodge override defaults so each lodge starts with its own name.
         per_lodge_overrides = {
-            "udumulas": {"hotel_name": "Udumula's Grand"},
+            "rusto": {"hotel_name": "Rusto Lodge"},
             "rk":       {"hotel_name": "RK Lodge"},
         }
 
@@ -385,7 +385,7 @@ def _seed_default_settings_per_lodge(engine):
 
 def _seed_lodge_admin_users(engine):
     """Make sure every lodge has at least one admin user. The existing
-    'admin' user is attached to lodge 1 (udumulas). For the RK lodge we
+    'admin' user is attached to lodge 1 (rusto). For the RK lodge we
     create 'rkadmin' with a default password the operator must change.
 
     Also creates the default 'admin' user if no user exists at all (fresh

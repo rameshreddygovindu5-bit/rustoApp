@@ -122,7 +122,7 @@ export default function Import() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "udumulas-import-template.xlsx";
+      a.download = "rusto-import-template.xlsx";
       a.click();
       URL.revokeObjectURL(url);
     } catch {

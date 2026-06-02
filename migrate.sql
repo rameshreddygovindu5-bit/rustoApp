@@ -85,11 +85,11 @@ CREATE TABLE IF NOT EXISTS lodges (
 -- Seed the default lodge (id=1) using the existing hotel_name setting as
 -- its display name, then promote the existing 'admin' user into it.
 INSERT INTO lodges (lodge_id, code, name, is_active)
-SELECT 1, 'udumulas',
+SELECT 1, 'rusto',
        COALESCE((SELECT setting_value FROM settings WHERE setting_key = 'hotel_name' LIMIT 1),
-                'Udumula''s Grand'),
+                'Rusto Lodge'),
        TRUE
-WHERE NOT EXISTS (SELECT 1 FROM lodges WHERE code = 'udumulas');
+WHERE NOT EXISTS (SELECT 1 FROM lodges WHERE code = 'rusto');
 
 -- 2) Add lodge_id to every tenant-scoped table (nullable; back-filled below).
 ALTER TABLE users               ADD COLUMN IF NOT EXISTS lodge_id INTEGER REFERENCES lodges(lodge_id);

@@ -5,7 +5,7 @@
 *.db
 *.sqlite
 *.sqlite3
-udumulas_lms.db
+rusto_lms.db
 
 # Python caches
 __pycache__/

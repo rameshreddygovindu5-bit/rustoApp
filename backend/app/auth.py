@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .models import User
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "udumulas-secret-key")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "rusto-secret-key")
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "8"))
 

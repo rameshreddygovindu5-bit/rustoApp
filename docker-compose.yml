@@ -11,18 +11,18 @@
 services:
   db:
     image: postgres:15-alpine
-    container_name: udumulas_lms_db_dev
+    container_name: rusto_lms_db_dev
     environment:
       POSTGRES_USER: lms
       POSTGRES_PASSWORD: lms_password
-      POSTGRES_DB: udumulas_lms
+      POSTGRES_DB: rusto_lms
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lms -d udumulas_lms"]
+      test: ["CMD-SHELL", "pg_isready -U lms -d rusto_lms"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -32,12 +32,12 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: udumulas_lms_backend_dev
+    container_name: rusto_lms_backend_dev
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://lms:lms_password@db:5432/udumulas_lms
+      DATABASE_URL: postgresql://lms:lms_password@db:5432/rusto_lms
       JWT_SECRET_KEY: dev-only-change-in-prod-jwt-secret-key
       JWT_ALGORITHM: HS256
       JWT_EXPIRE_HOURS: "8"
@@ -65,7 +65,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: /api
-    container_name: udumulas_lms_frontend_dev
+    container_name: rusto_lms_frontend_dev
     depends_on:
       backend:
         condition: service_healthy
