@@ -22,7 +22,21 @@ echo "  App dir: $APP_DIR"
 echo "  Owner:   $APP_USER"
 echo "════════════════════════════════════════════════════════════"
 
-# 1. System update + base packages (NO host nginx — we use a container)
+# 1. Swap Space (to prevent out-of-memory errors on micro instances)
+echo ""
+echo ">> [0/5] Configuring 2GB Swap Space..."
+if ! swapon --show | grep -q "/swapfile"; then
+  sudo fallocate -l 2G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
+  sudo chmod 600 /swapfile
+  sudo mkswap /swapfile
+  sudo swapon /swapfile
+  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+  echo "   ✓ Swap configured and enabled"
+else
+  echo "   ✓ Swap already configured"
+fi
+
+# 2. System update + base packages (NO host nginx — we use a container)
 echo ""
 echo ">> [1/5] Updating system packages..."
 sudo apt-get update -y
