@@ -676,6 +676,7 @@ div[class*="fixed inset-0"][class*="flex"][class*="items-center"] > div > form,
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35) !important;
   transition: all 0.45s cubic-bezier(0.22, 1, 0.36, 1);
   isolation: isolate;
+  animation: card-glow 6s infinite ease-in-out !important;
 }
 .lodge-card-lux:hover {
   transform: translateY(-6px);
@@ -2634,6 +2635,56 @@ h1, h2, h3, .font-display {
 /* Background Gradients */
 .bg-deep-gradient {
   background: linear-gradient(180deg, #081C22 0%, #102C34 40%, #081C22 100%) !important;
+}
+
+/* Immersive Animated Quiet Luxury Styling Rules */
+@keyframes orb-float-1 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(40px, -60px) scale(1.15); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes orb-float-2 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-30px, 40px) scale(0.9); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes card-glow {
+  0% { box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35); border-color: rgba(255, 255, 255, 0.1); }
+  50% { box-shadow: 0 8px 32px 0 rgba(212, 175, 55, 0.05), 0 0 20px rgba(212, 175, 55, 0.15); border-color: rgba(212, 175, 55, 0.35); }
+  100% { box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35); border-color: rgba(255, 255, 255, 0.1); }
+}
+.luxury-glow-card {
+  animation: card-glow 6s infinite ease-in-out !important;
+}
+.animated-orb-1 {
+  animation: orb-float-1 20s infinite ease-in-out !important;
+}
+.animated-orb-2 {
+  animation: orb-float-2 25s infinite ease-in-out !important;
+}
+.breathe-logo {
+  animation: logo-breathe 4s infinite ease-in-out !important;
+}
+@keyframes logo-breathe {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(212, 175, 55, 0.2)); }
+  50% { transform: scale(1.05); filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.5)); }
+}
+.btn-amber-glow-animated {
+  background: linear-gradient(135deg, #D4AF37 0%, #AA7C11 100%) !important;
+  color: #081C22 !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.btn-amber-glow-animated:hover {
+  background: linear-gradient(135deg, #F5E7C4 0%, #D4AF37 100%) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 10px 25px rgba(212, 175, 55, 0.45) !important;
+}
+.luxury-glow-input:focus {
+  border-color: #D4AF37 !important;
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.25) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
 }
 
 

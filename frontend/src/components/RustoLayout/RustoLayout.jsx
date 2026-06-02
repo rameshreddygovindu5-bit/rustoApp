@@ -77,7 +77,15 @@ export default function RustoLayout() {
   const isPremiumTheme = settings.premium_theme_enabled !== "false";
 
   return (
-    <div className={`${isPremiumTheme ? "rusto-layout" : ""} min-h-screen flex flex-col`}>
+    <div className={`${isPremiumTheme ? "rusto-layout" : ""} min-h-screen flex flex-col relative overflow-hidden`}>
+      {/* Immersive background luxury animated orbs visible across all customer pages */}
+      {isPremiumTheme && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div className="absolute top-[10%] left-[-5%] w-[450px] h-[450px] rounded-full bg-gradient-to-br from-[#D4AF37]/5 to-transparent blur-[120px] pointer-events-none animated-orb-1" />
+          <div className="absolute top-[50%] right-[-10%] w-[550px] h-[550px] rounded-full bg-gradient-to-br from-[#D69A80]/3 to-transparent blur-[150px] pointer-events-none animated-orb-2" />
+          <div className="absolute bottom-[10%] left-[10%] w-[400px] h-[400px] rounded-full bg-gradient-to-br from-[#0B252C]/35 to-transparent blur-[100px] pointer-events-none animated-orb-1" />
+        </div>
+      )}
       {/* ── Top nav ─────────────────────────────────────────────── */}
       {!isAuthPage && (
         <header className={`fixed top-0 inset-x-0 z-40 ${
