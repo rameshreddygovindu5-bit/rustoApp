@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Globe, Plus, Trash2, X } from "lucide-react";
+import { Globe, Plus, Trash2, X, Sparkles } from "lucide-react";
 import { toast } from "react-toastify";
 import { otaAPI } from "../services/api";
 
@@ -22,6 +22,7 @@ export default function OtaReservations() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [channelFilter, setChannelFilter] = useState("");
+  const [expandedCard, setExpandedCard] = useState(null);
 
   const refresh = async () => {
     setLoading(true);
@@ -87,6 +88,151 @@ export default function OtaReservations() {
           })}
         </div>
       )}
+
+      {/* ── Channel Strategy & Industry Insights ── */}
+      <div className="bg-gradient-to-br from-navy to-navy-dark rounded-2xl p-6 text-white border border-white/10 shadow-lux relative overflow-hidden">
+        {/* Floating gradient orb background for premium feel */}
+        <div className="absolute top-[-50%] right-[-20%] w-96 h-96 rounded-full bg-gold/10 blur-[100px] pointer-events-none" />
+        
+        <div className="flex items-center gap-2 mb-4 relative z-10">
+          <Sparkles className="text-gold animate-pulse-soft" size={20} />
+          <h2 className="font-display text-lg font-bold text-white">Lodge Channel Strategy & Industry Insights</h2>
+        </div>
+        <p className="text-white/70 text-xs mb-6 max-w-3xl relative z-10 leading-relaxed">
+          Industry benchmarks from hotel operators: Direct bookers yield up to 30% higher margins than OTA channels. Review our integration strategy checklist below to configure your property management system (PMS) and optimize room yield.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10">
+          {/* Card 1: OTA Tradeoffs */}
+          <div 
+            onClick={() => setExpandedCard(expandedCard === "ota" ? null : "ota")}
+            className={`cursor-pointer p-4 rounded-xl border transition-all duration-300 ${
+              expandedCard === "ota" 
+                ? "bg-white/10 border-gold/50 shadow-gold/10 shadow-md" 
+                : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/8"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-widest font-bold text-gold">Direct Booker Math</span>
+              <span className="text-white/40 text-[10px]">{expandedCard === "ota" ? "▼ Collapse" : "▲ Expand Details"}</span>
+            </div>
+            <h3 className="font-display text-base font-bold mt-2 text-white">OTA vs. Direct Booking Economics</h3>
+            <p className="text-white/60 text-2xs mt-1.5 leading-relaxed">
+              At 17-30% commissions, hotels structurally prioritize direct reservations for upgrades and VIP perks.
+            </p>
+
+            {expandedCard === "ota" && (
+              <div className="mt-4 pt-4 border-t border-white/10 space-y-3 text-xs animate-fade-in">
+                <p className="text-white/80 font-semibold uppercase tracking-wider text-[10px]">Step-by-Step Implementation Guide:</p>
+                <div className="space-y-2.5">
+                  <div className="flex gap-2">
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">1</span>
+                    <p className="text-white/75"><strong className="text-white">Calculate Net Channel Yield:</strong> Deduct OTA fees (17%–30%) from gross rates (e.g. a ₹5,000 booking yields only ₹3,500 net).</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">2</span>
+                    <p className="text-white/75"><strong className="text-white">Allocate Upgrade Budgets:</strong> Reinvest 10%–15% of saved commission into free perks (breakfast, priority early check-ins) exclusively for direct bookers.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">3</span>
+                    <p className="text-white/75"><strong className="text-white">Direct-Conversion Scripting:</strong> Train front-desk agents to distribute a direct-booking discount card containing a custom discount code during OTA guest checkout.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">4</span>
+                    <p className="text-white/75"><strong className="text-white">Auto-Tag Guest Profiles:</strong> Create automated tags like <code className="bg-white/10 px-1 rounded text-gold">OTA_COMMISSION_HIGH</code> to prioritize room allocations in favor of direct profiles.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Card 2: PMS Stack Recommendations */}
+          <div 
+            onClick={() => setExpandedCard(expandedCard === "pms" ? null : "pms")}
+            className={`cursor-pointer p-4 rounded-xl border transition-all duration-300 ${
+              expandedCard === "pms" 
+                ? "bg-white/10 border-gold/50 shadow-gold/10 shadow-md" 
+                : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/8"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-widest font-bold text-gold">PMS Benchmarks</span>
+              <span className="text-white/40 text-[10px]">{expandedCard === "pms" ? "▼ Collapse" : "▲ Expand Details"}</span>
+            </div>
+            <h3 className="font-display text-base font-bold mt-2 text-white">Independent PMS Selection Stack</h3>
+            <p className="text-white/60 text-2xs mt-1.5 leading-relaxed">
+              Mews, Cloudbeds, and Sirvoy. Sirvoy is optimized for ~40-room hotels with transparent pricing ($185/mo) and fast support.
+            </p>
+
+            {expandedCard === "pms" && (
+              <div className="mt-4 pt-4 border-t border-white/10 space-y-3 text-xs animate-fade-in">
+                <p className="text-white/80 font-semibold uppercase tracking-wider text-[10px]">Step-by-Step Implementation Guide:</p>
+                <div className="space-y-2.5">
+                  <div className="flex gap-2">
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">1</span>
+                    <p className="text-white/75"><strong className="text-white">Evaluate Scale Matching:</strong> Choose Cloudbeds for standard operations, Mews for enterprise automation, or Sirvoy for simple transparency.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">2</span>
+                    <p className="text-white/75"><strong className="text-white">Configure Sirvoy Tiering:</strong> Deploy Sirvoy's $185/month tier. Configure callback and email escalations to secure fast human support responses.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">3</span>
+                    <p className="text-white/75"><strong className="text-white">Synchronize Tax & Invoice Items:</strong> Map all GST percentage settings and invoice ledger categories to match local billing regulations.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">4</span>
+                    <p className="text-white/75"><strong className="text-white">Align Room Categories:</strong> Align room type codes exactly across PMS inventories and OTAs to prevent sync dropouts.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Card 3: Integrations & Marketplace */}
+          <div 
+            onClick={() => setExpandedCard(expandedCard === "marketplace" ? null : "marketplace")}
+            className={`cursor-pointer p-4 rounded-xl border transition-all duration-300 ${
+              expandedCard === "marketplace" 
+                ? "bg-white/10 border-gold/50 shadow-gold/10 shadow-md" 
+                : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/8"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-widest font-bold text-gold">Integrations Marketplace</span>
+              <span className="text-white/40 text-[10px]">{expandedCard === "marketplace" ? "▼ Collapse" : "▲ Expand Details"}</span>
+            </div>
+            <h3 className="font-display text-base font-bold mt-2 text-white">Integration & Sync Strategy</h3>
+            <p className="text-white/60 text-2xs mt-1.5 leading-relaxed">
+              Verify PMS integrations marketplaces to avoid a painful rip-and-replace data migration in the future.
+            </p>
+
+            {expandedCard === "marketplace" && (
+              <div className="mt-4 pt-4 border-t border-white/10 space-y-3 text-xs animate-fade-in">
+                <p className="text-white/80 font-semibold uppercase tracking-wider text-[10px]">Step-by-Step Implementation Guide:</p>
+                <div className="space-y-2.5">
+                  <div className="flex gap-2">
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">1</span>
+                    <p className="text-white/75"><strong className="text-white">Audit Core Ecosystem Needs:</strong> Map all current and future integrations (smartlocks, POS, Accounting CRM, analytics).</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">2</span>
+                    <p className="text-white/75"><strong className="text-white">Verify Open API Access:</strong> Avoid proprietary closed systems. Choose systems like Cloudbeds or Mews offering open REST endpoints.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">3</span>
+                    <p className="text-white/75"><strong className="text-white">Enable Two-Way Channel Sync:</strong> Link a 2-way channel manager (SiteMinder/RateGain) to automate rate updates across OTAs in real-time.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">4</span>
+                    <p className="text-white/75"><strong className="text-white">Monitor API Health Logs:</strong> Conduct quarterly checks on transaction times and API health logs to prevent double-booking issues.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Table */}
       <div className="bg-white rounded-2xl shadow-card border border-ink-100 overflow-hidden">
