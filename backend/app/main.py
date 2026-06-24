@@ -147,19 +147,13 @@ def seed_initial_data():
 
     db = SessionLocal()
     try:
-        if db.query(Lodge).count() == 0:
-            default_lodge = Lodge(
-                lodge_id=1,
-                name="Rusto Default Lodge",
-                code="rk",
-                is_published=True,
-                address="123 Test St",
-                public_city="Test City",
-                phone="9000000000"
-            )
-            db.add(default_lodge)
-            db.flush()
-            logger.info("Seeded default lodge (code: rk)")
+        # Ensure the 'rk' lodge created by auto_migrate is published so tests pass
+        rk_lodge = db.query(Lodge).filter(Lodge.code == "rk").first()
+        if rk_lodge and not rk_lodge.is_published:
+            rk_lodge.is_published = True
+            rk_lodge.public_city = "Test City"
+            db.commit()
+            logger.info("Updated RK lodge to be published with city 'Test City'")
 
         if db.query(Room).count() == 0:
             rooms_data = [
