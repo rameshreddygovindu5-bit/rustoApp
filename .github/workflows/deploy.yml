@@ -96,6 +96,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set lower case repository name
+        run: |
+          echo "REPO=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -114,8 +118,8 @@ jobs:
           file: ./backend/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/backend:latest
-            ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+            ghcr.io/${{ env.REPO }}/backend:latest
+            ghcr.io/${{ env.REPO }}/backend:${{ github.sha }}
           cache-from: type=gha,scope=backend
           cache-to:   type=gha,scope=backend,mode=max
 
@@ -130,8 +134,8 @@ jobs:
             PORTAL=pms
             VITE_API_URL=/api
           tags: |
-            ghcr.io/${{ github.repository }}/frontend-pms:latest
-            ghcr.io/${{ github.repository }}/frontend-pms:${{ github.sha }}
+            ghcr.io/${{ env.REPO }}/frontend-pms:latest
+            ghcr.io/${{ env.REPO }}/frontend-pms:${{ github.sha }}
           cache-from: type=gha,scope=frontend-pms
           cache-to:   type=gha,scope=frontend-pms,mode=max
 
@@ -146,8 +150,8 @@ jobs:
             PORTAL=customer
             VITE_API_URL=/api
           tags: |
-            ghcr.io/${{ github.repository }}/frontend-customer:latest
-            ghcr.io/${{ github.repository }}/frontend-customer:${{ github.sha }}
+            ghcr.io/${{ env.REPO }}/frontend-customer:latest
+            ghcr.io/${{ env.REPO }}/frontend-customer:${{ github.sha }}
           cache-from: type=gha,scope=frontend-customer
           cache-to:   type=gha,scope=frontend-customer,mode=max
 
