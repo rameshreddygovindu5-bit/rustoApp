@@ -16,10 +16,10 @@ def load_pages():
         for f in files:
             if f.endswith(".jsx"):
                 path = os.path.join(root, f)
-                with open(path) as fh:
+                with open(path, "r", encoding="utf-8") as fh:
                     pages[f] = fh.read()
-    pages["RustoLayout.jsx"] = open(f"{SRC}/components/RustoLayout/RustoLayout.jsx").read()
-    pages["App.jsx"] = open(f"{SRC}/App.jsx").read()
+    pages["RustoLayout.jsx"] = open(f"{SRC}/components/RustoLayout/RustoLayout.jsx", encoding="utf-8").read()
+    pages["App.jsx"] = open(f"{SRC}/App.jsx", encoding="utf-8").read()
     return pages
 
 PAGES = load_pages()
