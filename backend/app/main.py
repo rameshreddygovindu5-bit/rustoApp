@@ -149,11 +149,12 @@ def seed_initial_data():
     try:
         # Ensure the 'rk' lodge created by auto_migrate is published so tests pass
         rk_lodge = db.query(Lodge).filter(Lodge.code == "rk").first()
-        if rk_lodge and not rk_lodge.is_published:
+        if rk_lodge and (not rk_lodge.is_published or not rk_lodge.allow_online_booking):
             rk_lodge.is_published = True
+            rk_lodge.allow_online_booking = True
             rk_lodge.public_city = "Test City"
             db.commit()
-            logger.info("Updated RK lodge to be published with city 'Test City'")
+            logger.info("Updated RK lodge to be published and allow online booking")
 
         if db.query(Room).count() == 0:
             rooms_data = [
