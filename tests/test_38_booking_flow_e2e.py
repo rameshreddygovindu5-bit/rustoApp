@@ -28,7 +28,7 @@ Flow:
 import pytest, time
 from conftest import api_get, api_post, api_patch, api_delete
 
-LODGE_CODE = "udumulas"
+LODGE_CODE = "rusto"
 CUSTOMER_PHONE = "9000000000"
 CUSTOMER_PASS  = "Demo@1234"
 ADMIN_USER  = "admin"

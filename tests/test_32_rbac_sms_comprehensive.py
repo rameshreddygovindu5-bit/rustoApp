@@ -387,7 +387,7 @@ class TestPermissionEnforcement:
         ci = (date.today() + timedelta(days=300)).isoformat()
         co = (date.today() + timedelta(days=302)).isoformat()
         r, s = api_post("/api/bookings", {
-            "lodge_code": "udumulas",
+            "lodge_code": "rusto",
             "guest_name": "Test Guest",
             "guest_phone": "9876543210",
             "room_type": "non_ac",
@@ -861,7 +861,7 @@ class TestFrontendRBACFiles:
         import os
         full = f"{self.SRC}/{path}"
         assert os.path.exists(full), f"File not found: {path}"
-        with open(full) as f:
+        with open(full, encoding="utf-8") as f:
             return f.read()
 
     def test_module_gate_context_has_canseeemodule(self):

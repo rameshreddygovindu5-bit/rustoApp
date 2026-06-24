@@ -553,7 +553,7 @@ class TestFrontendNewFiles:
     def _read(self, relpath):
         path = os.path.join(self.SRC, relpath)
         assert os.path.exists(path), f"File missing: {relpath}"
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             return f.read()
 
     def test_module_gate_context_exists(self):

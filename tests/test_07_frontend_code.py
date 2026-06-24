@@ -28,8 +28,9 @@ PAGES = load_pages()
 class TestImports:
     """All imports must resolve to existing files."""
 
-    @pytest.mark.parametrize("name,src", list(PAGES.items()))
-    def test_relative_imports_resolve(self, name, src):
+    @pytest.mark.parametrize("name", list(PAGES.keys()))
+    def test_relative_imports_resolve(self, name):
+        src = PAGES[name]
         """Every relative import must point to an existing file."""
         file_path = f"{SRC}/pages/rusto/{name}" if name not in ("App.jsx",) else f"{SRC}/{name}"
         if name == "RustoLayout.jsx":
@@ -46,14 +47,16 @@ class TestImports:
         
         assert not failures, f"{name}: broken imports: {failures}"
 
-    @pytest.mark.parametrize("name,src", list(PAGES.items()))
-    def test_no_react_hot_toast(self, name, src):
+    @pytest.mark.parametrize("name", list(PAGES.keys()))
+    def test_no_react_hot_toast(self, name):
+        src = PAGES[name]
         """All pages must use react-toastify, not react-hot-toast."""
         assert "react-hot-toast" not in src, \
             f"{name}: uses react-hot-toast — must use react-toastify"
 
-    @pytest.mark.parametrize("name,src", list(PAGES.items()))
-    def test_toast_import_style(self, name, src):
+    @pytest.mark.parametrize("name", list(PAGES.keys()))
+    def test_toast_import_style(self, name):
+        src = PAGES[name]
         """toast must be imported as named export from react-toastify (except App.jsx which uses ToastContainer)."""
         if "react-toastify" in src and name not in ("App.jsx",):
             has_toast = "{ toast }" in src or "{ toast," in src or ", toast }" in src or ", toast," in src
@@ -207,7 +210,7 @@ class TestCSSVariables:
     """CSS variables used in JSX must be defined in index.css."""
 
     def test_all_css_vars_defined(self):
-        with open(f"{SRC}/index.css") as f:
+        with open(f"{SRC}/index.css", encoding="utf-8") as f:
             css = f.read()
         
         defined = set(re.findall(r'(-{2}[\w-]+)(?=\s*:)', css))
@@ -225,7 +228,7 @@ class TestCSSVariables:
 
     def test_no_undefined_css_vars_in_pages(self):
         """Vars used in JSX must be defined in CSS."""
-        with open(f"{SRC}/index.css") as f:
+        with open(f"{SRC}/index.css", encoding="utf-8") as f:
             css = f.read()
         
         defined = set(re.findall(r'(-{2}[\w-]+)(?=\s*:)', css))

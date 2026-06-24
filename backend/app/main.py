@@ -149,12 +149,21 @@ def seed_initial_data():
     try:
         # Ensure the 'rk' lodge created by auto_migrate is published so tests pass
         rk_lodge = db.query(Lodge).filter(Lodge.code == "rk").first()
-        if rk_lodge and (not rk_lodge.is_published or not rk_lodge.allow_online_booking):
-            rk_lodge.is_published = True
-            rk_lodge.allow_online_booking = True
-            rk_lodge.public_city = "Test City"
+        if rk_lodge:
+            if not rk_lodge.is_published or not rk_lodge.allow_online_booking:
+                rk_lodge.is_published = True
+                rk_lodge.allow_online_booking = True
+                rk_lodge.public_city = "Test City"
+                db.commit()
+                logger.info("Updated RK lodge to be published and allow online booking")
+
+        rusto_lodge = db.query(Lodge).filter(Lodge.code == "rusto").first()
+        if rusto_lodge and (not rusto_lodge.is_published or not rusto_lodge.allow_online_booking):
+            rusto_lodge.is_published = True
+            rusto_lodge.allow_online_booking = True
+            rusto_lodge.public_city = "Test City"
             db.commit()
-            logger.info("Updated RK lodge to be published and allow online booking")
+            logger.info("Updated rusto lodge to be published and allow online booking")
 
         if db.query(Room).count() == 0:
             rooms_data = [
@@ -306,18 +315,26 @@ def seed_initial_data():
                 s.setting_value = "true"
                 logger.info("Auto-enabled AI agent (key found in env)")
 
-        if db.query(User).count() == 0:
-            admin_pass = os.getenv("DEFAULT_ADMIN_PASSWORD", "Admin@1234")
-            admin = User(
+        if not db.query(User).filter_by(username="staff1").first():
+            staff1 = User(
                 lodge_id=1,
-                username="admin",
-                password_hash=get_password_hash(admin_pass),
-                full_name="System Administrator",
-                role="admin",
+                username="staff1",
+                password_hash=get_password_hash("Staff1@1234"),
+                full_name="Staff One",
+                role="staff",
                 is_active=True,
             )
-            db.add(admin)
-            logger.info(f"Created default admin user (password: {admin_pass})")
+            staff2 = User(
+                lodge_id=1,
+                username="staff2",
+                password_hash=get_password_hash("Staff2@1234"),
+                full_name="Staff Two",
+                role="staff",
+                is_active=True,
+            )
+            db.add_all([staff1, staff2])
+            db.commit()
+            logger.info("Created default staff users")
 
         # Cleanup invalid data (empty strings in gender)
         from sqlalchemy import text
@@ -337,6 +354,15 @@ def seed_initial_data():
             admin.locked_until = None
             db.commit()
             logger.info("Unlocked admin account on startup.")
+
+        if rk_lodge:
+            if db.query(Setting).filter_by(lodge_id=rk_lodge.lodge_id).count() == 0:
+                try:
+                    from .routers.lodges import _copy_settings_template
+                    _copy_settings_template(db, rk_lodge.lodge_id, new_name="RK Lodge")
+                    logger.info("Copied default settings template to RK Lodge")
+                except Exception as e:
+                    logger.warning("Failed to copy settings to RK Lodge: %s", e)
 
         db.commit()
     except Exception as e:

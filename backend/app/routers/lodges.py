@@ -110,17 +110,17 @@ def list_lodges(current_user: User = Depends(get_current_user),
     """List lodges visible to the caller.
 
     Regular users see only their own (so the lodge dropdown can show *that
-    lodge and disable it* per requirement). super_admin sees all lodges,
+    lodge and disable it* per requirement). super_admin and app_owner see all lodges,
     so the dropdown becomes a real selector for them.
     """
     role = getattr(current_user.role, "value", current_user.role)
-    if role == "super_admin":
+    if role in ("super_admin", "app_owner"):
         rows = db.query(Lodge).order_by(Lodge.lodge_id).all()
     else:
         rows = (db.query(Lodge)
                 .filter(Lodge.lodge_id == current_user.lodge_id)
                 .all())
-    use_rich = role == "super_admin"
+    use_rich = role in ("super_admin", "app_owner")
     return [_to_dict(l, db=db if use_rich else None, rich=use_rich) for l in rows]
 
 

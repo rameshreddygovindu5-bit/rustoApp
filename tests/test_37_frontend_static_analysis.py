@@ -17,7 +17,7 @@ BACKEND = "../backend/app"
 
 
 def read(path):
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return f.read()
 
 
@@ -511,7 +511,7 @@ class TestProductionReadiness:
 
     def test_docker_compose_has_all_services(self):
         import yaml
-        with open(ROOT + "/docker-compose.yml") as f:
+        with open(ROOT + "/docker-compose.yml", encoding="utf-8") as f:
             dc = yaml.safe_load(f)
         services = set(dc.get("services", {}).keys())
         required = {"db", "backend", "frontend", "frontend_pms", "frontend_customer"}
@@ -520,7 +520,7 @@ class TestProductionReadiness:
 
     def test_docker_compose_prod_has_split_portals(self):
         import yaml
-        with open(ROOT + "/docker-compose.prod.yml") as f:
+        with open(ROOT + "/docker-compose.prod.yml", encoding="utf-8") as f:
             dc = yaml.safe_load(f)
         services = set(dc.get("services", {}).keys())
         assert "frontend_pms" in services, "prod compose missing frontend_pms"
@@ -528,27 +528,27 @@ class TestProductionReadiness:
         assert "nginx" in services, "prod compose missing nginx"
 
     def test_env_example_has_all_integrations(self):
-        with open(ROOT + "/.env.production.example") as f:
+        with open(ROOT + "/.env.production.example", encoding="utf-8") as f:
             env = f.read()
         for key in ["RAZORPAY_KEY_ID", "TWILIO_ACCOUNT_SID", "MSG91_AUTH_KEY",
                     "SMTP_HOST", "ANTHROPIC_API_KEY", "JWT_SECRET_KEY"]:
             assert key in env, f".env.production.example missing {key}"
 
     def test_ci_workflow_has_test_gate(self):
-        with open(ROOT + "/.github/workflows/deploy.yml") as f:
+        with open(ROOT + "/.github/workflows/deploy.yml", encoding="utf-8") as f:
             workflow = f.read()
         assert "needs: test" in workflow or "needs: build" in workflow, \
             "CI/CD workflow must gate deploy on tests"
         assert "pytest" in workflow, "CI/CD must run pytest"
 
     def test_ci_workflow_builds_both_portals(self):
-        with open(ROOT + "/.github/workflows/deploy.yml") as f:
+        with open(ROOT + "/.github/workflows/deploy.yml", encoding="utf-8") as f:
             workflow = f.read()
         assert "PORTAL=pms" in workflow, "CI must build PMS portal"
         assert "PORTAL=customer" in workflow, "CI must build Customer portal"
 
     def test_nginx_has_both_portals(self):
-        with open(ROOT + "/nginx/conf.d/default.conf") as f:
+        with open(ROOT + "/nginx/conf.d/default.conf", encoding="utf-8") as f:
             nginx = f.read()
         assert "rusto_pms" in nginx or "frontend_pms" in nginx, \
             "nginx must route to PMS portal"
