@@ -7,7 +7,7 @@ import pytest
 import os
 import re
 
-SRC = "/home/claude/rusto-fix-upload/frontend/src"
+SRC = "../frontend/src"
 
 # ── Load all page source files ──────────────────────────────────────
 def load_pages():

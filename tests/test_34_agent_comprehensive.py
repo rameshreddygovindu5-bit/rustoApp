@@ -31,8 +31,8 @@ import urllib.error
 from datetime import date, datetime, timedelta
 
 # ── path setup ────────────────────────────────────────────────────────────
-sys.path.insert(0, "/home/claude/rusto-fix-upload/backend")
-os.chdir("/home/claude/rusto-fix-upload/backend")
+sys.path.insert(0, "../backend")
+os.chdir("../backend")
 
 from conftest import api_get, api_post, api_patch, api_delete
 

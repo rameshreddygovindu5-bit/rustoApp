@@ -14,14 +14,14 @@ import urllib.parse
 from datetime import date, timedelta
 
 # ── Add backend to path ─────────────────────────────────────────────
-sys.path.insert(0, "/home/claude/rusto-fix-upload/backend")
-os.chdir("/home/claude/rusto-fix-upload/backend")
+sys.path.insert(0, "../backend")
+os.chdir("../backend")
 
 # Use a SEPARATE test database so tests don't pollute the production DB
 # The test DB is a copy of the production DB made fresh before tests run
 import shutil
-PROD_DB = "/home/claude/rusto-fix-upload/backend/lodge_lms.db"
-TEST_DB = "/home/claude/rusto-fix-upload/backend/lodge_lms_test.db"
+PROD_DB = "../backend/lodge_lms.db"
+TEST_DB = "../backend/lodge_lms_test.db"
 
 # Copy production DB to test DB (gives tests real data to work with)
 if not os.path.exists(TEST_DB) or (
