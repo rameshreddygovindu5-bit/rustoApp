@@ -152,9 +152,9 @@ def seed_initial_data():
                 lodge_id=1,
                 name="Rusto Default Lodge",
                 code="rk",
-                published=True,
+                is_published=True,
                 address="123 Test St",
-                city="Test City",
+                public_city="Test City",
                 phone="9000000000"
             )
             db.add(default_lodge)
