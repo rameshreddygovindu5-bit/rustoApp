@@ -228,7 +228,7 @@ async function networkFirstWithCacheFallback(request, cacheName) {
   } catch (e) {
     const cached = await caches.match(request);
     if (cached) return cached;
-    throw e;
+    return new Response("Service Unavailable", { status: 503, headers: { "Content-Type": "text/plain" } });
   }
 }
 

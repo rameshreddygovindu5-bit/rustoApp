@@ -79,6 +79,31 @@ def get_summary_report(from_date: Optional[str] = None, to_date: Optional[str] =
     rt_val = best_row[0].value if best_row and hasattr(best_row[0], "value") else (best_row[0] if best_row else None)
     best_room_type = (rt_val.replace("_", " ").upper() if rt_val else "—")
 
+    # Add Rusto marketplace booking count
+    marketplace_bookings = 0
+    marketplace_revenue  = 0.0
+    try:
+        from ..models import CustomerBooking, CustomerBookingStatus
+        marketplace_bookings = db.query(func.count(CustomerBooking.booking_id)).filter(
+            CustomerBooking.lodge_id == lodge_id,
+            CustomerBooking.created_at >= from_dt,
+            CustomerBooking.created_at <= to_dt,
+        ).scalar() or 0
+        marketplace_revenue = float(db.query(func.coalesce(
+            func.sum(CustomerBooking.total_amount), 0
+        )).filter(
+            CustomerBooking.lodge_id == lodge_id,
+            CustomerBooking.status.in_([
+                CustomerBookingStatus.confirmed.value,
+                CustomerBookingStatus.checked_in.value,
+                CustomerBookingStatus.checked_out.value,
+            ]),
+            CustomerBooking.created_at >= from_dt,
+            CustomerBooking.created_at <= to_dt,
+        ).scalar() or 0)
+    except Exception:
+        pass
+
     return {
         "total_revenue": float(total_revenue),
         "checkins_count": checkins_count,
@@ -87,7 +112,9 @@ def get_summary_report(from_date: Optional[str] = None, to_date: Optional[str] =
         "occupied_room_nights": int(room_nights),
         "avg_occupancy": round(avg_occupancy, 1),
         "avg_revenue_per_night": round(avg_rev_per_night, 2),
-        "best_room_type": best_room_type
+        "best_room_type": best_room_type,
+        "marketplace_bookings": marketplace_bookings,
+        "marketplace_revenue":  round(marketplace_revenue, 2),
     }
 
 
@@ -233,6 +260,48 @@ def get_dashboard_data(db: Session = Depends(get_db),
         Checkin.checkin_datetime >= thirty_days_ago
     ).group_by(func.date(Checkin.checkin_datetime)).order_by(func.date(Checkin.checkin_datetime)).all()
 
+    # v10.2 — pending confirmed online bookings (from Rusto marketplace)
+    try:
+        from ..models import CustomerBooking as _CB, CustomerBookingStatus as _CBS
+        from datetime import date as _date
+        online_pending = (db.query(_CB)
+                          .filter(_CB.lodge_id == lodge_id,
+                                  _CB.status == _CBS.confirmed.value,
+                                  _CB.linked_checkin_id.is_(None))
+                          .count())
+        online_today = (db.query(_CB)
+                        .filter(_CB.lodge_id == lodge_id,
+                                _CB.checkin_date == _date.today(),
+                                _CB.status == _CBS.confirmed.value)
+                        .count())
+    except Exception:
+        online_pending = 0
+        online_today   = 0
+
+    # ── v10.5: Today's revenue breakdown by payment mode ────────────────
+    # Collect from BOTH Invoice (checkout) and Checkin.payment_mode sources
+    # so the breakdown is complete even if invoice wasn't created yet.
+    revenue_breakdown = {"cash": 0.0, "upi": 0.0, "card": 0.0,
+                         "bank_transfer": 0.0, "online": 0.0, "other": 0.0}
+    try:
+        from sqlalchemy import case as sa_case
+        mode_rows = (
+            db.query(Invoice.payment_mode, func.sum(Invoice.total_amount))
+            .filter(Invoice.lodge_id == lodge_id,
+                    cast(Invoice.created_at, Date) == today)
+            .group_by(Invoice.payment_mode)
+            .all()
+        )
+        for mode, amount in mode_rows:
+            amt = float(amount or 0)
+            key = (mode or "other").lower()
+            if key in revenue_breakdown:
+                revenue_breakdown[key] += amt
+            else:
+                revenue_breakdown["other"] += amt
+    except Exception:
+        pass
+
     return {
         "kpis": {
             "total_rooms": total_rooms,
@@ -243,8 +312,11 @@ def get_dashboard_data(db: Session = Depends(get_db),
             "due_checkout_today": due_checkout,
             "total_customers": total_customers,
             "today_revenue": float(today_revenue),
+            "today_revenue_breakdown": revenue_breakdown,
             "overdue_count": overdue_count,
-            "occupancy_rate": round((occupied_rooms / total_rooms * 100) if total_rooms else 0, 1)
+            "occupancy_rate": round((occupied_rooms / total_rooms * 100) if total_rooms else 0, 1),
+            "online_bookings_pending": online_pending,
+            "online_arrivals_today":   online_today,
         },
         "activity": activity[:10],
         "room_breakdown": chart_data,
@@ -284,7 +356,7 @@ def occupancy_report(from_date: Optional[str] = None, to_date: Optional[str] = N
         total_rooms = db.query(Room).filter(Room.lodge_id == lodge_id).count() or 1
         chart_data.append({
             "date": d_str,
-            "occupancy_pct": round((count / total_rooms * 100), 1)
+            "occupancy_pct": min(100.0, round((count / total_rooms * 100), 1))
         })
         curr += timedelta(days=1)
 

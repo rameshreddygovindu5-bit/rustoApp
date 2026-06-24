@@ -81,14 +81,14 @@ export default function Housekeeping() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold text-navy">Housekeeping</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-ink-500 text-sm mt-1">
             Cleaning workflow. Tasks auto-created on checkout; admins can also schedule maintenance + deep cleans.
           </p>
         </div>
         {isAdmin && (
           <button
             onClick={() => setShowCreate(true)}
-            className="bg-gold hover:bg-gold/90 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium shadow-sm"
+            className="bg-gold hover:bg-gold/90 text-navy-dark px-4 py-2 rounded-lg flex items-center gap-2 font-medium shadow-sm"
           >
             <Plus size={16} /> New Task
           </button>
@@ -96,7 +96,7 @@ export default function Housekeeping() {
       </div>
 
       {/* Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-gray-200">
+      <div className="flex flex-wrap gap-2 border-b border-ink-200">
         {Object.entries(STATUS_META).map(([key, meta]) => (
           <button
             key={key}
@@ -104,7 +104,7 @@ export default function Housekeeping() {
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               tab === key
                 ? 'border-gold text-gold'
-                : 'border-transparent text-gray-500 hover:text-navy'
+                : 'border-transparent text-ink-500 hover:text-navy'
             }`}
           >
             {meta.label}
@@ -113,16 +113,16 @@ export default function Housekeeping() {
       </div>
 
       {loading ? (
-        <div className="text-gray-400 text-center py-12">Loading…</div>
+        <div className="text-ink-400 text-center py-12">Loading…</div>
       ) : tasks.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <Sparkles size={40} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-gray-500">No {STATUS_META[tab].label.toLowerCase()} tasks.</p>
+          <Sparkles size={40} className="mx-auto text-ink-300 mb-3" />
+          <p className="text-ink-500">No {STATUS_META[tab].label.toLowerCase()} tasks.</p>
         </div>
       ) : (
         <div className="grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {tasks.map(t => (
-            <div key={t.task_id} className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+            <div key={t.task_id} className="bg-white rounded-2xl shadow-card border border-ink-100 p-4">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <BedDouble size={18} className="text-gold" />
@@ -133,37 +133,37 @@ export default function Housekeeping() {
                 </span>
               </div>
 
-              <p className="text-xs text-gray-500 mb-1">
-                <strong className="text-gray-700">Type:</strong> {t.task_type.replace(/_/g, ' ')}
+              <p className="text-xs text-ink-500 mb-1">
+                <strong className="text-ink-700">Type:</strong> {t.task_type.replace(/_/g, ' ')}
               </p>
               {t.assignee_name && (
-                <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+                <p className="text-xs text-ink-500 mb-1 flex items-center gap-1">
                   <User size={11} /> {t.assignee_name}
                 </p>
               )}
               {t.notes && (
-                <p className="text-xs text-gray-600 mt-2 bg-gray-50 p-2 rounded">
+                <p className="text-xs text-ink-600 mt-2 bg-ink-50 p-2 rounded">
                   {t.notes}
                 </p>
               )}
               {t.completion_notes && (
-                <p className="text-xs text-gray-600 mt-2 bg-green-50 border border-green-100 p-2 rounded">
+                <p className="text-xs text-ink-600 mt-2 bg-green-50 border border-green-100 p-2 rounded">
                   ✓ {t.completion_notes}
                 </p>
               )}
               {t.started_at && (
-                <p className="text-[11px] text-gray-400 mt-2 flex items-center gap-1">
+                <p className="text-[11px] text-ink-400 mt-2 flex items-center gap-1">
                   <Clock size={10} />
                   Started {new Date(t.started_at).toLocaleString()}
                 </p>
               )}
 
               {/* Action buttons */}
-              <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+              <div className="flex gap-2 mt-3 pt-3 border-t border-ink-100">
                 {t.status === 'pending' && (
                   <button
                     onClick={() => handleStart(t)}
-                    className="flex-1 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium flex items-center justify-center gap-1"
+                    className="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium flex items-center justify-center gap-1"
                   >
                     <Play size={12} /> Start
                   </button>
@@ -195,7 +195,7 @@ export default function Housekeeping() {
                 {t.status === 'inspection_failed' && (
                   <button
                     onClick={() => handleStart(t)}
-                    className="flex-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-medium"
+                    className="flex-1 px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded text-xs font-medium"
                   >
                     Redo
                   </button>
@@ -255,19 +255,19 @@ function CreateTaskModal({ onClose, onCreated }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <form onSubmit={submit} className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-ink-100">
           <h2 className="font-display font-bold text-navy text-lg">New Task</h2>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button type="button" onClick={onClose} className="text-ink-400 hover:text-ink-600">
             <X size={20}/>
           </button>
         </div>
         <div className="p-5 space-y-3">
           <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Room *</label>
+            <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Room *</label>
             <select
               value={form.room_id}
               onChange={e => setForm(s => ({ ...s, room_id: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-ink-300 rounded-lg"
             >
               <option value="">— select —</option>
               {rooms.map(r => (
@@ -278,11 +278,11 @@ function CreateTaskModal({ onClose, onCreated }) {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Task Type</label>
+            <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Task Type</label>
             <select
               value={form.task_type}
               onChange={e => setForm(s => ({ ...s, task_type: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-ink-300 rounded-lg"
             >
               <option value="checkout_clean">Checkout Clean</option>
               <option value="daily_turnover">Daily Turnover</option>
@@ -291,13 +291,13 @@ function CreateTaskModal({ onClose, onCreated }) {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
-              Assign to <span className="text-gray-400 normal-case">(optional)</span>
+            <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">
+              Assign to <span className="text-ink-400 normal-case">(optional)</span>
             </label>
             <select
               value={form.assigned_to}
               onChange={e => setForm(s => ({ ...s, assigned_to: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-ink-300 rounded-lg"
             >
               <option value="">Unassigned</option>
               {users.filter(u => u.is_active).map(u => (
@@ -306,23 +306,23 @@ function CreateTaskModal({ onClose, onCreated }) {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Notes</label>
+            <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Notes</label>
             <textarea
               value={form.notes}
               onChange={e => setForm(s => ({ ...s, notes: e.target.value }))}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-ink-300 rounded-lg"
               placeholder="e.g. AC making noise — needs technician"
             />
           </div>
         </div>
-        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+        <div className="px-5 py-4 border-t border-ink-100 flex justify-end gap-2">
           <button type="button" onClick={onClose}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+                  className="px-4 py-2 text-ink-600 hover:bg-ink-100 rounded-lg">
             Cancel
           </button>
           <button type="submit" disabled={saving}
-                  className="px-4 py-2 bg-gold text-white rounded-lg hover:bg-gold/90 disabled:opacity-50">
+                  className="px-4 py-2 bg-gold text-navy-dark rounded-lg hover:bg-gold/90 disabled:opacity-50">
             {saving ? 'Creating…' : 'Create Task'}
           </button>
         </div>

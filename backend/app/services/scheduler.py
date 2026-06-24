@@ -9,9 +9,15 @@ credentials would be picked for all lodges — silently wrong.
 """
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from collections import defaultdict
 import subprocess, os, logging
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 logger = logging.getLogger(__name__)
 scheduler = BackgroundScheduler()
@@ -421,8 +427,8 @@ def _whatsapp_review_request_batch():
     from . import whatsapp_service as wa
     db = SessionLocal()
     try:
-        cutoff_recent = datetime.utcnow() - timedelta(hours=4)
-        cutoff_old    = datetime.utcnow() - timedelta(hours=10)
+        cutoff_recent = _utcnow() - timedelta(hours=4)
+        cutoff_old    = _utcnow() - timedelta(hours=10)
         bookings = (db.query(CustomerBooking)
                       .filter(CustomerBooking.status == CustomerBookingStatus.checked_out.value,
                               CustomerBooking.updated_at <= cutoff_recent,

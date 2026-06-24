@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from ..database import get_db
 from ..models import Alert, AlertStatus
 from ..auth import get_current_user, resolve_lodge_scope
+from ..permissions import require_permission
 from ..services.alert_service import send_sms, send_email, is_sms_enabled, is_email_enabled
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
@@ -19,7 +20,7 @@ class CustomAlertRequest(BaseModel):
     customer_id: Optional[int] = None
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(require_permission("alerts.read"))])
 def list_alerts(
     alert_type: Optional[str] = None,
     status: Optional[str] = None,
@@ -57,7 +58,7 @@ def list_alerts(
             "checkin_id": a.checkin_id,
             "customer_id": a.customer_id,
             "alert_type": a.alert_type,
-            "event_type": a.event_type,
+            "event_type": getattr(a.event_type, "value", str(a.event_type)) if a.event_type else None,
             "recipient": a.recipient,
             "message_content": a.message_content,
             "status": a.status,
@@ -69,7 +70,7 @@ def list_alerts(
     }
 
 
-@router.post("/custom")
+@router.post("/custom", dependencies=[Depends(require_permission("alerts.write"))])
 def send_custom_alert(body: CustomAlertRequest, db: Session = Depends(get_db),
                       current_user=Depends(get_current_user),
                       lodge_id: int = Depends(resolve_lodge_scope)):
@@ -93,7 +94,7 @@ def send_custom_alert(body: CustomAlertRequest, db: Session = Depends(get_db),
     return {"alert_id": alert.alert_id, "status": alert.status, "message": "Alert processed"}
 
 
-@router.post("/{alert_id}/retry")
+@router.post("/{alert_id}/retry", dependencies=[Depends(require_permission("alerts.write"))])
 def retry_alert(alert_id: int, db: Session = Depends(get_db),
                 current_user=Depends(get_current_user),
                 lodge_id: int = Depends(resolve_lodge_scope)):
@@ -121,7 +122,7 @@ def retry_alert(alert_id: int, db: Session = Depends(get_db),
     return {"status": result.status, "message": f"Retry {result.status}"}
 
 
-@router.post("/retry-failed")
+@router.post("/retry-failed", dependencies=[Depends(require_permission("alerts.write"))])
 def retry_all_failed(db: Session = Depends(get_db),
                      current_user=Depends(get_current_user),
                      lodge_id: int = Depends(resolve_lodge_scope)):
@@ -154,7 +155,7 @@ def retry_all_failed(db: Session = Depends(get_db),
     return {"queued": queued, "sent": sent_ok, "message": f"Retried {queued} failed alert(s)"}
 
 
-@router.get("/stats")
+@router.get("/stats", dependencies=[Depends(require_permission("alerts.read"))])
 def get_alert_stats(db: Session = Depends(get_db),
                     current_user=Depends(get_current_user),
                     lodge_id: int = Depends(resolve_lodge_scope)):
@@ -168,3 +169,44 @@ def get_alert_stats(db: Session = Depends(get_db),
         "alert_type": s.alert_type.value if hasattr(s.alert_type, "value") else s.alert_type,
         "count": s[2]
     } for s in stats]
+
+
+@router.get("/sms-vendor-status")
+def get_sms_vendor_status_endpoint(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    lodge_id: int = Depends(resolve_lodge_scope),
+):
+    """Return SMS vendor configuration status for the Settings page.
+    Shows which vendor is active and whether credentials are present."""
+    from ..services.sms_service import get_sms_vendor_status
+    return get_sms_vendor_status(db, lodge_id)
+
+
+@router.post("/test-sms")
+def send_test_sms(
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    lodge_id: int = Depends(resolve_lodge_scope),
+):
+    """Send a test SMS to verify vendor configuration.
+    Only admin can trigger test sends (avoid accidental billing)."""
+    from ..auth import require_admin
+    from ..services.alert_service import send_sms
+    phone = body.get("phone", "")
+    if not phone:
+        from fastapi import HTTPException
+        raise HTTPException(400, "phone is required")
+    alert = send_sms(
+        db, phone,
+        "Rusto LMS test message — your SMS integration is working correctly! ✓",
+        lodge_id=lodge_id, event_type="custom",
+    )
+    status_val = getattr(alert.status, "value", str(alert.status))
+    return {
+        "status": status_val,
+        "error":  alert.error_message,
+        "sent":   status_val == "sent",
+        "recipient": phone,
+    }

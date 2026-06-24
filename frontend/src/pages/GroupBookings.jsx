@@ -62,7 +62,7 @@ export default function GroupBookings() {
             <option value="completed">Completed</option>
           </select>
           <button onClick={() => setShowCreate(true)}
-                  className="bg-gradient-to-br from-gold to-gold-dark text-white px-4 py-2 rounded-xl font-semibold flex items-center gap-2 shadow-gold">
+                  className="bg-gradient-to-br from-gold to-gold-dark text-navy-dark px-4 py-2 rounded-xl font-semibold flex items-center gap-2 shadow-gold">
             <Plus size={14}/> New Group
           </button>
         </div>

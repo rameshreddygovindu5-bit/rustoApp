@@ -13,7 +13,7 @@ Public surface:
 import os
 import logging
 import bcrypt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
@@ -67,7 +67,7 @@ def create_customer_token(customer_id: int) -> str:
         "sub": f"{CUSTOMER_TOKEN_TYPE}:{customer_id}",
         "typ": CUSTOMER_TOKEN_TYPE,        # explicit audience
         "cid": customer_id,                # convenience claim
-        "exp": datetime.utcnow() + timedelta(days=CUSTOMER_TOKEN_EXPIRE_DAYS),
+        "exp": datetime.now(timezone.utc) + timedelta(days=CUSTOMER_TOKEN_EXPIRE_DAYS),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 

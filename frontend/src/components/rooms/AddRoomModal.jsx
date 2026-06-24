@@ -47,41 +47,41 @@ export default function AddRoomModal({ onClose, onSuccess }) {
       <div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto animate-slide-up">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-navy font-display">Add New Room</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-600">✕</button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase">Room Number *</label>
+            <label className="text-xs font-semibold text-ink-500 uppercase">Room Number *</label>
             <input
               type="text"
               name="room_number"
               value={formData.room_number}
               onChange={handleChange}
               required
-              className="w-full mt-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-navy"
+              className="w-full mt-1 px-4 py-2 border border-ink-200 rounded-lg focus:ring-2 focus:ring-gold"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase">Floor *</label>
+            <label className="text-xs font-semibold text-ink-500 uppercase">Floor *</label>
             <input
               type="number"
               name="floor"
               value={formData.floor}
               onChange={handleChange}
               required
-              className="w-full mt-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-navy"
+              className="w-full mt-1 px-4 py-2 border border-ink-200 rounded-lg focus:ring-2 focus:ring-gold"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase">Room Type *</label>
+            <label className="text-xs font-semibold text-ink-500 uppercase">Room Type *</label>
             <select
               name="room_type"
               value={formData.room_type}
               onChange={handleChange}
-              className="w-full mt-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-navy"
+              className="w-full mt-1 px-4 py-2 border border-ink-200 rounded-lg focus:ring-2 focus:ring-gold"
             >
               <option value="non_ac">Non-AC</option>
               <option value="ac">AC</option>
@@ -91,25 +91,25 @@ export default function AddRoomModal({ onClose, onSuccess }) {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase">Base Tariff (₹) *</label>
+            <label className="text-xs font-semibold text-ink-500 uppercase">Base Tariff (₹) *</label>
             <input
               type="number"
               name="base_tariff"
               value={formData.base_tariff}
               onChange={handleChange}
               required
-              className="w-full mt-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-navy"
+              className="w-full mt-1 px-4 py-2 border border-ink-200 rounded-lg focus:ring-2 focus:ring-gold"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase">Max Occupancy</label>
+            <label className="text-xs font-semibold text-ink-500 uppercase">Max Occupancy</label>
             <input
               type="number"
               name="max_occupancy"
               value={formData.max_occupancy}
               onChange={handleChange}
-              className="w-full mt-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-navy"
+              className="w-full mt-1 px-4 py-2 border border-ink-200 rounded-lg focus:ring-2 focus:ring-gold"
             />
           </div>
 
@@ -119,31 +119,31 @@ export default function AddRoomModal({ onClose, onSuccess }) {
               name="has_ac"
               checked={formData.has_ac}
               onChange={handleChange}
-              className="rounded text-navy focus:ring-navy"
+              className="rounded text-navy focus:ring-gold"
             />
-            <label className="text-sm font-medium text-gray-700">Has AC</label>
+            <label className="text-sm font-medium text-ink-700">Has AC</label>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase">Amenities</label>
+            <label className="text-xs font-semibold text-ink-500 uppercase">Amenities</label>
             <input
               type="text"
               name="amenities"
               value={formData.amenities}
               onChange={handleChange}
               placeholder="TV, WiFi, Geyser"
-              className="w-full mt-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-navy"
+              className="w-full mt-1 px-4 py-2 border border-ink-200 rounded-lg focus:ring-2 focus:ring-gold"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase">Description</label>
+            <label className="text-xs font-semibold text-ink-500 uppercase">Description</label>
             <textarea
               name="description"
               value={formData.description}
               onChange={handleChange}
               rows="2"
-              className="w-full mt-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-navy"
+              className="w-full mt-1 px-4 py-2 border border-ink-200 rounded-lg focus:ring-2 focus:ring-gold"
             ></textarea>
           </div>
 
@@ -151,7 +151,7 @@ export default function AddRoomModal({ onClose, onSuccess }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
+              className="flex-1 px-4 py-2 border border-ink-200 rounded-lg text-sm font-medium text-ink-600 hover:bg-ink-50"
             >
               Cancel
             </button>

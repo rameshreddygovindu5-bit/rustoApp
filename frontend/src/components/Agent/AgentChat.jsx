@@ -374,7 +374,7 @@ export default function AgentChat({ open, onClose }) {
       {/* Panel */}
       <div className="fixed right-0 top-0 bottom-0 w-full sm:w-[480px] bg-white z-50 shadow-2xl flex flex-col animate-slide-in-right">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-navy text-white">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-ink-200 bg-navy text-white">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSidebar(s => !s)}
@@ -416,19 +416,19 @@ export default function AgentChat({ open, onClose }) {
 
         {/* Conversation list overlay */}
         {showSidebar && (
-          <div className="absolute top-[57px] left-0 right-0 bottom-0 bg-white z-10 flex flex-col border-r border-gray-200">
-            <div className="px-4 py-2 flex items-center justify-between border-b border-gray-100">
-              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+          <div className="absolute top-[57px] left-0 right-0 bottom-0 bg-white z-10 flex flex-col border-r border-ink-200">
+            <div className="px-4 py-2 flex items-center justify-between border-b border-ink-100">
+              <span className="text-xs font-semibold text-ink-600 uppercase tracking-wider">
                 Recent conversations
               </span>
               <button onClick={() => setShowSidebar(false)}
-                      className="text-gray-400 hover:text-navy">
+                      className="text-ink-400 hover:text-navy">
                 <ChevronLeft size={16} />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-2">
               {convos.length === 0 ? (
-                <p className="text-xs text-gray-400 p-4 text-center">No conversations yet.</p>
+                <p className="text-xs text-ink-400 p-4 text-center">No conversations yet.</p>
               ) : convos.map(c => (
                 <div
                   key={c.conversation_id}
@@ -440,13 +440,13 @@ export default function AgentChat({ open, onClose }) {
                   <MessageSquare size={14} className="text-navy/40 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-medium text-navy truncate">{c.title || 'Untitled'}</div>
-                    <div className="text-[10px] text-gray-400">
+                    <div className="text-[10px] text-ink-400">
                       {c.total_messages} msgs · {c.total_tool_calls} actions
                     </div>
                   </div>
                   <button
                     onClick={(e) => deleteConvo(c.conversation_id, e)}
-                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition"
+                    className="opacity-0 group-hover:opacity-100 text-ink-400 hover:text-red-500 transition"
                   >
                     <Trash2 size={12} />
                   </button>
@@ -458,8 +458,8 @@ export default function AgentChat({ open, onClose }) {
 
         {/* Quick actions */}
         {messages.length === 0 && !showSidebar && (
-          <div className="p-4 border-b border-gray-100">
-            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          <div className="p-4 border-b border-ink-100">
+            <div className="text-[10px] font-semibold text-ink-500 uppercase tracking-wider mb-2">
               Quick actions
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -468,7 +468,7 @@ export default function AgentChat({ open, onClose }) {
               <QuickBtn icon={CalendarClock} label="Upcoming arrivals" onClick={() => send('/arrivals')} />
               <QuickBtn icon={BedDouble} label="Available rooms" onClick={() => send('/available')} />
             </div>
-            <div className="mt-3 text-[10px] text-gray-400">
+            <div className="mt-3 text-[10px] text-ink-400">
               Or type plain English: <em>"Check in Ravi Kumar to room 102 for 3 nights with ₹500 deposit"</em>
             </div>
           </div>
@@ -480,7 +480,7 @@ export default function AgentChat({ open, onClose }) {
             <Message key={m.id} msg={m} onConfirm={handleConfirm} />
           ))}
           {isStreaming && (
-            <div className="text-xs text-gray-400 flex items-center gap-2">
+            <div className="text-xs text-ink-400 flex items-center gap-2">
               <Loader size={12} className="animate-spin" />
               Working…
             </div>
@@ -488,7 +488,7 @@ export default function AgentChat({ open, onClose }) {
         </div>
 
         {/* Input */}
-        <div className="border-t border-gray-200 px-3 py-2 bg-gray-50">
+        <div className="border-t border-ink-100 px-3 py-2 bg-ink-50">
           <form
             onSubmit={(e) => { e.preventDefault(); send() }}
             className="flex items-end gap-2"
@@ -506,7 +506,7 @@ export default function AgentChat({ open, onClose }) {
               }}
               disabled={isStreaming}
               placeholder="Ask anything, or use /dashboard, /overdue, /available…"
-              className="flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold focus:border-gold transition disabled:bg-gray-100"
+              className="flex-1 resize-none rounded-lg border border-ink-300 px-3 py-2 text-sm text-ink-800 focus:outline-none focus:ring-2 focus:ring-gold/30 focus:border-gold transition disabled:bg-ink-100 placeholder:text-ink-400"
               style={{ maxHeight: '120px' }}
             />
             {isStreaming ? (
@@ -522,13 +522,13 @@ export default function AgentChat({ open, onClose }) {
               <button
                 type="submit"
                 disabled={!input.trim()}
-                className="px-3 py-2 rounded-lg bg-gold text-white hover:bg-gold-dark transition disabled:opacity-40"
+                className="px-3 py-2 rounded-lg bg-gold text-navy-dark font-bold hover:bg-gold-dark transition disabled:opacity-40"
               >
                 <Send size={14} />
               </button>
             )}
           </form>
-          <div className="mt-1 text-[10px] text-gray-400 px-1">
+          <div className="mt-1 text-[10px] text-ink-400 px-1">
             Enter to send · Shift+Enter for new line
           </div>
         </div>
@@ -556,7 +556,7 @@ function Message({ msg, onConfirm }) {
             return (
               <div
                 key={i}
-                className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed"
+                className="text-sm text-ink-800 whitespace-pre-wrap leading-relaxed"
                 dangerouslySetInnerHTML={{ __html: renderMarkdown(b.text || '') }}
               />
             )
@@ -582,7 +582,7 @@ function QuickBtn({ icon: Icon, label, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 hover:border-gold hover:bg-amber-50 transition text-xs text-navy text-left"
+      className="flex items-center gap-2 px-3 py-2 rounded-lg border border-ink-200 hover:border-gold hover:bg-amber-50 transition text-xs text-navy text-left"
     >
       <Icon size={14} className="text-gold flex-shrink-0" />
       <span className="truncate">{label}</span>
@@ -596,7 +596,7 @@ function renderMarkdown(text) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   return escape(text)
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/`([^`]+)`/g, '<code class="bg-amber-100 px-1 rounded text-[12px]">$1</code>')
+    .replace(/`([^`]+)`/g, '<code class="bg-ink-100 text-navy px-1 rounded text-[12px] font-mono">$1</code>')
     .replace(/\*([^*]+)\*/g, '<em>$1</em>')
     .replace(/_([^_]+)_/g, '<em>$1</em>')
     .replace(/\n/g, '<br/>')

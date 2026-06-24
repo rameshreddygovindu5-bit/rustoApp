@@ -4,13 +4,21 @@ Checks settings to determine if SMS/Email/None should be sent.
 """
 import re
 import smtplib
+# Multi-vendor SMS routing (Twilio / MSG91) — see sms_service.py
+from .sms_service import send_sms, normalize_indian_phone, normalize_phone_e164, get_sms_vendor_status  # noqa: F401
 import os
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from ..models import Alert, AlertType, AlertEvent, AlertStatus, Checkin, Customer, Room, Setting
 
@@ -139,16 +147,17 @@ def send_sms(db: Session, phone: str, message: str, checkin_id: Optional[int] = 
     # check the provider config means even a misconfigured deployment still
     # records a useful error ("not a valid Indian mobile") instead of the
     # confusing "SMS provider not configured" message.
+    provider = get_setting(db, "sms_provider", "twilio", lodge_id=resolved_lodge_id)
+    # MSG91 only works with Indian numbers; Twilio supports international
+    indian_only = (provider == "msg91")
     try:
-        to_number = normalize_indian_phone(phone)
+        to_number = normalize_phone_e164(phone, indian_only=indian_only)
     except ValueError as e:
         alert.status = AlertStatus.failed
         alert.error_message = str(e)
         logger.warning("SMS rejected at validation: %s", e)
         db.commit()
         return alert
-
-    provider = get_setting(db, "sms_provider", "twilio", lodge_id=resolved_lodge_id)
     # Read the auth token under either name — frontend Settings page writes
     # `twilio_auth_token` (the actual Twilio terminology), older deployments
     # may have it under `sms_api_key`. Whichever has a value wins.
@@ -216,7 +225,7 @@ def send_sms(db: Session, phone: str, message: str, checkin_id: Optional[int] = 
                 )
             else:
                 alert.status = AlertStatus.sent
-                alert.sent_at = datetime.utcnow()
+                alert.sent_at = _utcnow()
                 # Persist the Twilio SID + initial status so the Alerts page
                 # is diagnostic — operators can paste the SID into Twilio
                 # Console to see carrier-side delivery status.
@@ -314,7 +323,7 @@ def send_email(db: Session, to_email: str, subject: str, html_body: str,
             server.sendmail(smtp_user, to_email, msg.as_string())
 
         alert.status = AlertStatus.sent
-        alert.sent_at = datetime.utcnow()
+        alert.sent_at = _utcnow()
         logger.info(f"Email sent to {to_email}")
     except Exception as e:
         alert.status = AlertStatus.failed

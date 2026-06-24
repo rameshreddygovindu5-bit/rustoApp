@@ -5,7 +5,7 @@ import { otaAPI } from "../services/api";
 
 const CHANNEL_META = {
   booking_com: { label: "Booking.com", color: "bg-blue-50 text-blue-700 ring-blue-200" },
-  expedia:     { label: "Expedia",     color: "bg-yellow-50 text-yellow-700 ring-yellow-200" },
+  expedia:     { label: "Expedia",     color: "bg-amber-50 text-amber-700 ring-yellow-200" },
   airbnb:      { label: "Airbnb",      color: "bg-pink-50 text-pink-700 ring-pink-200" },
   agoda:       { label: "Agoda",       color: "bg-red-50 text-red-700 ring-red-200" },
   makemytrip:  { label: "MakeMyTrip",  color: "bg-orange-50 text-orange-700 ring-orange-200" },
@@ -63,7 +63,7 @@ export default function OtaReservations() {
             {Object.entries(CHANNEL_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
           </select>
           <button onClick={() => setShowCreate(true)}
-                  className="bg-gradient-to-br from-gold to-gold-dark text-white px-4 py-2 rounded-xl font-semibold flex items-center gap-2 shadow-gold">
+                  className="bg-gradient-to-br from-gold to-gold-dark text-navy-dark px-4 py-2 rounded-xl font-semibold flex items-center gap-2 shadow-gold">
             <Plus size={14}/> Log OTA Booking
           </button>
         </div>
@@ -109,7 +109,7 @@ export default function OtaReservations() {
             className={`cursor-pointer p-4 rounded-xl border transition-all duration-300 ${
               expandedCard === "ota" 
                 ? "bg-white/10 border-gold/50 shadow-gold/10 shadow-md" 
-                : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/8"
+                : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/[0.08]"
             }`}
           >
             <div className="flex items-center justify-between">
@@ -126,19 +126,19 @@ export default function OtaReservations() {
                 <p className="text-white/80 font-semibold uppercase tracking-wider text-[10px]">Step-by-Step Implementation Guide:</p>
                 <div className="space-y-2.5">
                   <div className="flex gap-2">
-                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">1</span>
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-[9px] flex-shrink-0">1</span>
                     <p className="text-white/75"><strong className="text-white">Calculate Net Channel Yield:</strong> Deduct OTA fees (17%–30%) from gross rates (e.g. a ₹5,000 booking yields only ₹3,500 net).</p>
                   </div>
                   <div className="flex gap-2">
-                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">2</span>
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-[9px] flex-shrink-0">2</span>
                     <p className="text-white/75"><strong className="text-white">Allocate Upgrade Budgets:</strong> Reinvest 10%–15% of saved commission into free perks (breakfast, priority early check-ins) exclusively for direct bookers.</p>
                   </div>
                   <div className="flex gap-2">
-                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">3</span>
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-[9px] flex-shrink-0">3</span>
                     <p className="text-white/75"><strong className="text-white">Direct-Conversion Scripting:</strong> Train front-desk agents to distribute a direct-booking discount card containing a custom discount code during OTA guest checkout.</p>
                   </div>
                   <div className="flex gap-2">
-                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">4</span>
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-[9px] flex-shrink-0">4</span>
                     <p className="text-white/75"><strong className="text-white">Auto-Tag Guest Profiles:</strong> Create automated tags like <code className="bg-white/10 px-1 rounded text-gold">OTA_COMMISSION_HIGH</code> to prioritize room allocations in favor of direct profiles.</p>
                   </div>
                 </div>
@@ -152,7 +152,7 @@ export default function OtaReservations() {
             className={`cursor-pointer p-4 rounded-xl border transition-all duration-300 ${
               expandedCard === "pms" 
                 ? "bg-white/10 border-gold/50 shadow-gold/10 shadow-md" 
-                : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/8"
+                : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/[0.08]"
             }`}
           >
             <div className="flex items-center justify-between">
@@ -169,19 +169,19 @@ export default function OtaReservations() {
                 <p className="text-white/80 font-semibold uppercase tracking-wider text-[10px]">Step-by-Step Implementation Guide:</p>
                 <div className="space-y-2.5">
                   <div className="flex gap-2">
-                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">1</span>
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-[9px] flex-shrink-0">1</span>
                     <p className="text-white/75"><strong className="text-white">Evaluate Scale Matching:</strong> Choose Cloudbeds for standard operations, Mews for enterprise automation, or Sirvoy for simple transparency.</p>
                   </div>
                   <div className="flex gap-2">
-                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">2</span>
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-[9px] flex-shrink-0">2</span>
                     <p className="text-white/75"><strong className="text-white">Configure Sirvoy Tiering:</strong> Deploy Sirvoy's $185/month tier. Configure callback and email escalations to secure fast human support responses.</p>
                   </div>
                   <div className="flex gap-2">
-                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">3</span>
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-[9px] flex-shrink-0">3</span>
                     <p className="text-white/75"><strong className="text-white">Synchronize Tax & Invoice Items:</strong> Map all GST percentage settings and invoice ledger categories to match local billing regulations.</p>
                   </div>
                   <div className="flex gap-2">
-                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">4</span>
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-[9px] flex-shrink-0">4</span>
                     <p className="text-white/75"><strong className="text-white">Align Room Categories:</strong> Align room type codes exactly across PMS inventories and OTAs to prevent sync dropouts.</p>
                   </div>
                 </div>
@@ -195,7 +195,7 @@ export default function OtaReservations() {
             className={`cursor-pointer p-4 rounded-xl border transition-all duration-300 ${
               expandedCard === "marketplace" 
                 ? "bg-white/10 border-gold/50 shadow-gold/10 shadow-md" 
-                : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/8"
+                : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/[0.08]"
             }`}
           >
             <div className="flex items-center justify-between">
@@ -212,19 +212,19 @@ export default function OtaReservations() {
                 <p className="text-white/80 font-semibold uppercase tracking-wider text-[10px]">Step-by-Step Implementation Guide:</p>
                 <div className="space-y-2.5">
                   <div className="flex gap-2">
-                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">1</span>
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-[9px] flex-shrink-0">1</span>
                     <p className="text-white/75"><strong className="text-white">Audit Core Ecosystem Needs:</strong> Map all current and future integrations (smartlocks, POS, Accounting CRM, analytics).</p>
                   </div>
                   <div className="flex gap-2">
-                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">2</span>
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-[9px] flex-shrink-0">2</span>
                     <p className="text-white/75"><strong className="text-white">Verify Open API Access:</strong> Avoid proprietary closed systems. Choose systems like Cloudbeds or Mews offering open REST endpoints.</p>
                   </div>
                   <div className="flex gap-2">
-                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">3</span>
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-[9px] flex-shrink-0">3</span>
                     <p className="text-white/75"><strong className="text-white">Enable Two-Way Channel Sync:</strong> Link a 2-way channel manager (SiteMinder/RateGain) to automate rate updates across OTAs in real-time.</p>
                   </div>
                   <div className="flex gap-2">
-                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-3xs flex-shrink-0">4</span>
+                    <span className="w-5 h-5 rounded-full bg-gold/20 text-gold flex items-center justify-center font-bold text-[9px] flex-shrink-0">4</span>
                     <p className="text-white/75"><strong className="text-white">Monitor API Health Logs:</strong> Conduct quarterly checks on transaction times and API health logs to prevent double-booking issues.</p>
                   </div>
                 </div>

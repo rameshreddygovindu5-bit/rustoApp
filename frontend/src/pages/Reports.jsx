@@ -154,22 +154,22 @@ export default function Reports() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-playfair text-xl sm:text-2xl font-bold text-navy">Reports & Analytics</h1>
-          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+          <h1 className="font-display text-xl sm:text-2xl font-bold text-navy">Reports & Analytics</h1>
+          <p className="text-xs sm:text-sm text-ink-500 mt-0.5">
             {new Date(dateRange.from).toLocaleDateString("en-IN")} — {new Date(dateRange.to).toLocaleDateString("en-IN")}
           </p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={fetchReports}
-            className="p-2 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 transition-colors"
+            className="p-2 border border-ink-200 rounded-xl text-ink-500 hover:bg-ink-50 transition-colors"
           >
             <RefreshCw size={16} />
           </button>
           <button
             onClick={() => handleExport("excel")}
             disabled={exporting}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 border border-ink-200 rounded-xl text-xs sm:text-sm text-ink-700 hover:bg-ink-50 transition-colors disabled:opacity-60"
           >
             <Download size={14} /> Excel
           </button>
@@ -192,15 +192,15 @@ export default function Reports() {
       </div>
 
       {/* Period Selector */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-ink-100 p-4">
         <div className="flex flex-wrap gap-3 items-center">
-          <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto no-scrollbar max-w-full">
+          <div className="flex gap-1 bg-ink-100 rounded-xl p-1 overflow-x-auto no-scrollbar max-w-full">
             {[["daily", "Daily"], ["week", "Week"], ["month", "Month"], ["quarter", "Quarter"], ["year", "Year"], ["custom", "Custom"]].map(([val, label]) => (
               <button
                 key={val}
                 onClick={() => handlePeriodChange(val)}
                 className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
-                  period === val ? "bg-white text-navy shadow-sm" : "text-gray-600 hover:text-gray-800"
+                  period === val ? "bg-white text-navy shadow-sm" : "text-ink-600 hover:text-ink-800"
                 }`}
               >
                 {label}
@@ -213,14 +213,14 @@ export default function Reports() {
                 type="date"
                 value={dateRange.from}
                 onChange={e => setDateRange(d => ({ ...d, from: e.target.value }))}
-                className="flex-1 sm:flex-none px-3 py-1.5 text-xs sm:text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                className="flex-1 sm:flex-none px-3 py-1.5 text-xs sm:text-sm border border-ink-200 rounded-xl focus:outline-none focus:border-gold"
               />
-              <span className="text-gray-400 text-xs">to</span>
+              <span className="text-ink-400 text-xs">to</span>
               <input
                 type="date"
                 value={dateRange.to}
                 onChange={e => setDateRange(d => ({ ...d, to: e.target.value }))}
-                className="flex-1 sm:flex-none px-3 py-1.5 text-xs sm:text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                className="flex-1 sm:flex-none px-3 py-1.5 text-xs sm:text-sm border border-ink-200 rounded-xl focus:outline-none focus:border-gold"
               />
             </div>
           )}
@@ -268,10 +268,10 @@ export default function Reports() {
       {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Revenue Chart */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 animate-slide-up">
+        <div className="bg-white rounded-2xl shadow-sm border border-ink-100 p-6 animate-slide-up">
           <h3 className="font-semibold text-navy mb-4">Revenue Trend</h3>
           {loading ? (
-            <div className="h-48 bg-gray-50 rounded-xl animate-pulse" />
+            <div className="h-48 bg-ink-50 rounded-xl animate-pulse" />
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={revenueData}>
@@ -286,10 +286,10 @@ export default function Reports() {
         </div>
 
         {/* Occupancy Chart */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 animate-slide-up">
+        <div className="bg-white rounded-2xl shadow-sm border border-ink-100 p-6 animate-slide-up">
           <h3 className="font-semibold text-navy mb-4">Occupancy Rate (%)</h3>
           {loading ? (
-            <div className="h-48 bg-gray-50 rounded-xl animate-pulse" />
+            <div className="h-48 bg-ink-50 rounded-xl animate-pulse" />
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={occupancyData}>
@@ -307,10 +307,10 @@ export default function Reports() {
       {/* Charts Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Room Type Breakdown */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 animate-slide-up">
+        <div className="bg-white rounded-2xl shadow-sm border border-ink-100 p-6 animate-slide-up">
           <h3 className="font-semibold text-navy mb-4">Revenue by Room Type</h3>
           {loading ? (
-            <div className="h-48 bg-gray-50 rounded-xl animate-pulse" />
+            <div className="h-48 bg-ink-50 rounded-xl animate-pulse" />
           ) : (
             <>
               <ResponsiveContainer width="100%" height={180}>
@@ -328,9 +328,9 @@ export default function Reports() {
                   <div key={rt.room_type} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <div className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
-                      <span className="text-gray-700">{rt.room_type}</span>
+                      <span className="text-ink-700">{rt.room_type}</span>
                     </div>
-                    <span className="font-medium text-gray-800">{formatCurrency(rt.revenue)}</span>
+                    <span className="font-medium text-ink-800">{formatCurrency(rt.revenue)}</span>
                   </div>
                 ))}
               </div>
@@ -339,17 +339,17 @@ export default function Reports() {
         </div>
 
         {/* Summary Table */}
-        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-ink-100 p-6">
           <h3 className="font-semibold text-navy mb-4">Room-wise Performance</h3>
           {loading ? (
             <div className="space-y-2">
-              {Array(5).fill(0).map((_, i) => <div key={i} className="h-10 bg-gray-100 rounded-xl animate-pulse" />)}
+              {Array(5).fill(0).map((_, i) => <div key={i} className="h-10 bg-ink-100 rounded-xl animate-pulse" />)}
             </div>
           ) : (
             <div className="overflow-x-auto -mx-6 px-6">
               <table className="w-full text-sm min-w-[500px]">
                 <thead>
-                  <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                  <tr className="text-xs text-ink-500 uppercase tracking-wider border-b border-ink-100">
                     <th className="text-left py-2">Room Type</th>
                     <th className="text-right py-2">Stays</th>
                     <th className="text-right py-2">Nights</th>
@@ -357,18 +357,18 @@ export default function Reports() {
                     <th className="text-right py-2">Avg/Night</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-ink-100">
                   {roomTypeData.map(rt => (
-                    <tr key={rt.room_type} className="hover:bg-gray-50">
-                      <td className="py-2.5 font-medium text-gray-800">{rt.room_type}</td>
-                      <td className="py-2.5 text-right text-gray-600">{rt.stays}</td>
-                      <td className="py-2.5 text-right text-gray-600">{rt.nights}</td>
+                    <tr key={rt.room_type} className="hover:bg-ink-50">
+                      <td className="py-2.5 font-medium text-ink-800">{rt.room_type}</td>
+                      <td className="py-2.5 text-right text-ink-600">{rt.stays}</td>
+                      <td className="py-2.5 text-right text-ink-600">{rt.nights}</td>
                       <td className="py-2.5 text-right font-semibold text-green-600">{formatCurrency(rt.revenue)}</td>
-                      <td className="py-2.5 text-right text-gray-600">{formatCurrency(rt.avg_per_night || 0)}</td>
+                      <td className="py-2.5 text-right text-ink-600">{formatCurrency(rt.avg_per_night || 0)}</td>
                     </tr>
                   ))}
                   {roomTypeData.length > 0 && (
-                    <tr className="border-t-2 border-gray-200 font-semibold">
+                    <tr className="border-t-2 border-ink-200 font-semibold">
                       <td className="py-2.5 text-navy">Total</td>
                       <td className="py-2.5 text-right">{roomTypeData.reduce((a, r) => a + r.stays, 0)}</td>
                       <td className="py-2.5 text-right">{roomTypeData.reduce((a, r) => a + r.nights, 0)}</td>
@@ -396,7 +396,7 @@ function KPICard({ label, value, sub, icon, trend, color, loading }) {
   const c = colors[color] || colors.blue;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+    <div className="bg-white rounded-2xl shadow-sm border border-ink-100 p-5">
       <div className="flex items-center justify-between mb-3">
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${c.bg} ${c.text}`}>
           {icon}
@@ -410,14 +410,14 @@ function KPICard({ label, value, sub, icon, trend, color, loading }) {
       </div>
       {loading ? (
         <div className="space-y-1.5">
-          <div className="h-7 bg-gray-100 rounded animate-pulse w-3/4" />
-          <div className="h-3 bg-gray-50 rounded animate-pulse w-1/2" />
+          <div className="h-7 bg-ink-100 rounded animate-pulse w-3/4" />
+          <div className="h-3 bg-ink-50 rounded animate-pulse w-1/2" />
         </div>
       ) : (
         <>
-          <p className="text-2xl font-playfair font-bold text-gray-900">{value}</p>
-          <p className="text-xs text-gray-500 mt-0.5">{sub}</p>
-          <p className="text-xs text-gray-400 mt-1">{label}</p>
+          <p className="text-2xl font-display font-bold text-navy">{value}</p>
+          <p className="text-xs text-ink-500 mt-0.5">{sub}</p>
+          <p className="text-xs text-ink-400 mt-1">{label}</p>
         </>
       )}
     </div>

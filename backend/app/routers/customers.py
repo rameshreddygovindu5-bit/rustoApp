@@ -6,7 +6,7 @@ from ..database import get_db
 from ..models import Customer, Checkin, CheckinStatus
 from ..auth import get_current_user, require_admin, resolve_lodge_scope
 from ..services.audit_service import log_audit
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from datetime import date
 import re, os, uuid
 
@@ -27,13 +27,15 @@ class CustomerCreate(BaseModel):
     gender: Optional[str] = None
     is_vip: bool = False
 
-    @validator("phone")
+    @field_validator("phone", mode="before")
+    @classmethod
     def validate_phone(cls, v):
         if not re.match(r"^\d{10}$", v):
             raise ValueError("Phone must be exactly 10 digits")
         return v
 
-    @validator("gender", "email", "address", "nationality")
+    @field_validator("gender", "email", "address", "nationality", mode="before")
+    @classmethod
     def empty_to_none(cls, v):
         if v == "":
             return None
@@ -55,7 +57,8 @@ class CustomerUpdate(BaseModel):
     blacklisted: Optional[bool] = None
     blacklist_reason: Optional[str] = None
 
-    @validator("gender", "email", "address", "nationality")
+    @field_validator("gender", "email", "address", "nationality", mode="before")
+    @classmethod
     def empty_to_none(cls, v):
         if v == "":
             return None
@@ -66,8 +69,36 @@ def customer_to_dict(c: Customer, include_history: bool = False):
     # Compute last_room safely (sorted by checkin_datetime, most recent)
     sorted_checkins = sorted(c.checkins or [], key=lambda x: x.checkin_datetime, reverse=True) if c.checkins else []
     last_room = sorted_checkins[0].room.room_number if sorted_checkins and sorted_checkins[0].room else None
+    # Look up Rusto marketplace loyalty tier for this customer
+    rusto_tier = None
+    rusto_points = None
+    try:
+        from ..models import RustoCustomer as RC, RustoMembership as RM
+        phone_str = str(c.phone or "")
+        rc = None
+        from sqlalchemy.orm import Session as _S
+        # Access db from the function's local scope (passed through include_history parameter handling)
+        # Use direct SQL approach since db isn't passed to this function
+        import sqlalchemy as _sa
+        engine = c.__class__.__table__.metadata.bind
+        if engine:
+            with engine.connect() as conn:
+                row = conn.execute(
+                    _sa.text("SELECT rm.tier, rm.rusto_points FROM rusto_memberships rm "
+                             "JOIN rusto_customers rc ON rc.customer_id = rm.customer_id "
+                             "WHERE rc.phone = :phone LIMIT 1"),
+                    {"phone": phone_str}
+                ).fetchone()
+                if row:
+                    rusto_tier   = row[0]
+                    rusto_points = row[1]
+    except Exception:
+        pass
+
     data = {
         "customer_id": c.customer_id,
+        "rusto_tier":   rusto_tier,
+        "rusto_points": rusto_points,
         "first_name": c.first_name,
         "last_name": c.last_name,
         "full_name": f"{c.first_name} {c.last_name}",
@@ -242,7 +273,7 @@ def create_customer(body: CustomerCreate, request: Request,
     if existing:
         raise HTTPException(status_code=400, detail="Phone number already registered")
 
-    customer = Customer(lodge_id=lodge_id, **body.dict())
+    customer = Customer(lodge_id=lodge_id, **body.model_dump())
     db.add(customer)
     db.commit()
     db.refresh(customer)
@@ -287,7 +318,7 @@ def update_customer(customer_id: int, body: CustomerUpdate, request: Request,
                 detail=f"Phone {new_phone} already belongs to another guest "
                        f"({clash.first_name} {clash.last_name}).",
             )
-    changed_fields = body.dict(exclude_unset=True)
+    changed_fields = body.model_dump(exclude_unset=True)
     for field, value in changed_fields.items():
         setattr(customer, field, value)
     db.commit()

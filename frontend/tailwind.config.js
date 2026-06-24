@@ -7,38 +7,79 @@ export default {
         // ── Brand: navy + gold + ink ─────────────────────────────────
         // Navy: authority, trust. Used for primary surfaces and the brand
         // mark. Range gives us depth without arbitrary tints.
+        // Midnight Indigo — "Indian Dusk" v2 palette
+        // Synced with mobile/src/theme/index.ts
         navy: {
-          DEFAULT: '#1B2A4A',
-          light:   '#243557',
-          dark:    '#0F1B33',
-          50:  '#F0F3F8',
-          100: '#DCE3EE',
-          200: '#B9C5D8',
-          300: '#8FA0BF',
-          400: '#5A7099',
-          500: '#3A4F7A',
-          600: '#283C63',
-          700: '#1B2A4A',
-          800: '#0F1B33',
-          900: '#0A1224',
-          950: '#050912',
+          DEFAULT: '#0D1F2D',  // Midnight Indigo
+          light:   '#162E42',  // Dusk Indigo
+          dark:    '#07131C',  // Obsidian Depth
+          mid:     '#1E3D57',  // Twilight Steel
+          50:  '#EBF4FA',
+          100: '#C2DFF0',
+          200: '#7AAEC8',
+          300: '#4A7A9B',
+          400: '#2E5470',
+          500: '#1E3D57',
+          600: '#162E42',
+          700: '#0D1F2D',
+          800: '#07131C',
+          900: '#040D14',
+          950: '#02070D',
         },
-        // Gold: accent. Used sparingly on CTAs and the brand mark.
-        // Over-use cheapens the whole palette.
+        // Saffron Gold — Temple Saffron. The sacred fire. Never over-use.
+        // "Indian Dusk" v2 — synced with mobile/src/theme/index.ts
         gold: {
-          DEFAULT: '#C9A84C',
-          light:   '#E2C470',
-          dark:    '#A8873C',
-          50:  '#FDFAF1',
-          100: '#F7EFD7',
-          200: '#EEDFA9',
-          300: '#E2C470',
-          400: '#D9B85F',
-          500: '#C9A84C',
-          600: '#B89540',
-          700: '#A8873C',
-          800: '#856B2E',
-          900: '#5E4B20',
+          DEFAULT: '#E8A020',  // Temple Saffron
+          light:   '#F2BF5E',  // Golden Hour
+          dark:    '#C4841A',  // Aged Brass
+          mid:     '#D4951E',  // Molten Gold
+          50:  '#FDF3DC',      // Ivory Warmth
+          100: '#FAE8C5',      // Morning Champagne
+          200: '#F7D49A',      // Warm Glow
+          300: '#F2BF5E',      // Golden Hour
+          400: '#EDB84A',      // Afternoon Amber
+          500: '#E8A020',      // Temple Saffron
+          600: '#D4951E',      // Molten Gold
+          700: '#C4841A',      // Aged Brass
+          800: '#A36800',
+          900: '#5C3A00',
+        },
+        // Terracotta — elite/premium surfaces
+        terra: {
+          DEFAULT: '#C85D3A',
+          light:   '#E8845F',
+        },
+        // Sage — success/availability
+        sage: {
+          DEFAULT: '#2A7D5F',
+          bg:      '#DFFBEF',
+        },
+        // ── Warm Neutrals (PMS theme — "Marsn Ibom" palette) ──────────
+        wn: {
+          canvas:    '#F2EDE4',   // warm linen background
+          paper:     '#EAE4D7',   // off-white card surface
+          parchment: '#DDD5C4',   // hover/alt surface
+          travert:   '#D6CAB2',   // travertine stone subtle fill
+          sand:      '#C9AE8A',   // sand borders and accents
+          burlap:    '#B89A74',   // burlap secondary
+          suede:     '#8C6E54',   // suede — primary interactive
+          tobacco:   '#6B5040',   // tobacco — active/pressed
+          charcoal:  '#4E3D30',   // charcoal text
+          espresso:  '#3A2718',   // espresso headings
+          walnut:    '#231509',   // deep walnut max-contrast
+        },
+        // Warm ivory neutrals (replaces cold ink palette on some components)
+        ivory: {
+          50:  '#FAFAF8',
+          100: '#F2F0EB',
+          200: '#E0DDD4',
+          300: '#C5C0B2',
+          400: '#9B9486',
+          500: '#736C5E',
+          600: '#524D41',
+          700: '#38342A',
+          800: '#201E17',
+          900: '#0F0E0B',
         },
         // Ink: neutral palette. Tighter than Tailwind default gray.
         ink: {
@@ -55,13 +96,16 @@ export default {
         },
       },
       fontFamily: {
-        display: ['Outfit', 'sans-serif'],
-        sans:    ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
-        body:    ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
-        mono:    ['JetBrains Mono', 'Menlo', 'monospace'],
+        display:   ['Outfit', 'Plus Jakarta Sans', 'sans-serif'],
+        playfair:  ['Outfit', 'Plus Jakarta Sans', 'sans-serif'],  // fallback alias — removed from design but kept to avoid build errors
+        sans:      ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+        body:      ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+        mono:      ['JetBrains Mono', 'Menlo', 'monospace'],
       },
       fontSize: {
-        '2xs': ['0.6875rem', { lineHeight: '1rem',     letterSpacing: '0.04em' }],
+        '2xs': ['0.6875rem', { lineHeight: '1rem',     letterSpacing: '0.04em' }],  // 11px
+        '3xs': ['0.5625rem', { lineHeight: '0.875rem', letterSpacing: '0.06em' }],  // 9px
+        '4xs': ['0.5rem',    { lineHeight: '0.75rem',  letterSpacing: '0.08em' }],  // 8px
       },
       letterSpacing: {
         eyebrow: '0.14em',
@@ -101,7 +145,20 @@ export default {
       // Easings favour cubic-bezier(0.22, 1, 0.36, 1) — quick start, slow
       // settle — over linear. Durations land between 300ms and 700ms.
       animation: {
-        // Existing primitives.
+        // ── Indian Dusk v2 animations ──────────────────────────────────
+        'dusk-fade':       'duskFadeIn 0.42s cubic-bezier(0.16,1,0.3,1) both',
+        'dusk-rise':       'duskRiseUp 0.42s cubic-bezier(0.16,1,0.3,1) both',
+        'dusk-scale':      'duskScaleIn 0.42s cubic-bezier(0.34,1.56,0.64,1) both',
+        'gold-breath':     'goldBreath 2.4s ease-in-out infinite',
+        'lantern-sway':    'lanternSway 3.2s ease-in-out infinite',
+        'temple-float':    'templeFloat 7s ease-in-out infinite',
+        'heart-pop':       'heartPop 0.42s cubic-bezier(0.34,1.56,0.64,1) both',
+        'cascade':         'cascadeReveal 0.42s cubic-bezier(0.16,1,0.3,1) both',
+        'confirmed':       'confirmedZoom 0.6s cubic-bezier(0.175,0.885,0.32,1.275) both',
+        'orb-1':           'orbDrift1 9s ease-in-out infinite',
+        'orb-2':           'orbDrift2 12s ease-in-out infinite',
+        'saffron-shimmer': 'saffronShimmer 1.6s ease-in-out infinite',
+        // ── Existing primitives ─────────────────────────────────────────
         'fade-in':     'fadeIn 0.5s ease-out both',
         'slide-up':    'slideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both',
         'slide-down':  'slideDown 0.4s cubic-bezier(0.22, 1, 0.36, 1) both',
@@ -287,6 +344,60 @@ export default {
         bgDrift: {
           '0%, 100%': { backgroundPosition: '0% 50%' },
           '50%':      { backgroundPosition: '100% 50%' },
+        },
+        // ── Indian Dusk v2 keyframes ──────────────────────────────────────
+        duskFadeIn: { from: { opacity: '0' }, to: { opacity: '1' } },
+        duskRiseUp: {
+          from: { opacity: '0', transform: 'translateY(28px)' },
+          to:   { opacity: '1', transform: 'translateY(0)' },
+        },
+        duskScaleIn: {
+          from: { opacity: '0', transform: 'scale(0.88)' },
+          '60%':{ opacity: '1', transform: 'scale(1.03)' },
+          to:   { opacity: '1', transform: 'scale(1)' },
+        },
+        goldBreath: {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(232,160,32,0.40)' },
+          '50%':      { boxShadow: '0 0 0 10px rgba(232,160,32,0)' },
+        },
+        lanternSway: {
+          '0%, 100%': { boxShadow: '0 0 20px 4px rgba(232,160,32,0.25)' },
+          '33%':      { boxShadow: '0 0 32px 8px rgba(232,160,32,0.45)' },
+          '66%':      { boxShadow: '0 0 16px 2px rgba(232,160,32,0.20)' },
+        },
+        templeFloat: {
+          '0%, 100%': { transform: 'translateY(0px) rotate(-1deg)' },
+          '50%':      { transform: 'translateY(-12px) rotate(1deg)' },
+        },
+        heartPop: {
+          '0%':  { transform: 'scale(1)' },
+          '40%': { transform: 'scale(1.5)' },
+          '65%': { transform: 'scale(0.88)' },
+          '100%':{ transform: 'scale(1)' },
+        },
+        cascadeReveal: {
+          from: { opacity: '0', transform: 'translateY(20px) scale(0.97)' },
+          to:   { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        saffronShimmer: {
+          '0%':   { backgroundPosition: '-300px 0' },
+          '100%': { backgroundPosition: '400px 0' },
+        },
+        confirmedZoom: {
+          '0%':  { opacity: '0', transform: 'scale(0.5) rotate(-8deg)' },
+          '60%': { opacity: '1', transform: 'scale(1.1) rotate(3deg)' },
+          '80%': { transform: 'scale(0.96) rotate(-1deg)' },
+          '100%':{ transform: 'scale(1) rotate(0deg)' },
+        },
+        orbDrift1: {
+          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+          '33%':      { transform: 'translate(8px, -14px) scale(1.05)' },
+          '66%':      { transform: 'translate(-6px, -8px) scale(0.97)' },
+        },
+        orbDrift2: {
+          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+          '40%':      { transform: 'translate(-10px, 12px) scale(1.08)' },
+          '70%':      { transform: 'translate(6px, -6px) scale(0.95)' },
         },
       },
       // Stagger delays — used to cascade KPI card entrances etc.

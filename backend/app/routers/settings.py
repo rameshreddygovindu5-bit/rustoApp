@@ -130,12 +130,36 @@ def get_public_settings(lodge_code: Optional[str] = Query(None),
     if lodge_code:
         lodge = db.query(Lodge).filter(Lodge.code == lodge_code.lower()).first()
         if lodge:
-            public_keys = ["hotel_name", "hotel_tagline", "logo_path",
-                           "hotel_phone", "hotel_email", "hotel_address",
+            public_keys = [
+                           # Core branding
+                           "hotel_name", "hotel_tagline", "logo_path", "banner_image_url",
+                           "hotel_phone", "hotel_email", "hotel_address", "hotel_city",
+                           "hotel_website", "hotel_description",
+                           # Theme / property identity
                            "primary_color", "accent_color", "agent_enabled",
-                           "premium_theme_enabled",
+                           "premium_theme_enabled", "property_category",
+                           "star_rating", "gstin",
+                           # Social media
+                           "social_instagram", "social_facebook", "social_twitter",
+                           # Operational policies
+                           "checkin_time_setting", "checkout_time_setting",
+                           "meal_plan_options",   # "ep,cp,map,ap" csv
+                           "pet_policy",          # allowed/not_allowed/on_request
+                           "smoking_policy",       # allowed_rooms/no_smoking/designated_area
+                           "extra_bed_charge",
+                           # Amenity flags
+                           "has_pool", "has_spa", "has_gym", "has_restaurant",
+                           "has_bar", "has_conference_hall", "has_parking",
+                           "has_airport_transfer", "has_ev_charging",
+                           "has_kids_play_area", "has_24hr_reception",
+                           # Nearby attractions
+                           "nearby_attractions",   # json string
+                           # Tariffs
                            "tariff_deluxe_ac", "tariff_ac", "tariff_non_ac",
-                           "tariff_house", "gst_rate", "gst_enabled", "gst_threshold"]
+                           "tariff_house", "tariff_suite", "tariff_villa",
+                           "gst_rate", "gst_enabled", "gst_threshold",
+                           # v10 — module config
+                           "enabled_modules"]
             rows = (db.query(Setting)
                     .filter(Setting.setting_key.in_(public_keys),
                             Setting.lodge_id == lodge.lodge_id).all())

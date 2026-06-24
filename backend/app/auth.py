@@ -1,4 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+def _now():
+    """Naive UTC now for SQLite datetime comparisons."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 from typing import Optional
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status, Request
@@ -26,9 +30,18 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS))
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_token(token: str) -> dict:
+    """Decode a JWT and return its payload. Raises ValueError on failure."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError as e:
+        raise ValueError(f"Invalid token: {e}")
 
 
 def get_current_user(
@@ -56,9 +69,9 @@ def get_current_user(
 
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    """Allow either tenant admin or super_admin."""
+    """Allow admin, lodge_owner, app_owner, or super_admin."""
     role = getattr(current_user.role, 'value', current_user.role)
-    if role not in ("admin", "super_admin"):
+    if role not in ("admin", "lodge_owner", "super_admin", "app_owner"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"
@@ -67,12 +80,12 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
 
 
 def require_super_admin(current_user: User = Depends(get_current_user)) -> User:
-    """Only super_admin can create lodges or operate across lodges."""
+    """Only super_admin or app_owner can create lodges or operate across lodges."""
     role = getattr(current_user.role, 'value', current_user.role)
-    if role != "super_admin":
+    if role not in ("super_admin", "app_owner"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Super-admin access required",
+            detail="Super-admin or app_owner access required",
         )
     return current_user
 
@@ -111,7 +124,7 @@ def resolve_lodge_scope(
       lodges.
     """
     role = getattr(current_user.role, 'value', current_user.role)
-    if role == "super_admin":
+    if role in ("super_admin", "app_owner"):
         header = request.headers.get("x-lodge-id")
         if not header:
             raise HTTPException(

@@ -6,7 +6,10 @@
  * because the backend already pins them to their own lodge from the JWT.
  */
 
-const BASE = "/api";
+// BASE: use VITE_API_BASE env var if set, otherwise /api
+// VITE_API_BASE can be set to "http://192.168.68.60:8000/api" for
+// direct backend calls (bypassing Vite proxy) in some setups
+const BASE = import.meta.env.VITE_API_BASE || "/api";
 
 function getToken() {
   return localStorage.getItem("lms_token");
@@ -116,6 +119,13 @@ export const authAPI = {
   updateUser:        (id, b) => axiosInst.put(`/auth/users/${id}`, b),
   resetUserPassword: (id, newPassword) =>
     axiosInst.post(`/auth/users/${id}/reset-password`, { new_password: newPassword }),
+  // v10.0 — Staff OTP login verification
+  verifyStaffOtp:    d  => axiosInst.post("/auth/login/verify-otp", d),
+  // v10.0 — Toggle per-user OTP requirement (admin sets this for each staff member)
+  setUserOtpSetting: (id, require) =>
+    axiosInst.put(`/auth/users/${id}/otp-setting`, { require_login_otp: require }),
+  setUserStaticPin: (id, pin) =>
+    axiosInst.put(`/auth/users/${id}/static-pin`, { pin: pin || null }),
 };
 
 export const customersAPI = {
@@ -135,10 +145,12 @@ export const roomsAPI = {
 };
 
 export const checkinsAPI = {
-  list:     params => axiosInst.get("/checkins", { params }),
-  get:      id     => axiosInst.get(`/checkins/${id}`),
-  create:   fd     => axiosInst.post("/checkins", fd, { headers: { "Content-Type": "multipart/form-data" } }),
-  checkout: (id,d) => axiosInst.put(`/checkins/${id}/checkout`, d),
+  list:         params  => axiosInst.get("/checkins", { params }),
+  get:          id      => axiosInst.get(`/checkins/${id}`),
+  create:       fd      => axiosInst.post("/checkins", fd, { headers: { "Content-Type": "multipart/form-data" } }),
+  checkout:     (id, d) => axiosInst.put(`/checkins/${id}/checkout`, d),
+  // v10.5 — Late Checkout: extend guest stay + add folio charge
+  lateCheckout: (id, d) => axiosInst.put(`/checkins/${id}/late-checkout`, d),
 };
 
 export const alertsAPI = {
@@ -219,14 +231,21 @@ export const gstAPI = {
 
 export const lodgesAPI = {
   /** Returns just the caller's own lodge (or null for unbound super_admin). */
-  me:      ()       => axiosInst.get("/lodges/me"),
-  /** Tenant admins see only their own lodge; super_admin sees all. The
-   *  header dropdown uses this — it's the data source that drives the
-   *  "show this lodge and disable it" behaviour for non-super-admins. */
-  list:    ()       => axiosInst.get("/lodges"),
-  create:  body     => axiosInst.post("/lodges", body),
-  update:  (id, b)  => axiosInst.put(`/lodges/${id}`, b),
-  archive: id       => axiosInst.delete(`/lodges/${id}`),
+  me:                 ()       => axiosInst.get("/lodges/me"),
+  /** Tenant admins see only their own lodge; super_admin sees all with rich stats. */
+  list:               ()       => axiosInst.get("/lodges"),
+  create:             body     => axiosInst.post("/lodges", body),
+  update:             (id, b)  => axiosInst.put(`/lodges/${id}`, b),
+  archive:            id       => axiosInst.delete(`/lodges/${id}`),
+  // v11 — super-admin rich data
+  detail:             id       => axiosInst.get(`/lodges/${id}/detail`),
+  crossSearch:        q        => axiosInst.get("/lodges/search/cross-tenant", { params: { q } }),
+  // v11.0 — portal branding (super_admin only): IP ranges, logo, colours
+  getPortalSettings:  id       => axiosInst.get(`/lodges/${id}/portal-settings`),
+  setPortalSettings:  (id, b)  => axiosInst.put(`/lodges/${id}/portal-settings`, b),
+  uploadLodgeLogo:    (id, fd) => axiosInst.post("/settings/logo", fd, {
+    headers: { "Content-Type": "multipart/form-data", "X-Lodge-Id": String(id) }
+  }),
 };
 
 // ── v2.1 operational PMS modules ────────────────────────────────────────────
@@ -318,6 +337,9 @@ export const promosAPI = {
   update:   (id, b) => axiosInst.patch(`/promos/${id}`, b),
   delete:   id      => axiosInst.delete(`/promos/${id}`),
   validate: body    => axiosInst.post("/promos/validate", body),
+  // Public validate — used on customer checkout page (no admin token needed)
+  validatePublic: (code, subtotal, lodge_code) =>
+    axiosInst.post(`/promos/validate-public`, { code, subtotal }, { params: { lodge_code } }),
 };
 
 export const loyaltyAPI = {
@@ -354,7 +376,9 @@ export const backupAPI = {
 
 export const tapeChartAPI = {
   /** Fetch a rooms × dates occupancy matrix for the visible window. */
-  get: (from, to, days = 14) => axiosInst.get("/tape-chart", { params: { from, to, days } }),
+  get:         (from, to, days = 14) => axiosInst.get("/tape-chart", { params: { from, to, days } }),
+  moveCheckin: (checkinId, body)     => axiosInst.patch(`/tape-chart/move-checkin/${checkinId}`, body),
+  moveBooking: (bookingId, body)     => axiosInst.patch(`/tape-chart/move-booking/${bookingId}`, body),
 };
 
 export const nightAuditAPI = {
@@ -443,13 +467,18 @@ Object.assign(tapeChartAPI, {
  */
 export const registrationsAPI = {
   // Public — anyone can hit this without logging in.
-  submit:  body => axios.post(`${BASE}/public/register-lodge`, body),
+  submit:   body => axios.post(`${BASE}/public/register-lodge`, body),
   // Super-admin only.
-  list:    params => axiosInst.get("/registrations", { params }),
-  get:     id     => axiosInst.get(`/registrations/${id}`),
-  approve: id     => axiosInst.post(`/registrations/${id}/approve`),
-  reject:  (id, reason) => axiosInst.post(`/registrations/${id}/reject`, { reason }),
-  stats:   () => axiosInst.get("/registrations/stats"),
+  list:     params => axiosInst.get("/registrations", { params }),
+  get:      id     => axiosInst.get(`/registrations/${id}`),
+  approve:  id     => axiosInst.post(`/registrations/${id}/approve`),
+  reject:   (id, reason) => axiosInst.post(`/registrations/${id}/reject`, { reason }),
+  stats:    () => axiosInst.get("/registrations/stats"),
+  // v11 — payment management
+  updatePayment:      (id, body) => axiosInst.patch(`/registrations/${id}/payment`, body),
+  resendCredentials:  id         => axiosInst.post(`/registrations/${id}/resend-credentials`),
+  followUps:          ()         => axiosInst.get("/registrations/follow-ups"),
+  paymentStats:       ()         => axiosInst.get("/registrations/stats/payments"),
 };
 
 /** Public pricing — used by the onboarding wizard. No auth. */
@@ -543,8 +572,10 @@ rustoAxios.interceptors.response.use(
 
 /** Customer auth (signup / login / profile). */
 export const rustoAuthAPI = {
-  signup: body => rustoAxios.post("/rusto/auth/signup", body),
-  login:  body => rustoAxios.post("/rusto/auth/login", body),
+  signup:         body => rustoAxios.post("/rusto/auth/signup", body),
+  login:          body => rustoAxios.post("/rusto/auth/login", body),
+  forgotPassword: body => axios.post(`${BASE}/rusto/auth/forgot-password`, body),
+  resetPassword:  body => axios.post(`${BASE}/rusto/auth/reset-password`, body),
   me:     () => rustoAxios.get("/rusto/auth/me"),
   updateMe: body => rustoAxios.patch("/rusto/auth/me", body),
   changePassword: body => rustoAxios.post("/rusto/auth/change-password", body),
@@ -555,6 +586,7 @@ export const rustoAuthAPI = {
 };
 
 export const rustoPublicAPI = {
+  stats: () => axios.get(`${BASE}/rusto/public/stats`),
   cities: () => axios.get(`${BASE}/rusto/public/cities`),
   suggestions: q => axios.get(`${BASE}/rusto/public/suggestions`, { params: { q } }),
   // Search params: { city, town, area, landmark, pincode, q, ai_q, from, to, rooms, guests, min_price, max_price, amenities, min_rating, sort }
@@ -562,6 +594,10 @@ export const rustoPublicAPI = {
   lodge:  code => axios.get(`${BASE}/rusto/public/lodges/${code}`),
   availability: (code, params) =>
     axios.get(`${BASE}/rusto/public/lodges/${code}/availability`, { params }),
+  // v9 — local experience bundles
+  lodgeBundles: code => axios.get(`${BASE}/rusto/public/lodges/${code}/bundles`),
+  // v12 — AI natural language search (falls back to standard search)
+  aiSearch: params => axios.get(`${BASE}/rusto/public/lodges`, { params: { ai_q: params.q, limit: params.limit || 30 } }),
 };
 
 /** Customer-side bookings (auth required). */
@@ -571,7 +607,9 @@ export const rustoBookingsAPI = {
   create: body => rustoAxios.post("/rusto/bookings", body),
   verifyPayment: (id, body) =>
     rustoAxios.post(`/rusto/bookings/${id}/verify-payment`, body),
-  cancel: (id, body) => rustoAxios.post(`/rusto/bookings/${id}/cancel`, body),
+  cancel:  (id, body) => rustoAxios.post(`/rusto/bookings/${id}/cancel`, body),
+  receipt: id         => rustoAxios.get(`/rusto/bookings/${id}/receipt`),
+  applyPromo: (id, body) => rustoAxios.post(`/rusto/bookings/${id}/apply-promo`, body),
 };
 
 /** Lodge-side listing management (uses staff axiosInst — admin auth + lodge scope). */
@@ -584,6 +622,17 @@ export const rustoListingAPI = {
   deletePhoto: id => axiosInst.delete(`/rusto/listing/photos/${id}`),
   // Incoming customer bookings
   incomingBookings: params => axiosInst.get("/rusto/listing/bookings", { params }),
+  // Lodge-side booking actions
+  confirmBooking: (id, body) => axiosInst.post(`/rusto/listing/bookings/${id}/confirm`, body),
+  rejectBooking:  (id, body) => axiosInst.post(`/rusto/listing/bookings/${id}/reject`, body),
+  // Local experience bundles
+  getBundles:    ()          => axiosInst.get("/rusto/listing/bundles"),
+  createBundle:  body        => axiosInst.post("/rusto/listing/bundles", body),
+  updateBundle:  (id, body)  => axiosInst.patch(`/rusto/listing/bundles/${id}`, body),
+  deleteBundle:  id          => axiosInst.delete(`/rusto/listing/bundles/${id}`),
+  // QR self check-in tokens
+  generateCheckinToken: (bookingId, body) => axiosInst.post(`/rusto/listing/self-checkin/${bookingId}/generate`, body),
+  getCheckinToken:       bookingId        => axiosInst.get(`/rusto/listing/self-checkin/${bookingId}`),
 };
 
 /** Reviews — three audiences (public, customer, lodge) hitting different
@@ -596,9 +645,19 @@ export const rustoWishlistAPI = {
   unsave:  code => rustoAxios.delete(`/rusto/wishlist/${code}`),
 };
 
+// v12 — Rusto membership & rewards
+export const rustoMembershipAPI = {
+  get:           () => rustoAxios.get("/rusto/membership"),
+  ledger:        (limit=50) => rustoAxios.get("/rusto/membership/ledger", { params: { limit } }),
+  redeem:        body => rustoAxios.post("/rusto/membership/redeem", body),
+  applyReferral: code => rustoAxios.post("/rusto/membership/apply-referral", { referral_code: code }),
+  allPerks:      () => axios.get(`${BASE}/rusto/membership/perks`),
+};
+
 // v9 — self check-in (customer)
 export const rustoSelfCheckinAPI = {
-  validate: token => rustoAxios.post("/rusto/self-checkin/validate", { token }),
+  validate:      body  => rustoAxios.post("/rusto/self-checkin/validate", body),
+  validateToken: body  => rustoAxios.post("/rusto/self-checkin/validate", body),
 };
 
 // v9 — platform analytics (super-admin)
@@ -608,6 +667,23 @@ export const platformAnalyticsAPI = {
   lodges:           ()   => axiosInst.get("/platform/analytics/lodges"),
   customers:        days => axiosInst.get("/platform/analytics/customers", { params: { days } }),
   onboardingHealth: ()   => axiosInst.get("/platform/analytics/onboarding-health"),
+  // v11.1 additions
+  registrations:    ()   => axiosInst.get("/platform/analytics/registrations"),
+  systemHealth:     ()   => axiosInst.get("/platform/analytics/system-health"),
+  notifications:    ()   => axiosInst.get("/platform/analytics/notifications"),
+};
+
+// Global Partner API management (super-admin)
+export const globalPartnerAdminAPI = {
+  list:   ()              => axiosInst.get("/global/admin/keys"),
+  create: body            => axiosInst.post("/global/admin/keys", body),
+  update: (id, body)      => axiosInst.patch(`/global/admin/keys/${id}`, body),
+  revoke: id              => axiosInst.post(`/global/admin/keys/${id}/revoke`),
+};
+
+// Registration payment link (public — no auth needed)
+export const registrationPaymentAPI = {
+  createPaymentLink: regId => axios.post(`${BASE}/public/${regId}/create-payment-link`),
 };
 
 export const reviewsAPI = {
@@ -645,6 +721,14 @@ export const staffAPI = {
   create:  body => axiosInst.post("/staff", body),
   update:  (id, body) => axiosInst.patch(`/staff/${id}`, body),
   resetPassword: id => axiosInst.post(`/staff/${id}/reset-password`),
+};
+
+export const planAPI = {
+  // Plan feature gating endpoints
+  features:       () => axiosInst.get('/plan/features'),
+  enabledModules: () => axiosInst.get('/plan/enabled-modules'),
+  saveModules:    (modules) => axiosInst.post('/plan/enabled-modules', { modules }),
+  staffContext:   () => axiosInst.get('/plan/staff-context'),
 };
 
 export default axiosInst;

@@ -127,14 +127,14 @@ export default function Customers() {
   return (
     <div className="flex flex-col lg:flex-row h-full gap-4 animate-fade-in" style={{ height: "calc(100vh - 80px)" }}>
       {/* Left Panel */}
-      <div className={`${selected && !isDesktop ? 'hidden' : 'flex'} w-full lg:w-96 flex-col bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex-shrink-0`}>
+      <div className={`${selected && !isDesktop ? 'hidden' : 'flex'} w-full lg:w-96 flex-col bg-white rounded-2xl shadow-sm border border-ink-100 overflow-hidden flex-shrink-0`}>
         {/* Search & Filter */}
-        <div className="p-4 border-b border-gray-100 space-y-3">
+        <div className="p-4 border-b border-ink-100 space-y-3">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="font-playfair font-bold text-navy">Guests</h3>
+            <h3 className="font-display font-bold text-navy">Guests</h3>
             <button 
               onClick={() => setShowAdd(true)}
-              className="bg-gold text-navy text-[10px] font-bold px-2 py-1 rounded-lg hover:bg-gold/90 transition-colors flex items-center gap-1"
+              className="bg-gold text-navy-dark text-[10px] font-bold px-2 py-1 rounded-lg hover:bg-gold/90 transition-colors flex items-center gap-1"
             >
               + NEW CUSTOMER
             </button>
@@ -151,14 +151,14 @@ export default function Customers() {
                 key={val}
                 onClick={() => { setFilter(val); setPage(1); }}
                 className={`flex-1 py-1.5 px-3 whitespace-nowrap text-xs font-medium rounded-lg transition-colors ${
-                  filter === val ? "bg-navy text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  filter === val ? "bg-navy text-white" : "bg-ink-100 text-ink-600 hover:bg-ink-200"
                 }`}
               >
                 {label}
               </button>
             ))}
           </div>
-          <div className="flex items-center justify-between text-xs text-gray-500">
+          <div className="flex items-center justify-between text-xs text-ink-500">
             <span>{total} customers found</span>
             <button onClick={fetchCustomers} className="flex items-center gap-1 hover:text-navy">
               <RefreshCw size={12} /> Refresh
@@ -168,21 +168,21 @@ export default function Customers() {
 
 
         {/* Customer List */}
-        <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
+        <div className="flex-1 overflow-y-auto divide-y divide-ink-100">
           {loading ? (
             Array(6).fill(0).map((_, i) => (
               <div key={i} className="p-4 animate-pulse">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-200 rounded-full" />
+                  <div className="w-10 h-10 bg-ink-200 rounded-full" />
                   <div className="flex-1 space-y-1.5">
-                    <div className="h-3 bg-gray-200 rounded w-3/4" />
-                    <div className="h-2.5 bg-gray-100 rounded w-1/2" />
+                    <div className="h-3 bg-ink-200 rounded w-3/4" />
+                    <div className="h-2.5 bg-ink-100 rounded w-1/2" />
                   </div>
                 </div>
               </div>
             ))
           ) : customers.length === 0 ? (
-            <div className="p-8 text-center text-gray-400">
+            <div className="p-8 text-center text-ink-400">
               <User size={32} className="mx-auto mb-2 opacity-40" />
               <p className="text-sm">No customers found</p>
             </div>
@@ -191,7 +191,7 @@ export default function Customers() {
               <button
                 key={c.customer_id}
                 onClick={() => handleSelect(c)}
-                className={`w-full p-4 text-left flex items-center gap-3 hover:bg-gray-50 transition-colors ${
+                className={`w-full p-4 text-left flex items-center gap-3 hover:bg-ink-50 transition-colors ${
                   selected?.customer_id === c.customer_id ? "bg-blue-50 border-l-2 border-l-navy" : ""
                 }`}
               >
@@ -202,15 +202,24 @@ export default function Customers() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{c.first_name} {c.last_name}</p>
+                    <p className="text-sm font-semibold text-navy truncate">{c.first_name} {c.last_name}</p>
                     {c.current_stay && <span className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0 animate-pulse" title="Currently Staying" />}
                     {c.is_vip && <Star size={12} className="text-gold fill-gold flex-shrink-0" />}
                     {c.blacklisted && <Ban size={12} className="text-red-500 flex-shrink-0" />}
+                    {c.rusto_tier && c.rusto_tier !== "explorer" && (
+                      <span className="text-2xs px-1.5 py-0.5 rounded-full font-bold ml-1"
+                            style={{
+                              background: c.rusto_tier==="elite"?"#D4AF37":c.rusto_tier==="gold"?"#F59E0B":c.rusto_tier==="silver"?"#9CA3AF":"#6B7280",
+                              color: "white"
+                            }}>
+                        {c.rusto_tier==="elite"?"👑":c.rusto_tier==="gold"?"🥇":"🥈"} {c.rusto_tier}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-gray-500">{c.phone}</p>
-                  <p className="text-xs text-gray-400">{c.total_visits || 0} stays · {c.city || "—"}</p>
+                  <p className="text-xs text-ink-500">{c.phone}</p>
+                  <p className="text-xs text-ink-400">{c.total_visits || 0} stays · {c.city || "—"}</p>
                 </div>
-                <ChevronRight size={14} className="text-gray-300" />
+                <ChevronRight size={14} className="text-ink-300" />
               </button>
             ))
           )}
@@ -218,19 +227,19 @@ export default function Customers() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="p-3 border-t border-gray-100 flex items-center justify-between">
+          <div className="p-3 border-t border-ink-100 flex items-center justify-between">
             <button
               disabled={page === 1}
               onClick={() => setPage(p => p - 1)}
-              className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50"
+              className="text-xs px-3 py-1.5 border border-ink-200 rounded-lg disabled:opacity-40 hover:bg-ink-50"
             >
               Prev
             </button>
-            <span className="text-xs text-gray-500">Page {page} of {totalPages}</span>
+            <span className="text-xs text-ink-500">Page {page} of {totalPages}</span>
             <button
               disabled={page === totalPages}
               onClick={() => setPage(p => p + 1)}
-              className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50"
+              className="text-xs px-3 py-1.5 border border-ink-200 rounded-lg disabled:opacity-40 hover:bg-ink-50"
             >
               Next
             </button>
@@ -241,7 +250,7 @@ export default function Customers() {
       {/* Right Panel — Customer Detail */}
       <div className={`${!selected && !isDesktop ? 'hidden' : ''} flex-1 overflow-y-auto`}>
         {!selected ? (
-          <div className="h-full flex items-center justify-center text-gray-400">
+          <div className="h-full flex items-center justify-center text-ink-400">
             <div className="text-center">
               <Eye size={48} className="mx-auto mb-3 opacity-30" />
               <p className="text-lg font-medium">Select a customer to view profile</p>
@@ -260,22 +269,22 @@ export default function Customers() {
               </button>
             )}
             {/* Profile Card */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-ink-100 overflow-hidden">
               <div className="bg-gradient-to-r from-navy to-navy/80 p-6 text-white">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
-                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold text-white ${
-                      selected.blacklisted ? "bg-red-500" : selected.is_vip ? "bg-gold" : "bg-white/20"
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold ${
+                      selected.blacklisted ? "bg-red-500 text-white" : selected.is_vip ? "bg-gold text-navy-dark" : "bg-white/20 text-white"
                     }`}>
                       {selected.first_name?.[0]}{selected.last_name?.[0]}
                     </div>
                     <div>
-                      <h2 className="font-playfair text-2xl font-bold">
+                      <h2 className="font-display text-2xl font-bold">
                         {selected.first_name} {selected.last_name}
                       </h2>
                       <div className="flex items-center gap-2 mt-1">
                         {selected.is_vip && (
-                          <span className="flex items-center gap-1 bg-gold text-navy text-xs font-bold px-2 py-0.5 rounded-full">
+                          <span className="flex items-center gap-1 bg-gold text-navy-dark text-xs font-bold px-2 py-0.5 rounded-full">
                             <Star size={10} className="fill-navy" /> VIP Guest
                           </span>
                         )}
@@ -291,7 +300,7 @@ export default function Customers() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-3xl font-playfair text-white font-bold">{selected.total_visits || 0}</p>
+                    <p className="text-3xl font-display text-white font-bold">{selected.total_visits || 0}</p>
                     <p className="text-xs text-white/60">Total Stays</p>
                   </div>
                 </div>
@@ -314,7 +323,7 @@ export default function Customers() {
                     {stays.map((stay) => (
                       <div
                         key={stay.checkin_id}
-                        className="p-4 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-500"
+                        className="p-4 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-between gap-3 animate-fade-in"
                       >
                         <div className="flex items-center gap-4 min-w-0">
                           <div className="w-12 h-12 bg-green-600 rounded-xl flex flex-col items-center justify-center text-white shadow-lg shadow-green-100 flex-shrink-0">
@@ -331,7 +340,7 @@ export default function Customers() {
                               </p>
                             )}
                             {stay.tariff_per_night && (
-                              <p className="text-[11px] text-gray-600">
+                              <p className="text-[11px] text-ink-600">
                                 ₹{Number(stay.tariff_per_night).toLocaleString('en-IN')}/night
                               </p>
                             )}
@@ -361,12 +370,12 @@ export default function Customers() {
               {/* ID image preview / viewer — admin needs to verify the image
                   on file matches the typed ID number. */}
               {selected.id_proof_path && (
-                <div className="mx-4 sm:mx-6 mb-4 p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                <div className="mx-4 sm:mx-6 mb-4 p-3 bg-ink-50 border border-ink-200 rounded-xl">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-xs text-gray-700">
+                    <div className="flex items-center gap-2 text-xs text-ink-700">
                       <Shield size={14} className="text-green-600" />
                       <span className="font-semibold">ID image on file</span>
-                      <span className="text-gray-400 truncate max-w-[200px]">
+                      <span className="text-ink-400 truncate max-w-[200px]">
                         {selected.id_proof_path.split('/').pop()}
                       </span>
                     </div>
@@ -415,7 +424,7 @@ export default function Customers() {
                 {/* Edit — available to all roles too */}
                 <button
                   onClick={() => setShowEdit(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-navy border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-white text-navy border border-ink-200 rounded-xl text-sm font-medium hover:bg-ink-50 transition-colors"
                 >
                   <Edit2 size={14} /> Edit Guest
                 </button>
@@ -428,7 +437,7 @@ export default function Customers() {
                       className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-50 ${
                         selected.is_vip
                           ? "bg-gold/20 text-gold hover:bg-gold/30"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          : "bg-ink-100 text-ink-700 hover:bg-ink-200"
                       }`}
                     >
                       <Star size={14} className={selected.is_vip ? "fill-gold text-gold" : ""} />
@@ -448,27 +457,27 @@ export default function Customers() {
             <GuestExtras customerId={selected.customer_id}/>
 
             {/* Stay History */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h3 className="font-playfair text-lg font-semibold text-navy mb-4">Stay History</h3>
+            <div className="bg-white rounded-2xl shadow-sm border border-ink-100 p-6">
+              <h3 className="font-display text-lg font-semibold text-navy mb-4">Stay History</h3>
               {historyLoading ? (
                 <div className="space-y-3">
                   {Array(3).fill(0).map((_, i) => (
-                    <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />
+                    <div key={i} className="h-16 bg-ink-100 rounded-xl animate-pulse" />
                   ))}
                 </div>
               ) : history.length === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-4">No stay history found</p>
+                <p className="text-ink-400 text-sm text-center py-4">No stay history found</p>
               ) : (
                 <div className="space-y-3">
                   {history.map(stay => (
-                    <div key={stay.checkin_id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                    <div key={stay.checkin_id} className="flex items-center justify-between p-4 bg-ink-50 rounded-xl">
                       <div className="flex items-center gap-4">
                         <div className="text-center">
                           <p className="text-lg font-bold text-navy">{stay.room_number}</p>
-                          <p className="text-xs text-gray-500">Room</p>
+                          <p className="text-xs text-ink-500">Room</p>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-gray-800">
+                          <p className="text-sm font-medium text-ink-800">
                             {formatDateTime(stay.checkin_datetime)} →{" "}
                             {stay.actual_checkout
                               ? formatDateTime(stay.actual_checkout)
@@ -476,7 +485,7 @@ export default function Customers() {
                                   ? `${formatDateTime(stay.expected_checkout)} (expected)`
                                   : "Ongoing")}
                           </p>
-                          <p className="text-xs text-gray-500">{stay.nights} night(s) · ₹{stay.tariff_per_night}/night</p>
+                          <p className="text-xs text-ink-500">{stay.nights} night(s) · ₹{stay.tariff_per_night}/night</p>
                         </div>
                       </div>
                       <div className="text-right">
@@ -486,7 +495,7 @@ export default function Customers() {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                           stay.status === "active"
                             ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-600"
+                            : "bg-ink-100 text-ink-600"
                         }`}>
                           {stay.status === "active" ? "Staying" : "Checked Out"}
                         </span>
@@ -555,8 +564,8 @@ function DetailItem({ icon, label, value }) {
     <div className="flex items-start gap-2">
       <span className="text-gold mt-0.5">{icon}</span>
       <div>
-        <p className="text-xs text-gray-400">{label}</p>
-        <p className="text-sm font-medium text-gray-800">{value}</p>
+        <p className="text-xs text-ink-400">{label}</p>
+        <p className="text-sm font-medium text-ink-800">{value}</p>
       </div>
     </div>
   );
@@ -599,7 +608,7 @@ function BlacklistButton({ customer, onToggle, loading }) {
         </button>
         <button
           onClick={() => setShowReason(false)}
-          className="px-3 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200 transition-colors"
+          className="px-3 py-2 bg-ink-100 text-ink-600 rounded-xl text-sm hover:bg-ink-200 transition-colors"
         >
           Cancel
         </button>
@@ -731,7 +740,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }) {
     >
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
         <div className="bg-navy text-white px-6 py-4 flex items-center justify-between flex-shrink-0">
-          <h3 className="font-playfair text-lg font-bold">
+          <h3 className="font-display text-lg font-bold">
             {step === 'form' ? 'Edit Guest Details' : 'Review Changes'}
           </h3>
           <button type="button" onClick={attemptClose} aria-label="Close" title="Close (Esc)"
@@ -746,16 +755,16 @@ function EditCustomerModal({ customer, onClose, onSuccess }) {
           {/* Name */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase">First Name</label>
+              <label className="text-xs font-bold text-ink-500 uppercase">First Name</label>
               <input type="text" required
-                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-gold"
+                className="w-full mt-1 px-3 py-2 border border-ink-200 rounded-xl text-sm focus:outline-none focus:border-gold"
                 value={form.first_name}
                 onChange={e => setForm({ ...form, first_name: e.target.value })} />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase">Last Name</label>
+              <label className="text-xs font-bold text-ink-500 uppercase">Last Name</label>
               <input type="text" required
-                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-gold"
+                className="w-full mt-1 px-3 py-2 border border-ink-200 rounded-xl text-sm focus:outline-none focus:border-gold"
                 value={form.last_name}
                 onChange={e => setForm({ ...form, last_name: e.target.value })} />
             </div>
@@ -763,16 +772,16 @@ function EditCustomerModal({ customer, onClose, onSuccess }) {
           {/* Phone + Email */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase">Phone</label>
+              <label className="text-xs font-bold text-ink-500 uppercase">Phone</label>
               <input type="tel" required maxLength={10}
-                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-gold"
+                className="w-full mt-1 px-3 py-2 border border-ink-200 rounded-xl text-sm focus:outline-none focus:border-gold"
                 value={form.phone}
                 onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })} />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase">Email</label>
+              <label className="text-xs font-bold text-ink-500 uppercase">Email</label>
               <input type="email"
-                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-gold"
+                className="w-full mt-1 px-3 py-2 border border-ink-200 rounded-xl text-sm focus:outline-none focus:border-gold"
                 value={form.email}
                 onChange={e => setForm({ ...form, email: e.target.value })} />
             </div>
@@ -780,9 +789,9 @@ function EditCustomerModal({ customer, onClose, onSuccess }) {
           {/* ID Type + Number */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase">ID Type</label>
+              <label className="text-xs font-bold text-ink-500 uppercase">ID Type</label>
               <select
-                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-gold"
+                className="w-full mt-1 px-3 py-2 border border-ink-200 rounded-xl text-sm focus:outline-none focus:border-gold"
                 value={form.id_type}
                 onChange={e => setForm({ ...form, id_type: e.target.value })}>
                 <option value="aadhar">Aadhar Card</option>
@@ -793,21 +802,21 @@ function EditCustomerModal({ customer, onClose, onSuccess }) {
               </select>
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase">ID Number</label>
+              <label className="text-xs font-bold text-ink-500 uppercase">ID Number</label>
               <input type="text"
-                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm uppercase focus:outline-none focus:border-gold"
+                className="w-full mt-1 px-3 py-2 border border-ink-200 rounded-xl text-sm uppercase focus:outline-none focus:border-gold"
                 value={form.id_number}
                 onChange={e => setForm({ ...form, id_number: e.target.value.toUpperCase() })} />
             </div>
           </div>
           {/* ID Proof file upload */}
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase">
-              Replace ID Proof <span className="text-gray-400 font-normal">(JPG/PNG/PDF, max 5MB)</span>
+            <label className="text-xs font-bold text-ink-500 uppercase">
+              Replace ID Proof <span className="text-ink-400 font-normal">(JPG/PNG/PDF, max 5MB)</span>
             </label>
-            <label className="mt-1 flex items-center gap-3 border-2 border-dashed border-gray-300 rounded-lg p-3 cursor-pointer hover:border-navy transition-colors">
-              <Upload size={16} className="text-gray-400" />
-              <span className="text-sm text-gray-500 truncate">
+            <label className="mt-1 flex items-center gap-3 border-2 border-dashed border-ink-300 rounded-lg p-3 cursor-pointer hover:border-navy transition-colors">
+              <Upload size={16} className="text-ink-400" />
+              <span className="text-sm text-ink-500 truncate">
                 {idFile ? idFile.name : (customer.id_proof_path ? 'Replace existing ID image' : 'Upload ID image')}
               </span>
               <input type="file" className="hidden" accept=".jpg,.jpeg,.png,.pdf"
@@ -824,16 +833,16 @@ function EditCustomerModal({ customer, onClose, onSuccess }) {
           {/* Nationality + Gender */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase">Nationality</label>
+              <label className="text-xs font-bold text-ink-500 uppercase">Nationality</label>
               <input type="text"
-                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-gold"
+                className="w-full mt-1 px-3 py-2 border border-ink-200 rounded-xl text-sm focus:outline-none focus:border-gold"
                 value={form.nationality}
                 onChange={e => setForm({ ...form, nationality: e.target.value })} />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase">Gender</label>
+              <label className="text-xs font-bold text-ink-500 uppercase">Gender</label>
               <select
-                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-gold"
+                className="w-full mt-1 px-3 py-2 border border-ink-200 rounded-xl text-sm focus:outline-none focus:border-gold"
                 value={form.gender}
                 onChange={e => setForm({ ...form, gender: e.target.value })}>
                 <option value="">Select</option>
@@ -845,15 +854,15 @@ function EditCustomerModal({ customer, onClose, onSuccess }) {
           </div>
           {/* Address */}
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase">Address</label>
+            <label className="text-xs font-bold text-ink-500 uppercase">Address</label>
             <textarea rows={2}
-              className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-gold resize-none"
+              className="w-full mt-1 px-3 py-2 border border-ink-200 rounded-xl text-sm focus:outline-none focus:border-gold resize-none"
               value={form.address}
               onChange={e => setForm({ ...form, address: e.target.value })} />
           </div>
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={attemptClose}
-              className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
+              className="flex-1 py-2.5 border border-ink-200 rounded-xl text-sm font-medium hover:bg-ink-50 transition-colors">
               Cancel
             </button>
             <button type="submit" disabled={!dirty}
@@ -861,55 +870,55 @@ function EditCustomerModal({ customer, onClose, onSuccess }) {
               Review Changes ➔
             </button>
           </div>
-          <p className="text-[10px] text-gray-400 text-center -mt-1">
-            Tip: Press <kbd className="px-1 py-0.5 bg-gray-100 border rounded">Esc</kbd> or click outside to close.
+          <p className="text-[10px] text-ink-400 text-center -mt-1">
+            Tip: Press <kbd className="px-1 py-0.5 bg-ink-100 border rounded">Esc</kbd> or click outside to close.
           </p>
         </form>
         ) : (
         <div className="p-6 space-y-5">
-          <div className="bg-gray-50 rounded-xl p-5 border border-gray-100 space-y-3">
-            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Changes to Save</p>
+          <div className="bg-ink-50 rounded-xl p-5 border border-ink-100 space-y-3">
+            <p className="text-xs text-ink-500 font-bold uppercase tracking-wider">Changes to Save</p>
             <div className="grid grid-cols-2 gap-y-4">
               <div>
-                <p className="text-xs text-gray-400">Name</p>
-                <p className="text-sm font-semibold text-gray-800">{form.first_name} {form.last_name}</p>
+                <p className="text-xs text-ink-400">Name</p>
+                <p className="text-sm font-semibold text-ink-800">{form.first_name} {form.last_name}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-400">Phone</p>
-                <p className="text-sm font-semibold text-gray-800">{form.phone}</p>
+                <p className="text-xs text-ink-400">Phone</p>
+                <p className="text-sm font-semibold text-ink-800">{form.phone}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-400">Email</p>
-                <p className="text-sm font-semibold text-gray-800">{form.email || '—'}</p>
+                <p className="text-xs text-ink-400">Email</p>
+                <p className="text-sm font-semibold text-ink-800">{form.email || '—'}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-400">ID</p>
-                <p className="text-sm font-semibold text-gray-800">{form.id_type.toUpperCase()} {form.id_number}</p>
+                <p className="text-xs text-ink-400">ID</p>
+                <p className="text-sm font-semibold text-ink-800">{form.id_type.toUpperCase()} {form.id_number}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-400">Nationality</p>
-                <p className="text-sm font-semibold text-gray-800">{form.nationality}</p>
+                <p className="text-xs text-ink-400">Nationality</p>
+                <p className="text-sm font-semibold text-ink-800">{form.nationality}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-400">Gender</p>
-                <p className="text-sm font-semibold text-gray-800">{form.gender || 'Not specified'}</p>
+                <p className="text-xs text-ink-400">Gender</p>
+                <p className="text-sm font-semibold text-ink-800">{form.gender || 'Not specified'}</p>
               </div>
             </div>
             {form.address && (
-              <div className="pt-2 border-t border-gray-200">
-                <p className="text-xs text-gray-400">Address</p>
-                <p className="text-sm font-semibold text-gray-800">{form.address}</p>
+              <div className="pt-2 border-t border-ink-200">
+                <p className="text-xs text-ink-400">Address</p>
+                <p className="text-sm font-semibold text-ink-800">{form.address}</p>
               </div>
             )}
             {idFile && (
-              <p className="text-[11px] text-blue-700 bg-blue-50 px-2 py-1.5 rounded border-t border-gray-200">
+              <p className="text-[11px] text-blue-700 bg-blue-50 px-2 py-1.5 rounded border-t border-ink-200">
                 📎 New ID image will be uploaded: <strong>{idFile.name}</strong>
               </p>
             )}
           </div>
           <div className="flex gap-3">
             <button type="button" onClick={() => setStep('form')} disabled={loading}
-              className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
+              className="flex-1 py-2.5 border border-ink-200 rounded-xl text-sm font-medium hover:bg-ink-50 transition-colors">
               ← Back to Edit
             </button>
             <button type="button" onClick={processSubmit} disabled={loading}
@@ -926,11 +935,11 @@ function EditCustomerModal({ customer, onClose, onSuccess }) {
         <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4"
           onClick={(e) => e.target === e.currentTarget && setShowCloseConfirm(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
-            <h3 className="font-playfair text-lg font-bold text-navy">Discard changes?</h3>
-            <p className="text-sm text-gray-600 mt-2">Your edits to this guest profile will be lost. Close anyway?</p>
+            <h3 className="font-display text-lg font-bold text-navy">Discard changes?</h3>
+            <p className="text-sm text-ink-600 mt-2">Your edits to this guest profile will be lost. Close anyway?</p>
             <div className="flex gap-3 mt-5">
               <button type="button" onClick={() => setShowCloseConfirm(false)}
-                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50">
+                className="flex-1 py-2.5 border border-ink-200 rounded-xl text-sm font-medium hover:bg-ink-50">
                 Keep Editing
               </button>
               <button type="button" onClick={() => { setShowCloseConfirm(false); onClose(); }}
@@ -947,13 +956,13 @@ function EditCustomerModal({ customer, onClose, onSuccess }) {
 function CheckoutModal({ target, data, setData, loading, onClose, onConfirm }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-pop-in">
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <LogOut size={28} className="text-red-600" />
           </div>
-          <h3 className="font-playfair text-xl font-bold text-gray-900">Confirm Checkout</h3>
-          <p className="text-sm text-gray-500 mt-2">
+          <h3 className="font-display text-xl font-bold text-navy">Confirm Checkout</h3>
+          <p className="text-sm text-ink-500 mt-2">
             Checkout <strong>{target.customer?.first_name}</strong> from Room <strong>{target.room_number}</strong>?
           </p>
         </div>
@@ -961,28 +970,28 @@ function CheckoutModal({ target, data, setData, loading, onClose, onConfirm }) {
         <div className="space-y-4 mb-8">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Addl. Charges (₹)</label>
+              <label className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Addl. Charges (₹)</label>
               <input
                 type="number"
-                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:border-red-500 outline-none"
+                className="w-full mt-1 px-3 py-2 border border-ink-200 rounded-xl text-sm focus:border-red-500 outline-none"
                 value={data.additional_charges}
                 onChange={e => setData({ ...data, additional_charges: parseFloat(e.target.value) || 0 })}
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Discount (₹)</label>
+              <label className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Discount (₹)</label>
               <input
                 type="number"
-                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:border-red-500 outline-none"
+                className="w-full mt-1 px-3 py-2 border border-ink-200 rounded-xl text-sm focus:border-red-500 outline-none"
                 value={data.discount}
                 onChange={e => setData({ ...data, discount: parseFloat(e.target.value) || 0 })}
               />
             </div>
           </div>
           <div>
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Payment Method</label>
+            <label className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Payment Method</label>
             <select
-              className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:border-red-500 outline-none"
+              className="w-full mt-1 px-3 py-2 border border-ink-200 rounded-xl text-sm focus:border-red-500 outline-none"
               value={data.payment_mode}
               onChange={e => setData({ ...data, payment_mode: e.target.value })}
             >
@@ -997,7 +1006,7 @@ function CheckoutModal({ target, data, setData, loading, onClose, onConfirm }) {
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-3 border border-gray-200 rounded-xl text-gray-600 font-bold hover:bg-gray-50 transition-all"
+            className="flex-1 py-3 border border-ink-200 rounded-xl text-ink-600 font-bold hover:bg-ink-50 transition-all"
           >
             Cancel
           </button>

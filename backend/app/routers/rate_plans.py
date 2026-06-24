@@ -132,7 +132,7 @@ def update_plan(plan_id: int, body: PlanUpdate, request: Request,
                  RatePlan.lodge_id == lodge_id).first())
     if not p:
         raise HTTPException(status_code=404, detail="Plan not found")
-    fields = body.dict(exclude_unset=True)
+    fields = body.model_dump(exclude_unset=True)
     if "adjustment_type" in fields:
         if fields["adjustment_type"] not in {t.value for t in RatePlanAdjustmentType}:
             raise HTTPException(status_code=400, detail="Invalid adjustment_type")

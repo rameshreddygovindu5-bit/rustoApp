@@ -347,6 +347,7 @@ function EditStaffModal({ u, catalog, currentUserId, onClose, onUpdated, onPassw
     email: u.email || "",
     phone: u.phone || "",
     is_active: u.is_active,
+    require_login_otp: u.require_login_otp || false,
     permissions: new Set(u.permissions_explicit || u.permissions_effective),
     uses_defaults: u.uses_legacy_defaults,
   });
@@ -371,6 +372,15 @@ function EditStaffModal({ u, catalog, currentUserId, onClose, onUpdated, onPassw
         }
       }
       await staffAPI.update(u.user_id, patch);
+      // Handle OTP setting separately (goes to a different endpoint)
+      if (isStaff && typeof form.require_login_otp === 'boolean'
+          && form.require_login_otp !== (u.require_login_otp || false)) {
+        try {
+          await authAPI.setUserOtpSetting(u.user_id, form.require_login_otp);
+        } catch (otpErr) {
+          console.warn('OTP setting update failed:', otpErr);
+        }
+      }
       toast.success("Saved");
       onUpdated();
     } catch (e) {
@@ -446,6 +456,31 @@ function EditStaffModal({ u, catalog, currentUserId, onClose, onUpdated, onPassw
               </button>
             </div>
           </div>
+
+          {/* OTP Login requirement (staff only) */}
+          {isStaff && !isSelf && (
+            <div className="card bg-ink-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-navy text-sm flex items-center gap-1.5">
+                    🔐 Require OTP on login
+                  </h3>
+                  <p className="text-2xs text-ink-500 mt-0.5">
+                    Sends a 6-digit code to admin phone on each staff login — premises lock
+                  </p>
+                </div>
+                <button type="button"
+                        onClick={() => setForm(f => ({...f, require_login_otp: !f.require_login_otp}))}
+                        className={`relative w-11 h-6 rounded-full transition-colors ${
+                          form.require_login_otp ? 'bg-green-500' : 'bg-ink-300'
+                        }`}>
+                  <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                    form.require_login_otp ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}/>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Permissions block: only meaningful for staff role */}
           {isStaff && (

@@ -139,7 +139,7 @@ export default function PublicBooking() {
               <React.Fragment key={n}>
                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
                   done ? "bg-green-50 text-green-700 border border-green-200" :
-                  active ? "bg-gold text-white" :
+                  active ? "bg-gold text-navy-dark" :
                   "bg-ink-100 text-ink-500"
                 }`}>
                   {done ? <CheckCircle size={12}/> : <span className="font-bold">{n}</span>}

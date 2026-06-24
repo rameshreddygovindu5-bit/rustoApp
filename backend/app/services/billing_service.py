@@ -33,9 +33,15 @@ import os
 import re
 import logging
 from abc import ABC, abstractmethod
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional, Dict, Any, List
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -290,7 +296,7 @@ def cancel_subscription(db: Session, sub: Subscription, *, reason: str,
     if sub.provider_subscription_id:
         get_provider().cancel_subscription(sub.provider_subscription_id)
     sub.status = SubscriptionStatus.cancelled.value
-    sub.cancelled_at = datetime.utcnow()
+    sub.cancelled_at = _utcnow()
     sub.cancellation_reason = (reason or "").strip()[:2000] or "Cancelled by admin"
     sub.next_charge_date = None
     db.commit(); db.refresh(sub)
@@ -357,7 +363,7 @@ def issue_invoice(db: Session, sub: Subscription, *,
         total_inr=total,
         status=(BillingInvoiceStatus.paid.value if mark_paid
                 else BillingInvoiceStatus.open.value),
-        paid_at=(datetime.utcnow() if mark_paid else None),
+        paid_at=(_utcnow() if mark_paid else None),
     )
     db.add(invoice); db.flush()
 
@@ -580,13 +586,13 @@ def apply_subscription_status(db: Session, *, provider_subscription_id: str,
         sub.last_failure_reason = None
     elif new_status == "past_due":
         sub.status = SubscriptionStatus.past_due.value
-        sub.last_failure_at = datetime.utcnow()
+        sub.last_failure_at = _utcnow()
         sub.last_failure_reason = failure_reason or "Charge failed"
     elif new_status == "paused":
         sub.status = SubscriptionStatus.paused.value
     elif new_status == "cancelled":
         sub.status = SubscriptionStatus.cancelled.value
-        sub.cancelled_at = datetime.utcnow()
+        sub.cancelled_at = _utcnow()
         sub.cancellation_reason = sub.cancellation_reason or "Cancelled via provider"
         sub.next_charge_date = None
     else:
@@ -762,7 +768,7 @@ def send_invoice_email(db: Session, invoice: BillingInvoice,
         }],
     )
     if ok:
-        invoice.email_sent_at = datetime.utcnow()
+        invoice.email_sent_at = _utcnow()
         db.commit()
         logger.info("Invoice email sent: %s → %s",
                     invoice.invoice_number, invoice.bill_to_email)
@@ -1107,7 +1113,7 @@ def apply_plan_change(db: Session, sub: Subscription, *,
                            (Decimal(1) + DEFAULT_GST_PCT / Decimal(100))
                           ).quantize(Decimal("0.01")),
                 status=BillingInvoiceStatus.paid.value,
-                paid_at=datetime.utcnow(),
+                paid_at=_utcnow(),
             )
             db.add(inv); db.flush()
             # Replace the description-derived render call by re-rendering.
@@ -1152,7 +1158,7 @@ def apply_plan_change(db: Session, sub: Subscription, *,
     sub.pending_billing_cycle = new_cycle
     sub.pending_total_rooms = new_rooms
     sub.pending_change_takes_effect_at = date.fromisoformat(preview["effective_at"])
-    sub.pending_change_queued_at = datetime.utcnow()
+    sub.pending_change_queued_at = _utcnow()
     db.commit(); db.refresh(sub)
     return {**preview, "applied": True, "scheduled": True}
 
@@ -1365,7 +1371,7 @@ def issue_refund(db: Session, sub: Subscription, *,
             import secrets
             refund.razorpay_refund_id = f"rfnd_mock_{secrets.token_hex(8)}"
             refund.status = BillingRefundStatus.processed.value
-            refund.processed_at = datetime.utcnow()
+            refund.processed_at = _utcnow()
             logger.info("Billing[mock] refund %s ₹%s for sub %s",
                         refund.refund_number, refund.total_refund_inr,
                         sub.subscription_id)
@@ -1387,7 +1393,7 @@ def issue_refund(db: Session, sub: Subscription, *,
             else:
                 refund.razorpay_refund_id = r.json().get("id")
                 refund.status = BillingRefundStatus.processed.value
-                refund.processed_at = datetime.utcnow()
+                refund.processed_at = _utcnow()
     except Exception as e:
         logger.exception("Refund processing failed: %s", e)
         refund.status = BillingRefundStatus.failed.value
@@ -1522,7 +1528,7 @@ def cancel_subscription_v2(db: Session, sub: Subscription, *,
         if sub.provider_subscription_id:
             get_provider().cancel_subscription(sub.provider_subscription_id)
         sub.status = SubscriptionStatus.cancelled.value
-        sub.cancelled_at = datetime.utcnow()
+        sub.cancelled_at = _utcnow()
         sub.cancellation_reason = (reason or "").strip()[:2000] or "Cancelled by lodge"
         sub.next_charge_date = None
         sub.service_ends_at = date.today()
@@ -1550,7 +1556,7 @@ def realize_due_cancellations(db: Session) -> Dict[str, int]:
             if sub.provider_subscription_id:
                 get_provider().cancel_subscription(sub.provider_subscription_id)
             sub.status = SubscriptionStatus.cancelled.value
-            sub.cancelled_at = datetime.utcnow()
+            sub.cancelled_at = _utcnow()
             sub.next_charge_date = None
             db.commit()
             realized += 1

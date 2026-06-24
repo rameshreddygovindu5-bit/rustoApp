@@ -10,7 +10,7 @@ Every successful (and failed-auth) call is logged to agency_api_calls.
 """
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 import secrets, time, bcrypt, logging
 
 from .database import get_db
@@ -93,7 +93,7 @@ def get_agency(request: Request, db: Session = Depends(get_db)) -> Agency:
         _log_call(db, agency.agency_id, request, 403, ms, f"Agency status: {agency.status}")
         raise HTTPException(status_code=403, detail=f"Agency is {agency.status.value}")
 
-    agency.last_used_at = datetime.utcnow()
+    agency.last_used_at = datetime.now(timezone.utc)
     db.commit()
 
     # Stash on request state so the route can record the success log after responding

@@ -8,7 +8,7 @@ const STATUS_META = {
   pending: { label: 'Pending', color: 'bg-amber-100 text-amber-700 border-amber-300', icon: Clock },
   submitted: { label: 'Submitted', color: 'bg-blue-100 text-blue-700 border-blue-300', icon: CheckCircle },
   confirmed: { label: 'Confirmed', color: 'bg-green-100 text-green-700 border-green-300', icon: CheckCircle },
-  not_required: { label: 'Not Required', color: 'bg-gray-100 text-gray-600 border-gray-300', icon: X },
+  not_required: { label: 'Not Required', color: 'bg-ink-100 text-ink-600 border-ink-300', icon: X },
 }
 
 /**
@@ -63,7 +63,7 @@ export default function ForeignGuests() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold text-navy">Foreign Guests (C-Form)</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-ink-500 text-sm mt-1">
             FRRO compliance — auto-created on check-in of guests with passport ID. File within 24 hours.
           </p>
         </div>
@@ -77,8 +77,8 @@ export default function ForeignGuests() {
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {Object.entries(STATUS_META).map(([k, m]) => (
-            <div key={k} className="bg-white rounded-xl shadow-sm p-4">
-              <div className="text-[11px] uppercase tracking-wide text-gray-500">{m.label}</div>
+            <div key={k} className="bg-white rounded-2xl shadow-card border border-ink-100 p-4">
+              <div className="text-[11px] uppercase tracking-wide text-ink-500">{m.label}</div>
               <div className="text-2xl font-bold text-navy mt-1">{stats.by_status?.[k] || 0}</div>
             </div>
           ))}
@@ -101,11 +101,11 @@ export default function ForeignGuests() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200">
+      <div className="flex gap-2 border-b border-ink-200">
         {[['pending', 'Pending'], ['submitted', 'Submitted'], ['confirmed', 'Confirmed'], ['all', 'All']].map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)}
                   className={`px-4 py-2 text-sm font-medium border-b-2 ${
-                    tab === k ? 'border-gold text-gold' : 'border-transparent text-gray-500 hover:text-navy'
+                    tab === k ? 'border-gold text-gold' : 'border-transparent text-ink-500 hover:text-navy'
                   }`}>
             {l}
           </button>
@@ -113,16 +113,16 @@ export default function ForeignGuests() {
       </div>
 
       {loading ? (
-        <div className="text-gray-400 text-center py-12">Loading…</div>
+        <div className="text-ink-400 text-center py-12">Loading…</div>
       ) : rows.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <Flag size={40} className="mx-auto text-gray-300 mb-3"/>
-          <p className="text-gray-500">No registrations in this view.</p>
+          <Flag size={40} className="mx-auto text-ink-300 mb-3"/>
+          <p className="text-ink-500">No registrations in this view.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-card border border-ink-100 overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
+            <thead className="bg-ink-50 text-ink-600 text-xs uppercase tracking-wide">
               <tr>
                 <th className="text-left px-4 py-3">Guest</th>
                 <th className="text-left px-4 py-3 hidden md:table-cell">Nationality</th>
@@ -138,7 +138,7 @@ export default function ForeignGuests() {
                 const Status = STATUS_META[r.status] || STATUS_META.pending
                 return (
                   <tr key={r.registration_id}
-                      className={`border-t border-gray-100 ${overdue ? 'bg-red-50/30' : 'hover:bg-gray-50/50'}`}>
+                      className={`border-t border-ink-100 ${overdue ? 'bg-red-50/30' : 'hover:bg-ink-50/50'}`}>
                     <td className="px-4 py-2.5">
                       <div className="font-semibold text-navy">{r.customer_name || `#${r.customer_id}`}</div>
                       {overdue && (
@@ -147,9 +147,9 @@ export default function ForeignGuests() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-2.5 hidden md:table-cell text-gray-600">{r.nationality || '—'}</td>
-                    <td className="px-4 py-2.5 hidden md:table-cell font-mono text-xs text-gray-600">{r.passport_number || '—'}</td>
-                    <td className="px-4 py-2.5 hidden lg:table-cell text-gray-500 text-xs">
+                    <td className="px-4 py-2.5 hidden md:table-cell text-ink-600">{r.nationality || '—'}</td>
+                    <td className="px-4 py-2.5 hidden md:table-cell font-mono text-xs text-ink-600">{r.passport_number || '—'}</td>
+                    <td className="px-4 py-2.5 hidden lg:table-cell text-ink-500 text-xs">
                       {new Date(r.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-2.5 text-center">
@@ -212,9 +212,9 @@ function EditModal({ reg, onClose, onSaved }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <form onSubmit={submit} className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-ink-100">
           <h2 className="font-display font-bold text-navy text-lg">C-Form Details</h2>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
+          <button type="button" onClick={onClose} className="text-ink-400 hover:text-ink-600"><X size={20}/></button>
         </div>
         <div className="p-5 space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -231,9 +231,9 @@ function EditModal({ reg, onClose, onSaved }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Status</label>
+              <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Status</label>
               <select value={f.status} onChange={e => set('status', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                      className="input-field">
                 <option value="pending">Pending</option>
                 <option value="submitted">Submitted</option>
                 <option value="confirmed">Confirmed</option>
@@ -243,15 +243,15 @@ function EditModal({ reg, onClose, onSaved }) {
             <Field label="FRRO Reference" value={f.frro_reference} onChange={v => set('frro_reference', v)} mono/>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Notes</label>
+            <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Notes</label>
             <textarea value={f.notes} onChange={e => set('notes', e.target.value)}
-                      rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                      rows={2} className="input-field" />
           </div>
         </div>
-        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+        <div className="px-5 py-4 border-t border-ink-100 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-ink-600 hover:bg-ink-100 rounded-lg">Cancel</button>
           <button type="submit" disabled={saving}
-                  className="px-4 py-2 bg-gold text-white rounded-lg hover:bg-gold/90 disabled:opacity-50">
+                  className="px-4 py-2 bg-gold text-navy-dark rounded-lg hover:bg-gold/90 disabled:opacity-50">
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
@@ -263,10 +263,10 @@ function EditModal({ reg, onClose, onSaved }) {
 function Field({ label, value, onChange, type = 'text', placeholder, mono = false }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">{label}</label>
+      <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">{label}</label>
       <input type={type} value={value} placeholder={placeholder}
              onChange={e => onChange(e.target.value)}
-             className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${mono ? 'font-mono' : ''}`}/>
+             className={`w-full px-3 py-2 border border-ink-300 rounded-lg ${mono ? 'font-mono' : ''}`}/>
     </div>
   )
 }

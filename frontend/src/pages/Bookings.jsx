@@ -7,19 +7,28 @@ import BookingModal from '../components/bookings/BookingModal'
 import GuestSearchInput from '../components/GuestSearchInput'
 
 const STATUS_COLORS = {
-  pending:    'bg-amber-100 text-amber-800',
-  confirmed:  'bg-blue-100 text-blue-800',
-  checked_in: 'bg-green-100 text-green-800',
-  completed:  'bg-gray-100 text-gray-700',
-  cancelled:  'bg-red-100 text-red-800',
-  no_show:    'bg-red-100 text-red-700',
+  pending:    'bg-amber-50 text-amber-700 ring-1 ring-amber-200/60',
+  confirmed:  'bg-blue-50 text-blue-700 ring-1 ring-blue-200/60',
+  checked_in: 'bg-green-50 text-green-700 ring-1 ring-green-200/60',
+  completed:  'bg-ink-100 text-ink-600 ring-1 ring-ink-200/60',
+  cancelled:  'bg-red-50 text-red-700 ring-1 ring-red-200/60',
+  no_show:    'bg-red-50 text-red-600 ring-1 ring-red-200/60',
 }
 
 const SOURCE_COLORS = {
-  walk_in:   'text-gray-600',
+  walk_in:   'text-ink-500',
   direct:    'text-blue-600',
   agency:    'text-purple-600',
-  corporate: 'text-amber-700',
+  corporate: 'text-gold-700',
+  online:    'text-green-600',   // Rusto online booking
+}
+
+const SOURCE_LABELS = {
+  walk_in:   'Walk-in',
+  direct:    'Direct',
+  agency:    'Agency',
+  corporate: 'Corporate',
+  online:    '🌐 Online (Rusto)',
 }
 
 export default function Bookings() {
@@ -104,7 +113,7 @@ export default function Bookings() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-display font-bold text-navy">Bookings & Reservations</h1>
-          <p className="text-xs sm:text-sm text-gray-500">
+          <p className="text-xs sm:text-sm text-ink-500">
             {total} bookings
             {filters.date
               ? ` · check-in on ${filters.date}`
@@ -125,7 +134,7 @@ export default function Bookings() {
           <button onClick={() => setShowCreateModal(true)} className="flex-1 sm:flex-none px-4 py-2.5 bg-navy text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-navy-dark transition-all shadow-lg shadow-navy/20 text-sm">
             <Calendar size={16} /> New Booking
           </button>
-          <button onClick={load} className="p-2.5 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 transition-colors">
+          <button onClick={load} className="p-2.5 border border-ink-200 rounded-xl text-ink-500 hover:bg-ink-50 transition-colors">
             <RefreshCw size={16} />
           </button>
         </div>
@@ -168,17 +177,17 @@ export default function Bookings() {
           <div className="w-10 h-10 border-4 border-navy border-t-gold rounded-full animate-spin" />
         </div>
       ) : bookings.length === 0 ? (
-        <div className="card text-center py-12 text-gray-500">No bookings match your filters.</div>
+        <div className="card text-center py-12 text-ink-500">No bookings match your filters.</div>
       ) : (
         <>
           {/* Mobile Card View */}
           <div className="md:hidden space-y-3">
             {bookings.map(b => (
               <div key={b.booking_id} onClick={() => setSelected(b)} 
-                   className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm active:bg-gray-50">
+                   className="bg-white rounded-xl p-4 border border-ink-100 shadow-sm active:bg-ink-50">
                 <div className="flex justify-between items-start mb-2">
                   <div>
-                    <p className="text-xs font-mono text-gray-400">{b.booking_ref}</p>
+                    <p className="text-xs font-mono text-ink-400">{b.booking_ref}</p>
                     <p className="font-bold text-navy">{b.guest_name}</p>
                   </div>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${STATUS_COLORS[b.status] || ''}`}>
@@ -187,19 +196,19 @@ export default function Bookings() {
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                   <div>
-                    <p className="text-gray-400">Stay</p>
+                    <p className="text-ink-400">Stay</p>
                     <p className="font-medium">{b.checkin_date} ({b.nights}n)</p>
                   </div>
                   <div>
-                    <p className="text-gray-400">Total</p>
+                    <p className="text-ink-400">Total</p>
                     <p className="font-bold text-navy">₹{b.total_amount.toLocaleString('en-IN')}</p>
                   </div>
                 </div>
-                <div className="flex justify-between items-center pt-2 border-t border-gray-50">
+                <div className="flex justify-between items-center pt-2 border-t border-ink-100">
                   <span className={`text-[10px] font-medium ${SOURCE_COLORS[b.source] || ''}`}>
                     {b.agency_name || (b.source || '').replace('_', ' ').toUpperCase()}
                   </span>
-                  <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-600">
+                  <span className="text-[10px] bg-ink-100 px-2 py-0.5 rounded text-ink-600">
                     Room {b.room_number || 'Unassigned'}
                   </span>
                 </div>
@@ -230,7 +239,7 @@ export default function Bookings() {
                     <td className="font-mono text-xs">{b.booking_ref}</td>
                     <td>
                       <div className="font-medium">{b.guest_name}</div>
-                      <div className="text-xs text-gray-500">{b.guest_phone}</div>
+                      <div className="text-xs text-ink-500">{b.guest_phone}</div>
                     </td>
                     <td>
                       <span className={`text-xs font-semibold ${SOURCE_COLORS[b.source] || ''}`}>
@@ -239,11 +248,11 @@ export default function Bookings() {
                     </td>
                     <td className="text-xs">
                       {b.checkin_date} → {b.checkout_date}<br/>
-                      <span className="text-gray-500">{b.nights}n · {b.adults}A {b.children > 0 && `${b.children}C`}</span>
+                      <span className="text-ink-500">{b.nights}n · {b.adults}A {b.children > 0 && `${b.children}C`}</span>
                     </td>
                     <td>
-                      {b.room_number || <span className="text-gray-400">unassigned</span>}
-                      <div className="text-[10px] text-gray-500">{b.room_type_requested?.replace('_', ' ')}</div>
+                      {b.room_number || <span className="text-ink-400">unassigned</span>}
+                      <div className="text-[10px] text-ink-500">{b.room_type_requested?.replace('_', ' ')}</div>
                     </td>
                     <td>
                       <div className="font-semibold">₹{b.total_amount.toLocaleString('en-IN')}</div>
@@ -258,7 +267,7 @@ export default function Bookings() {
                         {b.status}
                       </span>
                     </td>
-                    <td><ExternalLink size={14} className="text-gray-400 group-hover:text-gold group-hover:translate-x-0.5 transition-all" /></td>
+                    <td><ExternalLink size={14} className="text-ink-400 group-hover:text-gold group-hover:translate-x-0.5 transition-all" /></td>
                   </tr>
                 ))}
               </tbody>
@@ -268,10 +277,10 @@ export default function Bookings() {
           {/* Pagination */}
           <div className="flex justify-center gap-2 text-sm mt-4">
             <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
-                    className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">Prev</button>
-            <span className="self-center text-gray-500">Page {page} of {totalPages}</span>
+                    className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-ink-50 transition-colors">Prev</button>
+            <span className="self-center text-ink-500">Page {page} of {totalPages}</span>
             <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
-                    className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">Next</button>
+                    className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-ink-50 transition-colors">Next</button>
           </div>
         </>
       )}
@@ -300,9 +309,9 @@ export default function Bookings() {
             <div className="p-6 border-b flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-display font-bold text-navy">{selected.guest_name}</h3>
-                <p className="text-xs text-gray-500 font-mono">{selected.booking_ref}</p>
+                <p className="text-xs text-ink-500 font-mono">{selected.booking_ref}</p>
               </div>
-              <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-navy"><X size={20} /></button>
+              <button onClick={() => setSelected(null)} className="text-ink-400 hover:text-navy"><X size={20} /></button>
             </div>
             <div className="p-6 space-y-4 text-sm">
               <Field label="Status">
@@ -312,7 +321,7 @@ export default function Bookings() {
               </Field>
               <Field label="Source">
                 {selected.agency_name
-                  ? <><Building2 size={12} className="inline mr-1" /> {selected.agency_name} <code className="text-xs text-gray-500 ml-2">{selected.agency_booking_ref}</code></>
+                  ? <><Building2 size={12} className="inline mr-1" /> {selected.agency_name} <code className="text-xs text-ink-500 ml-2">{selected.agency_booking_ref}</code></>
                   : selected.source}
               </Field>
               <Field label="Phone">{selected.guest_phone}</Field>
@@ -332,7 +341,7 @@ export default function Bookings() {
                   ₹{(selected.advance_amount || 0).toLocaleString('en-IN')}
                 </span>
                 {selected.advance_amount > 0 && (
-                  <span className="text-gray-400 text-xs ml-1">via {selected.advance_payment_mode}</span>
+                  <span className="text-ink-400 text-xs ml-1">via {selected.advance_payment_mode}</span>
                 )}
               </Field>
               <Field label="Balance Due">
@@ -386,7 +395,7 @@ export default function Bookings() {
 function Field({ label, children }) {
   return (
     <div className="flex">
-      <div className="w-32 text-gray-500">{label}</div>
+      <div className="w-32 text-ink-500">{label}</div>
       <div className="flex-1 text-navy">{children}</div>
     </div>
   )

@@ -189,7 +189,7 @@ def create_room(body: RoomCreate, request: Request,
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="Room number already exists in this lodge")
-    room = Room(lodge_id=lodge_id, **body.dict())
+    room = Room(lodge_id=lodge_id, **body.model_dump())
     db.add(room)
     db.commit()
     db.refresh(room)

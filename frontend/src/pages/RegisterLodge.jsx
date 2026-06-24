@@ -5,9 +5,9 @@ import {
   Hotel, MapPin, User, Phone, Mail, Hash, Building2, BedDouble,
   Wallet, ShieldCheck, Sparkles, CheckCircle2, ArrowLeft, ArrowRight,
   Loader2, AlertCircle, Snowflake, Wind, Star, Crown, Lock, Calendar,
-  Smartphone, MessageCircle, BarChart3, Globe, Headphones, Zap
-} from "lucide-react";
-import { registrationsAPI, pricingAPI, authAPI } from "../services/api";
+  Smartphone, MessageCircle, BarChart3, Globe, Headphones, Zap, IndianRupee, ExternalLink} from "lucide-react";
+import { registrationsAPI, pricingAPI, authAPI, registrationPaymentAPI } from "../services/api";
+import { ALL_MODULES, MODULE_TAGS, PROPERTY_DEFAULT_MODULES, getDefaultModules, serializeModules } from "../utils/moduleConfig";
 import { RustoMark } from "../components/RustoLogo/RustoLogo";
 import { useSettings } from "../context/SettingsContext";
 
@@ -33,11 +33,14 @@ export default function RegisterLodge() {
   const navigate = useNavigate();
   const { settings } = useSettings();
   const isPremiumTheme = settings.premium_theme_enabled !== 'false';
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(null);
   const [errors, setErrors] = useState({});
   const [form, setForm] = useState({
+    // Step 0: property type + modules
+    property_category: "",         // chosen first — drives everything
+    enabled_modules: new Set(),    // chosen modules
     // Step 1: lodge + owner
     proposed_code: "",
     lodge_name: "",
@@ -76,6 +79,14 @@ export default function RegisterLodge() {
   }, [form.rooms_ac, form.rooms_non_ac, form.rooms_deluxe, form.rooms_suite]);
 
   // ── Per-step validation ───────────────────────────────────────────
+  const validateStep0 = () => {
+    const e = {};
+    if (!form.property_category) e.property_category = "Please select your property type";
+    if (form.enabled_modules.size === 0) e.enabled_modules = "Select at least one module";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
   const validateStep1 = () => {
     const e = {};
     if (!form.proposed_code.match(/^[a-z][a-z0-9_]{2,39}$/i))
@@ -112,7 +123,8 @@ export default function RegisterLodge() {
   };
 
   const goNext = () => {
-    const ok = step === 1 ? validateStep1() :
+    const ok = step === 0 ? validateStep0() :
+               step === 1 ? validateStep1() :
                step === 2 ? validateStep2() :
                step === 3 ? validateStep3() : true;
     if (ok) {
@@ -122,7 +134,7 @@ export default function RegisterLodge() {
   };
 
   const goBack = () => {
-    setStep(s => Math.max(1, s - 1));
+    setStep(s => Math.max(0, s - 1));
     setErrors({});
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -132,6 +144,8 @@ export default function RegisterLodge() {
     setSubmitting(true);
     try {
       const r = await registrationsAPI.submit({
+        property_category: form.property_category,
+        enabled_modules:   serializeModules(form.enabled_modules),
         proposed_code:   form.proposed_code.toLowerCase(),
         lodge_name:      form.lodge_name.trim(),
         owner_full_name: form.owner_full_name.trim(),
@@ -186,19 +200,20 @@ export default function RegisterLodge() {
       <PublicHeader/>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Hero/>
-        <StepIndicator step={step}/>
+        <StepIndicator step={step} maxStep={4}/>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 mt-8">
           {/* Form column */}
           <section className="bg-white rounded-2xl shadow-card border border-ink-100 p-6 md:p-8 glass-panel-lux">
+            {step === 0 && <Step0PropertyType form={form} set={set} errors={errors}/>}
             {step === 1 && <Step1Details form={form} set={set} errors={errors}/>}
             {step === 2 && <Step2Rooms form={form} set={set} errors={errors} totalRooms={totalRooms}/>}
             {step === 3 && <Step3Plan form={form} set={set} errors={errors} totalRooms={totalRooms}/>}
             {step === 4 && <Step4Confirm form={form} set={set} errors={errors} totalRooms={totalRooms}/>}
 
             <div className="flex justify-between items-center mt-8 pt-6 border-t border-ink-100">
-              <button onClick={goBack} disabled={step === 1}
-                      className={`btn-ghost flex items-center gap-1.5 ${step === 1 ? "invisible" : ""}`}>
+              <button onClick={goBack} disabled={step === 0}
+                      className={`btn-ghost flex items-center gap-1.5 ${step === 0 ? "invisible" : ""}`}>
                 <ArrowLeft size={14}/> Back
               </button>
               {step < 4 ? (
@@ -231,19 +246,31 @@ export default function RegisterLodge() {
 
 function PublicHeader() {
   return (
-    <header className="bg-navy-dark text-white border-b border-gold/20">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5">
-          <RustoMark size={36}/>
-          <span className="font-display text-xl font-bold hover:text-gold transition-colors">Rusto</span>
-        </Link>
-        <div className="flex items-center gap-4">
-          <Link to="/" className="btn-back-home !py-2">
-            <ArrowLeft size={13} /> Back to Home
+    <header className="bg-navy-dark text-white border-b border-white/10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
+        {/* Brand + portal identity */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <Link to="/" className="flex items-center gap-2.5 group">
+            <RustoMark size={36}/>
+            <span className="font-display text-xl font-bold group-hover:text-gold transition-colors">Rusto</span>
           </Link>
-          <span className="text-white/20">|</span>
-          <Link to="/login" className="text-sm text-white/80 hover:text-gold transition-colors font-medium">
-            Already onboarded? <span className="font-semibold text-gold">Sign in →</span>
+          {/* Portal identity badge — sage green = onboarding */}
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full"
+               style={{ background: "rgba(42,125,95,0.25)", border: "1px solid rgba(42,125,95,0.5)" }}>
+            <Building2 size={10} color="#4ADE80"/>
+            <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "#4ADE80" }}>
+              Lodge Onboarding
+            </span>
+          </div>
+        </div>
+        {/* Right actions */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <Link to="/" className="hidden sm:flex items-center gap-1.5 text-xs text-white/60 hover:text-white transition-colors font-medium">
+            <ArrowLeft size={12} /> Home
+          </Link>
+          <Link to="/login"
+                className="flex items-center gap-1.5 text-xs font-bold text-navy-dark bg-gold hover:bg-gold-light transition-colors px-3 py-1.5 rounded-lg">
+            Sign in to PMS →
           </Link>
         </div>
       </div>
@@ -279,9 +306,10 @@ function Hero() {
   );
 }
 
-function StepIndicator({ step }) {
+function StepIndicator({ step, maxStep = 4 }) {
   const steps = [
-    { n: 1, label: "Your lodge" },
+    { n: 0, label: "Property Type" },
+    { n: 1, label: "Your details" },
     { n: 2, label: "Rooms" },
     { n: 3, label: "Plan" },
     { n: 4, label: "Confirm" },
@@ -315,6 +343,178 @@ function StepIndicator({ step }) {
 
 
 // ── Step 1: Lodge details ─────────────────────────────────────────
+
+
+// ────────────────────────────────────────────────────────────────────
+// Step 0 — Property Category + Module Selection
+// ────────────────────────────────────────────────────────────────────
+
+const PROPERTY_TYPES = [
+  { value: "lodge",             label: "Lodge",              icon: "🏨", desc: "Small to mid-size lodge, dharmashala, traveller rest" },
+  { value: "hotel",             label: "Hotel",              icon: "🏩", desc: "Standard hotel with multiple floors and services" },
+  { value: "resort",            label: "Resort",             icon: "🌴", desc: "Full-service resort with pool, spa, dining, events" },
+  { value: "boutique_hotel",    label: "Boutique Hotel",     icon: "✨", desc: "Curated experience hotel with unique character" },
+  { value: "motel",             label: "Motel",              icon: "🚗", desc: "Drive-in highway motel, roadside property" },
+  { value: "homestay",          label: "Homestay",           icon: "🏡", desc: "Home converted to guesthouse, family-run" },
+  { value: "villa",             label: "Villa / Bungalow",   icon: "🏰", desc: "Private villa, bungalow, or luxury retreat" },
+  { value: "service_apartment", label: "Service Apartment",  icon: "🏢", desc: "Furnished apartment for extended stays" },
+  { value: "hostel",            label: "Hostel / Dormitory", icon: "🎒", desc: "Budget backpacker hostel with shared facilities" },
+  { value: "heritage",          label: "Heritage Property",  icon: "🏛️", desc: "Palace, fort, haveliturned heritage hotel" },
+  { value: "eco_resort",        label: "Eco Resort / Camp",  icon: "🌿", desc: "Nature camp, treehouse, eco-lodge, forest retreat" },
+];
+
+const TAG_COLORS = {
+  operations:  "bg-blue-50 border-blue-200 text-blue-800",
+  guest:       "bg-emerald-50 border-emerald-200 text-emerald-800",
+  revenue:     "bg-purple-50 border-purple-200 text-purple-800",
+  marketing:   "bg-orange-50 border-orange-200 text-orange-800",
+  finance:     "bg-navy/5 border-navy/20 text-navy",
+  ai:          "bg-amber-50 border-amber-200 text-amber-800",
+  marketplace: "bg-pink-50 border-pink-200 text-pink-800",
+};
+
+function Step0PropertyType({ form, set, errors }) {
+  const [showAllModules, setShowAllModules] = useState(false);
+
+  const selectCategory = (cat) => {
+    set("property_category", cat);
+    // Auto-select default modules for this category
+    const defaults = getDefaultModules(cat);
+    set("enabled_modules", defaults);
+  };
+
+  const toggleModule = (modId) => {
+    const mod = ALL_MODULES[modId];
+    if (mod?.core) return; // can't toggle core modules
+    const next = new Set(form.enabled_modules);
+    if (next.has(modId)) {
+      next.delete(modId);
+    } else {
+      next.add(modId);
+    }
+    set("enabled_modules", next);
+  };
+
+  const nonCoreModules = Object.values(ALL_MODULES).filter(m => !m.core);
+  const taggedModules = {};
+  nonCoreModules.forEach(m => {
+    const tag = m.tag || "operations";
+    if (!taggedModules[tag]) taggedModules[tag] = [];
+    taggedModules[tag].push(m);
+  });
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="font-display text-2xl font-bold text-navy">What kind of property do you run?</h2>
+        <p className="text-ink-500 mt-1 text-sm">This determines which features we set up for you. You can change this anytime.</p>
+      </div>
+
+      {/* Property type grid */}
+      <div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {PROPERTY_TYPES.map(pt => (
+            <button
+              key={pt.value}
+              type="button"
+              onClick={() => selectCategory(pt.value)}
+              className={`text-left p-4 rounded-2xl border-2 transition-all duration-200 group
+                ${form.property_category === pt.value
+                  ? "border-gold bg-gold/5 shadow-gold-glow"
+                  : "border-ink-200 bg-white hover:border-gold/40 hover:shadow-soft"}`}
+            >
+              <div className="flex items-start gap-3">
+                <span className="text-2xl leading-none">{pt.icon}</span>
+                <div>
+                  <p className={`font-bold text-sm ${form.property_category === pt.value ? "text-navy" : "text-navy"}`}>
+                    {pt.label}
+                  </p>
+                  <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">{pt.desc}</p>
+                </div>
+                {form.property_category === pt.value && (
+                  <CheckCircle2 size={16} className="text-gold ml-auto flex-shrink-0 mt-0.5"/>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+        {errors.property_category && (
+          <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+            <AlertCircle size={12}/> {errors.property_category}
+          </p>
+        )}
+      </div>
+
+      {/* Module selection — appears after category chosen */}
+      {form.property_category && (
+        <div className="animate-fade-in">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-display text-lg font-bold text-navy">Which features do you need?</h3>
+              <p className="text-xs text-ink-500 mt-0.5">
+                We pre-selected the right set for a <strong>{PROPERTY_TYPES.find(p=>p.value===form.property_category)?.label}</strong>.
+                Add or remove anything.
+              </p>
+            </div>
+            <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-full font-bold">
+              {form.enabled_modules.size} selected
+            </span>
+          </div>
+
+          {Object.entries(taggedModules).map(([tag, mods]) => {
+            const tagInfo = MODULE_TAGS[tag];
+            const colorClass = TAG_COLORS[tag] || "bg-ink-50 border-ink-200 text-ink-700";
+            return (
+              <div key={tag} className="mb-5">
+                <p className={`text-xs font-bold uppercase tracking-widest mb-2 px-2 py-0.5 rounded-full inline-block border ${colorClass}`}>
+                  {tagInfo?.label || tag}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {mods.map(mod => {
+                    const isOn = form.enabled_modules.has(mod.id);
+                    return (
+                      <label
+                        key={mod.id}
+                        className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all
+                          ${isOn
+                            ? "border-gold/50 bg-gold/5"
+                            : "border-ink-200 bg-white hover:border-ink-300"}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isOn}
+                          onChange={() => toggleModule(mod.id)}
+                          className="mt-0.5 w-4 h-4 accent-navy flex-shrink-0"
+                        />
+                        <div>
+                          <p className="text-sm font-semibold text-navy flex items-center gap-1.5">
+                            <span>{mod.icon}</span> {mod.label}
+                          </p>
+                          <p className="text-xs text-ink-500 leading-relaxed">{mod.desc}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          {errors.enabled_modules && (
+            <p className="text-xs text-red-500 flex items-center gap-1">
+              <AlertCircle size={12}/> {errors.enabled_modules}
+            </p>
+          )}
+
+          <div className="mt-4 p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-700 flex items-start gap-2">
+            <span className="shrink-0 mt-0.5">💡</span>
+            <span>Don't worry — you can enable or disable any feature later from <strong>Settings → Modules</strong>. Your data is always safe.</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Step1Details({ form, set, errors }) {
   const codePreview = form.proposed_code
@@ -753,8 +953,8 @@ function Step4Confirm({ form, set, errors, totalRooms }) {
                className="rounded mt-0.5"/>
         <span className="text-sm text-ink-700">
           I confirm the information above is accurate, I'm authorised to register this lodge,
-          and I agree to Rusto's <a href="#" className="text-gold-700 underline">Terms of Service</a> and{" "}
-          <a href="#" className="text-gold-700 underline">Privacy Policy</a>.
+          and I agree to Rusto's <a href="/terms" className="text-gold-700 underline">Terms of Service</a> and{" "}
+          <a href="/privacy" className="text-gold-700 underline">Privacy Policy</a>.
         </span>
       </label>
       {errors.accepts_terms && (
@@ -782,6 +982,17 @@ function BenefitsPanel({ step, form, totalRooms }) {
   // The panel content changes with each step to keep the user motivated
   // by surfacing what's coming next.
   const content = {
+    0: {
+      title: "Select your property profile",
+      items: [
+        { Icon: Building2,    label: "Tailored setup",
+          desc: "We configure the workspace specifically for your business model." },
+        { Icon: Sparkles,     label: "Modular features",
+          desc: "Choose only the modules you need. Turn others on/off anytime." },
+        { Icon: Lock,         label: "Zero commitment",
+          desc: "Try all features during your trial period. No credit card required." },
+      ],
+    },
     1: {
       title: "Why lodges choose Rusto",
       items: [
@@ -834,16 +1045,18 @@ function BenefitsPanel({ step, form, totalRooms }) {
     },
   }[step];
 
+  const activeContent = content || { title: "Why lodges choose Rusto", items: [] };
+
   return (
     <div className="bg-gradient-to-br from-navy-dark to-navy rounded-2xl p-6 text-white shadow-lifted glass-panel-lux">
       <div className="flex items-center gap-2 mb-4 pb-4 border-b border-white/10">
         <div className="w-8 h-8 rounded-lg bg-gold flex items-center justify-center">
           <Sparkles size={14} className="text-navy-dark"/>
         </div>
-        <h3 className="font-display font-bold">{content.title}</h3>
+        <h3 className="font-display font-bold">{activeContent.title}</h3>
       </div>
       <ul className="space-y-4">
-        {content.items.map((item, i) => (
+        {activeContent.items.map((item, i) => (
           <li key={i} className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
               <item.Icon size={14} className="text-gold"/>
@@ -874,6 +1087,25 @@ function SuccessCard({ requestId }) {
   const [credentials, setCredentials] = useState(null);
   const [error, setError] = useState(null);
   const [launching, setLaunching] = useState(false);
+  const [paymentLink, setPaymentLink] = useState(null);
+  const [creatingPayLink, setCreatingPayLink] = useState(false);
+
+  const handleCreatePayLink = async () => {
+    setCreatingPayLink(true);
+    try {
+      const r = await registrationPaymentAPI.createPaymentLink(requestId);
+      if (r.data.short_url) {
+        setPaymentLink(r.data);
+        window.open(r.data.short_url, "_blank", "noopener,noreferrer");
+      } else if (r.data.already_paid) {
+        toast.success("Payment already confirmed! Our team will review your application.");
+      } else {
+        toast.info(r.data.message || "Our team will contact you for payment.");
+      }
+    } catch {
+      toast.error("Could not create payment link. Our team will contact you.");
+    } finally { setCreatingPayLink(false); }
+  };
 
   const handleFastTrack = async () => {
     setFastTracking(true);
@@ -950,10 +1182,47 @@ function SuccessCard({ requestId }) {
             You'll hear back at your registered email within a few hours.
           </p>
           
-          <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-4 py-2 mb-8">
+          <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-4 py-2 mb-6">
             <span className="text-2xs uppercase tracking-eyebrow font-bold text-ink-500">Application ID</span>
             <code className="font-mono font-bold text-navy">REG-{String(requestId).padStart(6, "0")}</code>
           </div>
+
+          {/* ── Payment CTA ── */}
+          <div className="mb-6 p-5 rounded-2xl border border-emerald-200 bg-emerald-50 text-left">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                <IndianRupee size={18} className="text-emerald-700"/>
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-emerald-900 text-sm mb-1">Complete Payment to Fast-track Approval</p>
+                <p className="text-xs text-emerald-700 leading-relaxed mb-3">
+                  Pay your subscription fee now via UPI, PhonePe, Google Pay, or any UPI app.
+                  Once payment is confirmed, our team will approve your account within minutes.
+                </p>
+                {paymentLink ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-green-700 font-semibold flex items-center gap-1">
+                      <CheckCircle2 size={13}/> Payment link created! Complete payment in the new tab.
+                    </p>
+                    <a href={paymentLink.short_url} target="_blank" rel="noopener noreferrer"
+                       className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 hover:underline">
+                      Open payment link again <ExternalLink size={11}/>
+                    </a>
+                  </div>
+                ) : (
+                  <button onClick={handleCreatePayLink} disabled={creatingPayLink}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-60">
+                    {creatingPayLink ? <Loader2 size={14} className="animate-spin"/> : <Zap size={14}/>}
+                    {creatingPayLink ? "Creating link…" : "Pay Now via UPI / PhonePe / GPay"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <p className="text-xs text-ink-400 mb-6">
+            Prefer to pay later? Our team will call you to collect payment and approve your account.
+          </p>
 
           {/* ⚡ SANDBOX FAST-TRACK PANEL */}
           {!credentials ? (

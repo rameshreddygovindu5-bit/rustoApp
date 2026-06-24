@@ -13,8 +13,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
 from typing import Optional
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 import csv, io
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from fastapi.responses import StreamingResponse
 
@@ -78,7 +84,7 @@ def stats(db: Session = Depends(get_db),
         out[getattr(status, "value", status)] = int(n)
     # Pending overdue (>24h since checkin) — regulatory red flag.
     from datetime import timedelta
-    overdue_cutoff = datetime.utcnow() - timedelta(hours=24)
+    overdue_cutoff = _utcnow() - timedelta(hours=24)
     overdue = (db.query(ForeignGuestRegistration)
                .filter(ForeignGuestRegistration.lodge_id == lodge_id,
                        ForeignGuestRegistration.status == ForeignGuestStatus.pending,
@@ -113,12 +119,12 @@ def update_registration(registration_id: int, body: RegistrationUpdate, request:
                  ForeignGuestRegistration.lodge_id == lodge_id).first())
     if not r:
         raise HTTPException(status_code=404, detail="Registration not found")
-    fields = body.dict(exclude_unset=True)
+    fields = body.model_dump(exclude_unset=True)
     if "status" in fields:
         if fields["status"] not in {s.value for s in ForeignGuestStatus}:
             raise HTTPException(status_code=400, detail="Invalid status")
         if fields["status"] == "submitted" and not r.submitted_at:
-            r.submitted_at = datetime.utcnow()
+            r.submitted_at = _utcnow()
             r.submitted_by = current_user.user_id
     for k, v in fields.items():
         setattr(r, k, v)

@@ -9,7 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from ..database import get_db
 from ..models import EmailTemplate, EmailLog, Customer, Booking, Checkin
@@ -256,7 +262,7 @@ def list_logs(status: Optional[str] = None,
                db: Session = Depends(get_db),
                current_user=Depends(get_current_user),
                lodge_id: int = Depends(resolve_lodge_scope)):
-    since = datetime.utcnow() - timedelta(days=days)
+    since = _utcnow() - timedelta(days=days)
     q = (db.query(EmailLog)
          .filter(EmailLog.lodge_id == lodge_id,
                  EmailLog.sent_at >= since))
@@ -275,7 +281,7 @@ def stats(days: int = Query(30, ge=1, le=365),
           lodge_id: int = Depends(resolve_lodge_scope)):
     """Counts per status + per template_key for the dashboard tile."""
     from sqlalchemy import func
-    since = datetime.utcnow() - timedelta(days=days)
+    since = _utcnow() - timedelta(days=days)
     base = (db.query(EmailLog)
             .filter(EmailLog.lodge_id == lodge_id,
                     EmailLog.sent_at >= since))

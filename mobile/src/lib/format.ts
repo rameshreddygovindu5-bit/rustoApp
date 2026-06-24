@@ -50,9 +50,35 @@ export function nightsBetween(from: string, to: string): number {
 /** Surface a useful error message from an axios error. */
 export function errorMessage(err: any, fallback = "Something went wrong"): string {
   if (!err) return fallback;
+  // Network-level readable message attached by our axios interceptor
+  if (err?.readableMessage) return err.readableMessage;
+  // FastAPI validation / business logic errors
   const d = err?.response?.data?.detail;
   if (typeof d === "string") return d;
   if (Array.isArray(d) && d[0]?.msg) return d[0].msg;
   if (err?.message) return err.message;
   return fallback;
+}
+
+/** Relative day description: "Today", "Tomorrow", "In 3 days", etc. */
+export function relativeDays(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    const target = new Date(iso);
+    const today  = new Date();
+    today.setHours(0, 0, 0, 0);
+    target.setHours(0, 0, 0, 0);
+    const diff = Math.round((target.getTime() - today.getTime()) / 86_400_000);
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Tomorrow";
+    if (diff < 0)   return "Past";
+    if (diff < 7)   return `In ${diff} days`;
+    return shortDate(iso);
+  } catch { return iso ?? "—"; }
+}
+
+/** Format a date range as "29 May – 31 May" */
+export function dateRange(from: string | null, to: string | null): string {
+  if (!from || !to) return "—";
+  return `${tinyDate(from)} – ${tinyDate(to)}`;
 }

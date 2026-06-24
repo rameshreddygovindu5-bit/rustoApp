@@ -55,12 +55,12 @@ export default function ToolCallCard({ call, onConfirm, onDecline }) {
       {status === 'pending' && (
         <div className="px-3 py-2 border-t border-amber-200 flex items-center justify-end gap-2">
           <button onClick={onDecline}
-                  className="px-3 py-1 rounded text-xs hover:bg-white/50">
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-300 hover:bg-amber-100 transition-colors">
             Cancel
           </button>
           <button onClick={onConfirm}
-                  className="px-3 py-1 rounded text-xs bg-amber-700 text-white hover:bg-amber-800">
-            Confirm & run
+                  className="px-4 py-1.5 rounded-lg text-xs font-bold bg-amber-700 text-white hover:bg-amber-800 transition-colors shadow-sm">
+            ✓ Confirm & run
           </button>
         </div>
       )}

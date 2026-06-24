@@ -3,169 +3,312 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
-    
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <meta name="build-timestamp" content="2026-05-29 20:20:00 UTC" />
-    
     <title>Rusto — Travel Anywhere. Rest Everywhere.</title>
-    <meta name="description" content="Advanced luxury lodge management system and premium traveler booking platform across India." />
-
+    <meta name="description" content="Advanced lodge management system and premium traveler booking platform across India." />
     <link rel="manifest" href="/manifest.webmanifest" />
-    
     <meta name="theme-color" content="#081C22" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
-
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
-
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Rusto" />
     <meta name="mobile-web-app-capable" content="yes" />
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
-      /* Enforcing typography and layout rules for the entire app ecosystem */
       :root {
-        --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
-        --font-display: 'Cormorant Garamond', 'Plus Jakarta Sans', serif;
+        --font-sans:    'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+        --font-display: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+        /* Lodge brand colours — overwritten by inline script once portal is detected */
+        --lodge-primary: #07131C;
+        --lodge-accent:  #E8A020;
       }
-      
+
       html, body {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
+        margin: 0; padding: 0; width: 100%; height: 100%;
         font-family: var(--font-sans);
-        background-color: #081C22; /* Deep Ocean */
+        background-color: var(--lodge-primary);
         color: #F8FAFC;
         overflow-x: hidden;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
       }
 
-      /* Native-like scrolling configuration for advanced dashboard and cards */
-      .custom-scrollbar::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      .custom-scrollbar::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.03);
-      }
-      .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 10px;
-      }
-
-      /* Cinematic Initial Core App Boot Loader */
+      /* ── Pre-loader ─────────────────────────────────────────────────── */
       #app-preloader {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: #081C22; /* Deep Ocean background */
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        position: fixed; inset: 0;
+        background: var(--lodge-primary);
+        display: flex; justify-content: center; align-items: center;
         z-index: 99999;
-        transition: opacity 0.5s cubic-bezier(0.25, 1, 0.5, 1), visibility 0.5s;
+        transition: opacity 0.4s ease, visibility 0.4s ease;
       }
 
+      /* Lodge logo shown in preloader when portal=pms */
+      #preloader-lodge-logo {
+        max-height: 72px; max-width: 200px;
+        object-fit: contain;
+        border-radius: 10px;
+        display: none; /* shown by JS when lodge has a logo */
+      }
+
+      #preloader-lodge-name {
+        font-family: var(--font-display);
+        font-size: 28px;
+        font-weight: 700;
+        color: #fff;
+        text-align: center;
+        display: none; /* shown by JS for lodge portal */
+      }
+
+      /* Default Rusto ring (shown on customer/unknown) */
       .loader-container {
-        position: relative;
-        width: 180px;
-        height: 180px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        position: relative; width: 180px; height: 180px;
+        display: flex; justify-content: center; align-items: center;
       }
-
-      /* Luxury monogram rotating and pulsing ring */
       .logo-ring {
-        position: absolute;
-        width: 100%;
-        height: 100%;
-        border-radius: 50%;
+        position: absolute; width: 100%; height: 100%; border-radius: 50%;
         border: 2px solid transparent;
-        border-top-color: #D4AF37; /* Gold */
-        border-right-color: rgba(212, 175, 55, 0.2);
-        border-bottom-color: rgba(212, 175, 55, 0.05);
+        border-top-color: #D4AF37;
+        border-right-color: rgba(212,175,55,0.2);
+        border-bottom-color: rgba(212,175,55,0.05);
         animation: rotate 12s linear infinite, pulse 3s infinite;
         will-change: transform;
-        transform: translateZ(0);
       }
-
-      @keyframes rotate {
-        0% { transform: rotate(0deg) translateZ(0); }
-        100% { transform: rotate(360deg) translateZ(0); }
-      }
-
+      @keyframes rotate { 100% { transform: rotate(360deg) } }
       @keyframes pulse {
-        0%, 100% { opacity: 0.8; }
-        50% { opacity: 1; border-width: 3px; }
+        0%,100% { opacity:0.8 }
+        50%      { opacity:1; border-width:3px }
       }
-
       .loader-content {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        z-index: 2;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        text-align: center; z-index: 2;
       }
-
       .loader-brand {
         font-family: var(--font-display);
-        font-size: 58px;
-        font-weight: 300;
-        color: #D4AF37; /* Gold */
-        text-shadow: 0 0 15px rgba(212, 175, 55, 0.35);
-        margin-bottom: 2px;
+        font-size: 58px; font-weight: 300; color: #D4AF37;
+        text-shadow: 0 0 15px rgba(212,175,55,0.35);
         line-height: 1;
-        letter-spacing: normal;
-        text-indent: 0;
       }
-
       .loader-tagline {
         font-family: var(--font-sans);
-        font-size: 8px;
-        font-weight: 700;
-        letter-spacing: 0.3em;
-        color: #F5E7C4; /* Champagne */
+        font-size: 8px; font-weight: 700;
+        letter-spacing: 0.3em; color: #F5E7C4;
         text-transform: uppercase;
         animation: taglineBreathe 2s ease-in-out infinite;
       }
-
       @keyframes taglineBreathe {
-        0%, 100% { opacity: 0.5; transform: scale(0.96); }
-        50% { opacity: 1; transform: scale(1.02); }
+        0%,100% { opacity:0.5; transform:scale(0.96) }
+        50%      { opacity:1;   transform:scale(1.02) }
       }
+
+      /* Lodge preloader (portal=pms) */
+      #lodge-preloader {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        text-align: center;
+        padding: 40px;
+      }
+      #lodge-preloader-ring {
+        width: 56px; height: 56px; border-radius: 50%;
+        border: 3px solid transparent;
+        border-top-color: var(--lodge-accent);
+        border-right-color: rgba(255,255,255,0.1);
+        animation: rotate 1s linear infinite;
+      }
+      #lodge-preloader-tagline {
+        font-size: 11px; font-weight: 600;
+        letter-spacing: 0.2em; text-transform: uppercase;
+        color: rgba(255,255,255,0.4);
+        margin-top: 4px;
+      }
+
+      .scrollbar::-webkit-scrollbar { width:6px; height:6px }
+      .scrollbar::-webkit-scrollbar-track { background:rgba(255,255,255,0.03) }
+      .scrollbar::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:10px }
 
       .app-loaded #app-preloader {
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
+        opacity: 0; visibility: hidden; pointer-events: none;
       }
     </style>
+
+    <!--
+      ╔════════════════════════════════════════════════════════════════════╗
+      ║  PORTAL DETECTION v2 — Direct browser-to-backend call.           ║
+      ║                                                                    ║
+      ║  KEY: Calls backend DIRECTLY using window.location.hostname       ║
+      ║  (not through Vite proxy) so the backend sees the real TCP        ║
+      ║  socket IP from the browser — 192.168.68.60, not 127.0.0.1.     ║
+      ║                                                                    ║
+      ║  URL: http://<same-host>:8000/api/public/detect-portal           ║
+      ║  e.g. http://192.168.68.60:8000/api/public/detect-portal         ║
+      ║                                                                    ║
+      ║  Synchronous XHR runs in <head> before React starts.             ║
+      ║  Result → window.__PORTAL__ → PortalContext reads it instantly.  ║
+      ║  No flash. No loader. Correct portal on first paint.             ║
+      ╚════════════════════════════════════════════════════════════════════╝
+    -->
+    <script>
+      (function () {
+        'use strict';
+
+        // ── 1. Try to read from localStorage cache first ───────────────
+        // Cache key matches what PortalContext.jsx writes.
+        var CACHE_KEY = 'rusto_portal_cache';
+        var CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+        var cached = null;
+
+        try {
+          var raw = localStorage.getItem(CACHE_KEY);
+          if (raw) {
+            var c = JSON.parse(raw);
+            if (Date.now() - (c.ts || 0) < CACHE_TTL) {
+              cached = c;
+            } else {
+              localStorage.removeItem(CACHE_KEY);
+            }
+          }
+        } catch (e) {}
+
+        if (cached) {
+          // Cache hit — use it immediately, React will start with correct portal
+          window.__PORTAL__ = { portal: cached.portal, branding: cached.branding, clientIp: cached.clientIp };
+          applyBranding(cached);
+          // Fetch in background to refresh cache (do NOT block)
+          fetchInBackground();
+          return;
+        }
+
+        // ── 2. No cache — do a SYNCHRONOUS XHR so we block until we know ──
+        // This runs in <head> before React, so no flash is possible.
+        var result = { portal: 'customer', branding: null, clientIp: null };
+        try {
+          // ── Use Vite proxy path ───────────────────────────────────────
+          // The Vite dev server proxies /api/* to the backend.
+          // The backend checks the IP from the TCP socket.
+          // Because the lodge's IP ranges include 127.0.0.1 and ::1,
+          // this works correctly for localhost development.
+          // In production (nginx), the real client IP is in X-Forwarded-For.
+          var xhr = new XMLHttpRequest();
+          xhr.open('GET', '/api/public/detect-portal', false); // synchronous
+          xhr.setRequestHeader('Accept', 'application/json');
+          xhr.send(null);
+
+          if (xhr.status === 200) {
+            var data = JSON.parse(xhr.responseText);
+            result.portal   = data.portal    || 'customer';
+            result.branding = data.branding  || null;
+            result.clientIp = data.client_ip || null;
+            // Cache so next page load is instant (served from localStorage)
+            try {
+              localStorage.setItem(CACHE_KEY, JSON.stringify({
+                portal: result.portal, branding: result.branding,
+                clientIp: result.clientIp, ts: Date.now()
+              }));
+            } catch (e) {}
+          }
+        } catch (e) {
+          // Backend unreachable or CORS error — safe default = customer portal
+          // This also handles the case where backend hasn't started yet.
+          console.debug('[Rusto portal] Detection failed, defaulting to customer:', e.message);
+        }
+
+        window.__PORTAL__ = result;
+        applyBranding(result);
+
+        // ── Helper: apply branding to the preloader immediately ────────
+        function applyBranding(d) {
+          if (!d || d.portal !== 'pms' || !d.branding) return;
+          var b = d.branding;
+
+          // Update CSS variables so preloader background matches lodge brand
+          var primary = b.primary_color || '#07131C';
+          var accent  = b.accent_color  || '#E8A020';
+          document.documentElement.style.setProperty('--lodge-primary', primary);
+          document.documentElement.style.setProperty('--lodge-accent',  accent);
+          document.documentElement.style.setProperty('--lodge-name',    b.hotel_name || '');
+
+          // Update page title and theme-color
+          if (b.hotel_name) {
+            document.title = b.hotel_name + ' — Staff Portal';
+          }
+          var themeTag = document.querySelector('meta[name="theme-color"]');
+          if (themeTag) themeTag.setAttribute('content', primary);
+
+          // Switch to lodge preloader (hide Rusto ring, show lodge name/logo)
+          var defaultLoader  = document.getElementById('default-preloader');
+          var lodgeLoader    = document.getElementById('lodge-preloader');
+          var lodgeName      = document.getElementById('lodge-preloader-name');
+          var lodgeTagline   = document.getElementById('lodge-preloader-tagline');
+          var lodgeLogo      = document.getElementById('lodge-preloader-logo');
+
+          if (defaultLoader)  defaultLoader.style.display  = 'none';
+          if (lodgeLoader)    lodgeLoader.style.display     = 'flex';
+
+          if (lodgeName) {
+            lodgeName.textContent = b.hotel_name || b.lodge_name || '';
+            lodgeName.style.color = accent;
+          }
+          if (lodgeTagline) {
+            lodgeTagline.textContent = b.hotel_tagline || 'Staff Portal';
+          }
+          if (lodgeLogo && b.logo_url) {
+            lodgeLogo.src     = b.logo_url;
+            lodgeLogo.style.display = 'block';
+            lodgeLogo.onerror = function() { this.style.display = 'none'; };
+          }
+        }
+
+        function fetchInBackground() {
+          fetch('/api/public/detect-portal', { cache: 'no-store' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              try {
+                localStorage.setItem(CACHE_KEY, JSON.stringify({
+                  portal: data.portal || 'customer',
+                  branding: data.branding || null,
+                  clientIp: data.client_ip || null,
+                  ts: Date.now()
+                }));
+              } catch(e) {}
+            })
+            .catch(function() {});
+        }
+      })();
+    </script>
   </head>
-  
-  <body data-build-ts="2026-05-29 20:20:00 UTC">
-    
+
+  <body>
     <div id="app-preloader">
-      <div class="loader-container">
-        <div class="logo-ring"></div>
-        <div class="loader-content">
-          <div class="loader-brand">R</div>
-          <div class="loader-tagline">Rusto Elite</div>
+
+      <!-- Default Rusto loader (customer portal / unknown) -->
+      <div id="default-preloader">
+        <div class="loader-container">
+          <div class="logo-ring"></div>
+          <div class="loader-content">
+            <div class="loader-brand">R</div>
+            <div class="loader-tagline">Rusto Elite</div>
+          </div>
         </div>
       </div>
+
+      <!-- Lodge-branded loader (PMS portal) — shown by JS above -->
+      <div id="lodge-preloader">
+        <img id="lodge-preloader-logo" src="" alt="Lodge Logo" />
+        <div id="lodge-preloader-name" style="font-family:'Outfit',sans-serif;font-size:30px;font-weight:700;color:#E8A020;"></div>
+        <div id="lodge-preloader-ring"></div>
+        <div id="lodge-preloader-tagline" style="font-size:11px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.4);">Loading…</div>
+      </div>
+
     </div>
 
     <div id="root"></div>
@@ -173,30 +316,27 @@
     <script type="module" src="/src/main.jsx"></script>
 
     <script>
+      /* Service Worker registration */
       if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
+        window.addEventListener("load", function() {
           navigator.serviceWorker.register("/sw.js", { scope: "/" })
-            .then((reg) => {
-              const fireUpdateAvailable = (worker) => {
-                window.dispatchEvent(new CustomEvent("sw:update-available", {
-                  detail: { worker, registration: reg },
-                }));
+            .then(function(reg) {
+              var fireUpdate = function(worker) {
+                window.dispatchEvent(new CustomEvent("sw:update-available", { detail: { worker, registration: reg } }));
               };
-              if (reg.waiting) fireUpdateAvailable(reg.waiting);
-              reg.addEventListener("updatefound", () => {
-                const installing = reg.installing;
-                if (!installing) return;
-                installing.addEventListener("statechange", () => {
-                  if (installing.state === "installed" && navigator.serviceWorker.controller) {
-                    fireUpdateAvailable(installing);
-                  }
+              if (reg.waiting) fireUpdate(reg.waiting);
+              reg.addEventListener("updatefound", function() {
+                var inst = reg.installing;
+                if (!inst) return;
+                inst.addEventListener("statechange", function() {
+                  if (inst.state === "installed" && navigator.serviceWorker.controller) fireUpdate(inst);
                 });
               });
             })
-            .catch((err) => console.warn("[SW] Global ecosystem registration failed:", err));
+            .catch(function(err) { console.warn("[SW] Registration failed:", err); });
 
-          let refreshing = false;
-          navigator.serviceWorker.addEventListener("controllerchange", () => {
+          var refreshing = false;
+          navigator.serviceWorker.addEventListener("controllerchange", function() {
             if (refreshing) return;
             refreshing = true;
             window.location.reload();
@@ -204,12 +344,14 @@
         });
       }
 
-      // Automatically strip the preloader shield once React successfully initiates layout injection
-      window.addEventListener('DOMContentLoaded', () => {
-        // Delayed slightly to yield thread processing to React execution engine
-        setTimeout(() => {
-          document.body.classList.add('app-loaded');
-        }, 150);
+      /* Dismiss preloader once React mounts */
+      window.addEventListener('DOMContentLoaded', function() {
+        // Small delay to let React paint first frame
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            document.body.classList.add('app-loaded');
+          });
+        });
       });
     </script>
   </body>

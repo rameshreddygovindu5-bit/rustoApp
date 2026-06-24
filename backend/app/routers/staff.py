@@ -41,10 +41,10 @@ from ..database import get_db
 from ..models import User, UserRole, Lodge
 from ..auth import (get_current_user, require_admin, get_password_hash,
                      verify_password)
-from ..permissions import (PERMISSION_CATALOG, PERMISSION_KEYS,
-                             PERMISSION_KEY_SET, LEGACY_STAFF_DEFAULTS,
+from ..permissions import (PERMISSION_CATALOG, PERMISSION_CATALOG_V2, ROLE_PRESETS,
+                             PERMISSION_KEYS, PERMISSION_KEY_SET, LEGACY_STAFF_DEFAULTS,
                              parse_permissions, serialize_permissions,
-                             effective_permissions)
+                             effective_permissions, apply_preset)
 # Reuse the unambiguous-alphabet password generator from registration.
 from .lodge_registration import _generate_password
 from ..services.audit_service import log_audit
@@ -67,6 +67,7 @@ def _user_to_dict(u: User, include_permissions_detail: bool = True) -> dict:
         "last_login":   u.last_login.isoformat() if u.last_login else None,
         "created_at":   u.created_at.isoformat() if u.created_at else None,
         "totp_enabled": bool(u.totp_enabled),
+        "require_login_otp": bool(getattr(u, "require_login_otp", False)),
     }
     if include_permissions_detail:
         parsed = parse_permissions(u.permissions)
@@ -116,16 +117,58 @@ def _resolve_lodge_id(current_user: User, db: Session,
 
 @router.get("/permissions")
 def get_permission_catalog(current_user: User = Depends(require_admin)):
-    """Return the permission catalog so the UI can render toggles
-    grouped by section."""
+    """Return the enriched permission catalog + role presets for the
+    staff access control UI. Presets give admins one-click starting points."""
     return {
-        "permissions": [
-            {"key": key, "group": group, "label": label, "description": desc}
-            for key, group, label, desc in PERMISSION_CATALOG
-        ],
-        # The "default" preset used when creating a new staff member.
+        # Full catalog with module, risk level, and group
+        "permissions": PERMISSION_CATALOG_V2,
+        # Named role presets — admin picks a template, then fine-tunes
+        "presets": {
+            key: {
+                "key":         key,
+                "label":       p["label"],
+                "icon":        p["icon"],
+                "description": p["description"],
+                "permissions": sorted(p["permissions"]),
+                "count":       len(p["permissions"]),
+            }
+            for key, p in ROLE_PRESETS.items()
+        },
         "default_keys": sorted(LEGACY_STAFF_DEFAULTS),
     }
+
+
+@router.post("/{user_id}/apply-preset")
+def apply_staff_preset(user_id: int, body: dict, request: Request,
+                        current_user: User = Depends(require_admin),
+                        db: Session = Depends(get_db)):
+    """One-click apply a named role preset to a staff member.
+    Admin can then further customize individual toggles."""
+    preset_key = body.get("preset")
+    if not preset_key or preset_key not in ROLE_PRESETS:
+        from fastapi import HTTPException
+        raise HTTPException(400, f"Unknown preset '{preset_key}'. Valid: {list(ROLE_PRESETS.keys())}")
+    u = db.query(User).filter(User.user_id == user_id).first()
+    if not u:
+        from fastapi import HTTPException
+        raise HTTPException(404, "Staff member not found")
+    _enforce_lodge_scope(u, current_user)
+    if u.role != UserRole.staff:
+        from fastapi import HTTPException
+        raise HTTPException(400, "Presets only apply to staff users")
+    perm_set = apply_preset(preset_key)
+    u.permissions = serialize_permissions(perm_set)
+    db.commit(); db.refresh(u)
+    try:
+        log_audit(db, "staff.preset_applied",
+                  actor_user_id=current_user.user_id,
+                  actor_username=current_user.username,
+                  entity_type="user", entity_id=u.user_id,
+                  lodge_id=u.lodge_id,
+                  details={"preset": preset_key, "permissions_count": len(perm_set)},
+                  ip_address=request.client.host if request.client else None)
+    except Exception: pass
+    return {**_user_to_dict(u), "preset_applied": preset_key}
 
 
 # ── List ───────────────────────────────────────────────────────────

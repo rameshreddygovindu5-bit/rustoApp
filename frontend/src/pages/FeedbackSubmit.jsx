@@ -75,7 +75,7 @@ export default function FeedbackSubmit() {
         <div className="bg-white rounded-xl shadow-xl p-8 max-w-md text-center">
           <AlertCircle size={48} className="mx-auto text-red-400 mb-3"/>
           <h1 className="text-xl font-display font-bold text-navy mb-2">Link Invalid</h1>
-          <p className="text-gray-500 text-sm">{error}</p>
+          <p className="text-ink-500 text-sm">{error}</p>
           <Link to="/" className="btn-back-home-light mt-6">
             <ArrowLeft size={13} /> Back to Rusto Home
           </Link>
@@ -89,7 +89,7 @@ export default function FeedbackSubmit() {
         <div className="bg-white rounded-xl shadow-xl p-8 max-w-md text-center">
           <CheckCircle size={48} className="mx-auto text-green-500 mb-3"/>
           <h1 className="text-2xl font-display font-bold text-navy mb-2">Thank You!</h1>
-          <p className="text-gray-500">Your feedback has been recorded. We appreciate you taking the time to share it.</p>
+          <p className="text-ink-500">Your feedback has been recorded. We appreciate you taking the time to share it.</p>
           <Link to="/" className="btn-back-home-light mt-6">
             <ArrowLeft size={13} /> Discover more stays on Rusto
           </Link>
@@ -125,7 +125,7 @@ export default function FeedbackSubmit() {
             <textarea value={form.comment}
                       onChange={e => setForm(s => ({ ...s, comment: e.target.value }))}
                       rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="w-full px-3 py-2 border border-ink-300 rounded-lg"
                       placeholder="(optional) tell us what made your stay great, or what we could do better" />
           </div>
           <div>
@@ -133,13 +133,13 @@ export default function FeedbackSubmit() {
             <div className="flex gap-2">
               <button type="button" onClick={() => setForm(s => ({ ...s, would_recommend: true }))}
                       className={`flex-1 py-2 rounded-lg border-2 flex items-center justify-center gap-2 ${
-                        form.would_recommend === true ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500'
+                        form.would_recommend === true ? 'border-green-500 bg-green-50 text-green-700' : 'border-ivory-200 text-ink-500'
                       }`}>
                 <ThumbsUp size={16}/> Yes
               </button>
               <button type="button" onClick={() => setForm(s => ({ ...s, would_recommend: false }))}
                       className={`flex-1 py-2 rounded-lg border-2 flex items-center justify-center gap-2 ${
-                        form.would_recommend === false ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'
+                        form.would_recommend === false ? 'border-red-500 bg-red-50 text-red-700' : 'border-ivory-200 text-ink-500'
                       }`}>
                 <ThumbsDown size={16}/> No
               </button>
@@ -150,13 +150,13 @@ export default function FeedbackSubmit() {
               <label className="block text-sm font-medium text-navy mb-1">Your name</label>
               <input type="text" value={form.guest_name}
                      onChange={e => setForm(s => ({ ...s, guest_name: e.target.value }))}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                     className="w-full px-3 py-2 border border-ink-300 rounded-lg"
                      placeholder="(optional)" />
             </div>
           )}
           {error && <p className="text-red-600 text-sm">{error}</p>}
           <button type="submit" disabled={saving}
-                  className="w-full py-3 bg-gold hover:bg-gold/90 text-white font-semibold rounded-lg flex items-center justify-center gap-2 disabled:opacity-50">
+                  className="w-full py-3 bg-gold hover:bg-gold/90 text-navy-dark font-semibold rounded-lg flex items-center justify-center gap-2 disabled:opacity-50">
             <Send size={16}/> {saving ? 'Submitting…' : 'Submit Feedback'}
           </button>
         </div>
@@ -173,7 +173,7 @@ function BigStarPicker({ label, value, onChange }) {
         {[1, 2, 3, 4, 5].map(n => (
           <button key={n} type="button" onClick={() => onChange(n === value ? 0 : n)}>
             <Star size={36}
-                  className={n <= value ? 'text-amber-400 fill-amber-400' : 'text-gray-200 hover:text-amber-200'} />
+                  className={n <= value ? 'text-amber-400 fill-amber-400' : 'text-ink-200 hover:text-amber-200'} />
           </button>
         ))}
       </div>
@@ -184,12 +184,12 @@ function BigStarPicker({ label, value, onChange }) {
 function SmallStarPicker({ label, value, onChange }) {
   return (
     <div>
-      <label className="block text-xs text-gray-600 mb-1">{label}</label>
+      <label className="block text-xs text-ink-600 mb-1">{label}</label>
       <div className="flex gap-0.5">
         {[1, 2, 3, 4, 5].map(n => (
           <button key={n} type="button" onClick={() => onChange(n === value ? 0 : n)}>
             <Star size={18}
-                  className={n <= value ? 'text-amber-400 fill-amber-400' : 'text-gray-200 hover:text-amber-200'} />
+                  className={n <= value ? 'text-amber-400 fill-amber-400' : 'text-ink-200 hover:text-amber-200'} />
           </button>
         ))}
       </div>

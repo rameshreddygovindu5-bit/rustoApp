@@ -7,7 +7,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from ..database import get_db
 from ..models import Agency, AgencyApiCall, AgencyStatus, Booking, BookingStatus
@@ -113,7 +119,7 @@ def get_agency_detail(agency_id: int, db: Session = Depends(get_db),
                                                    BookingStatus.checked_in,
                                                    BookingStatus.pending]))
                        .count())
-    last24h = datetime.utcnow() - timedelta(hours=24)
+    last24h = _utcnow() - timedelta(hours=24)
     api_calls_24h = (db.query(AgencyApiCall)
                      .filter(AgencyApiCall.agency_id == agency_id,
                              AgencyApiCall.lodge_id == lodge_id,
@@ -206,14 +212,14 @@ def update_agency(agency_id: int, body: AgencyUpdate, request: Request,
     if not a:
         raise HTTPException(status_code=404, detail="Agency not found")
 
-    for k, v in body.dict(exclude_unset=True).items():
+    for k, v in body.model_dump(exclude_unset=True).items():
         setattr(a, k, v)
     db.commit()
 
     log_audit(db, "agency.updated",
               actor_user_id=current_user.user_id, actor_username=current_user.username,
               entity_type="agency", entity_id=agency_id,
-              details=body.dict(exclude_unset=True),
+              details=body.model_dump(exclude_unset=True),
               ip_address=request.client.host if request.client else None)
     return _agency_dict(a)
 

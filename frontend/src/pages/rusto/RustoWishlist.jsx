@@ -1,137 +1,129 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  Heart, MapPin, Star, IndianRupee, Building2,
-  Loader2, Trash2, ArrowRight, Sparkles
-} from "lucide-react";
-import { toast } from "react-toastify";
-import { rustoWishlistAPI } from "../../services/api";
+import { Heart, MapPin, Star, Trash2, Loader2, ArrowRight } from "lucide-react";
 import { useCustomerAuth } from "../../context/CustomerAuthContext";
+import { rustoWishlistAPI } from "../../services/api";
+import { toast } from "react-toastify";
 
 export default function RustoWishlist() {
-  const { customer, loading: authLoading } = useCustomerAuth();
+  const { customer, loading:authLoading } = useCustomerAuth();
   const navigate = useNavigate();
-  const [items, setItems] = useState([]);
+  const [items, setItems]   = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!authLoading && !customer) navigate("/signin?next=/wishlist");
-  }, [customer, authLoading, navigate]);
-
-  useEffect(() => {
-    if (!customer) return;
+  useEffect(()=>{
+    if(!authLoading&&!customer){ navigate("/signin?next=/wishlist",{replace:true}); return; }
+    if(!customer) return;
     rustoWishlistAPI.list()
-      .then(r => setItems(r.data.saved || []))
-      .catch(() => setItems([]))
-      .finally(() => setLoading(false));
-  }, [customer]);
+      .then(r=>setItems(r.data?.saved||[]))
+      .catch(()=>{})
+      .finally(()=>setLoading(false));
+  },[customer,authLoading,navigate]);
 
-  const unsave = async (code) => {
-    try {
+  const remove = async code => {
+    try{
       await rustoWishlistAPI.unsave(code);
-      setItems(prev => prev.filter(l => l.code !== code));
+      setItems(p=>p.filter(l=>l.code!==code));
       toast.success("Removed from wishlist");
-    } catch {
-      toast.error("Failed to remove");
-    }
+    } catch{ toast.error("Could not remove"); }
   };
 
-  if (authLoading || loading) return (
-    <div className="max-w-4xl mx-auto px-4 py-16 text-center">
-      <Loader2 size={28} className="mx-auto animate-spin text-gold mb-2"/>
-      <p className="text-ink-500 text-sm">Loading your wishlist…</p>
+  if(authLoading||loading) return(
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <Loader2 size={28} className="animate-spin" style={{color:"var(--text-muted,#94A3B8)"}}/>
     </div>
   );
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10 animate-fade-in">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
-          <Heart size={20} className="text-red-500 fill-red-500"/>
-        </div>
-        <div>
-          <h1 className="font-display text-2xl font-bold text-navy">My Wishlist</h1>
-          <p className="text-sm text-ink-500">{items.length} saved lodge{items.length !== 1 ? "s" : ""}</p>
+    <div className="customer-page">
+      <div style={{background:"var(--surface,#FFFFFF)",borderBottom:"1px solid var(--border,#E2E8F0)"}}>
+        <div style={{maxWidth:900,margin:"0 auto",padding:"28px 20px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <Heart size={22} style={{color:"var(--c-heart, #EF4444)",fill:"var(--c-heart, #EF4444)"}}/>
+            <h1 style={{fontFamily:"var(--font-display)",fontWeight:700,
+              color:"var(--text-primary,#0F172A)",fontSize:24,margin:0}}>Wishlist</h1>
+            {items.length>0&&(
+              <span className="badge badge-neutral" style={{marginLeft:4}}>
+                {items.length} saved
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      {items.length === 0 ? (
-        <div className="text-center py-16 bg-ink-50 rounded-2xl border border-ink-100">
-          <Heart size={44} className="mx-auto text-ink-300 mb-3"/>
-          <h2 className="font-display text-lg font-semibold text-navy mb-1">Nothing saved yet</h2>
-          <p className="text-sm text-ink-500 mb-5">
-            Tap the heart icon on any lodge to save it for later.
-          </p>
-          <Link to="/search" className="btn-gold inline-flex items-center gap-1.5">
-            <Sparkles size={14}/> Explore Lodges
-          </Link>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {items.map((lodge, idx) => {
-            const fallbackImgs = [
-              "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80",
-              "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=800&q=80",
-              "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=800&q=80",
-              "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=800&q=80",
-              "https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=800&q=80"
-            ];
-            const codeHash = (lodge.code || "").split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-            const photo = lodge.cover_photo || lodge.featured_image_url || (lodge.photos && lodge.photos[0]) || fallbackImgs[codeHash % 5];
-            const price = lodge.starting_price || lodge.starting_tariff || (12500 - (idx % 4) * 1500);
-            const rating = lodge.avg_rating || (4.5 + (idx % 3) * 0.2).toFixed(1);
-            const locationStr = lodge.public_city || lodge.city || "India";
-            const stateStr = lodge.public_state || lodge.state;
-
-            return (
-              <div key={lodge.code}
-                   className="card group overflow-hidden hover:shadow-lg transition-all duration-300">
-                {/* Cover photo */}
-                <div className="relative -mx-4 -mt-4 mb-3 h-40 bg-navy/10 overflow-hidden rounded-t-xl">
-                  <img src={photo} alt={lodge.name}
-                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
-                  <button onClick={() => unsave(lodge.code)}
-                          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90
-                                     flex items-center justify-center shadow-sm
-                                     hover:bg-red-50 transition-colors">
-                    <Heart size={16} className="text-red-500 fill-red-500"/>
+      <div style={{maxWidth:900,margin:"0 auto",padding:"32px 20px"}}>
+        {items.length===0 ? (
+          <div className="card" style={{textAlign:"center",padding:"72px 20px"}}>
+            <Heart size={52} style={{color:"var(--border,#E2E8F0)",margin:"0 auto 16px"}}/>
+            <h2 style={{fontFamily:"var(--font-display)",fontWeight:700,
+              color:"var(--text-primary,#0F172A)",fontSize:20,marginBottom:8}}>
+              Your wishlist is empty
+            </h2>
+            <p style={{fontSize:14,color:"var(--text-body,#475569)",marginBottom:24,maxWidth:300,margin:"0 auto 24px"}}>
+              Tap the heart icon on any property to save it here for later.
+            </p>
+            <Link to="/search" className="btn btn-p"
+              style={{padding:"12px 28px",borderRadius:"var(--r-md)"}}>
+              Browse properties <ArrowRight size={15}/>
+            </Link>
+          </div>
+        ) : (
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:20}}>
+            {items.map(lodge=>(
+              <div key={lodge.code} className="card" style={{overflow:"hidden"}}>
+                <div style={{position:"relative",height:180,overflow:"hidden",background:"var(--surface-2,#F1F5F9)"}}>
+                  <img
+                    src={lodge.photos?.[0]?.url||"https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&q=80"}
+                    alt={lodge.name}
+                    style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  <button onClick={()=>remove(lodge.code)}
+                    style={{position:"absolute",top:12,right:12,width:32,height:32,
+                      borderRadius:"50%",background:"rgba(255,255,255,0.9)",
+                      border:"none",cursor:"pointer",display:"flex",alignItems:"center",
+                      justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.15)"}}
+                    title="Remove from wishlist">
+                    <Trash2 size={13} style={{color:"var(--c-heart, #EF4444)"}}/>
                   </button>
                 </div>
-
-                {/* Details */}
-                <div className="space-y-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-navy leading-tight line-clamp-1">{lodge.name}</h3>
-                    <span className="flex items-center gap-0.5 text-amber-600 text-xs font-bold shrink-0">
-                      <Star size={11} className="fill-amber-400 text-amber-400"/>
-                      {rating}
-                    </span>
+                <div style={{padding:"14px 16px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",gap:8,marginBottom:4}}>
+                    <p style={{fontWeight:700,color:"var(--text-primary,#0F172A)",fontSize:14,
+                      flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {lodge.name}
+                    </p>
+                    {lodge.avg_rating&&(
+                      <span style={{display:"flex",alignItems:"center",gap:3,
+                        fontSize:12,fontWeight:700,color:"var(--brand-gold-dark,#A8873C)",flexShrink:0}}>
+                        <Star size={11} style={{fill:"var(--brand-gold,#C9A84C)",color:"var(--brand-gold,#C9A84C)"}}/>
+                        {Number(lodge.avg_rating).toFixed(1)}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-ink-500 flex items-center gap-1">
-                    <MapPin size={11}/> {locationStr}{stateStr ? `, ${stateStr}` : ""}
+                  <p style={{fontSize:12,color:"var(--text-body,#475569)",
+                    display:"flex",alignItems:"center",gap:4,marginBottom:14}}>
+                    <MapPin size={11}/>
+                    {lodge.public_city}{lodge.public_state?`, ${lodge.public_state}`:""}
                   </p>
-                  <p className="text-sm font-bold text-gold flex items-center gap-0.5">
-                    <IndianRupee size={13}/>
-                    {Math.round(price).toLocaleString("en-IN")}
-                    <span className="font-normal text-ink-500 text-xs">/night</span>
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-ink-100">
-                  <Link to={`/lodges/${lodge.code}`}
-                        className="flex-1 btn-gold text-xs py-1.5 text-center flex items-center justify-center gap-1">
-                    View Lodge <ArrowRight size={12}/>
-                  </Link>
-                  <button onClick={() => unsave(lodge.code)}
-                          className="p-1.5 rounded-lg border border-ink-200 hover:bg-red-50 hover:border-red-200 transition-colors">
-                    <Trash2 size={14} className="text-ink-400 hover:text-red-500"/>
-                  </button>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                    paddingTop:12,borderTop:"1px solid var(--border-soft,#F1F5F9)"}}>
+                    <div>
+                      <span style={{fontSize:11,color:"var(--text-muted,#94A3B8)",textTransform:"uppercase"}}>from </span>
+                      <span style={{fontWeight:800,color:"var(--text-primary,#0F172A)",fontSize:17}}>
+                        ₹{(lodge.starting_tariff||lodge.starting_price||1200).toLocaleString("en-IN")}
+                      </span>
+                      <span style={{fontSize:12,color:"var(--text-muted,#94A3B8)"}}>/night</span>
+                    </div>
+                    <Link to={`/lodges/${lodge.code}`} className="btn btn-p"
+                      style={{padding:"7px 14px",borderRadius:"var(--r-sm)",fontSize:13}}>
+                      View <ArrowRight size={12}/>
+                    </Link>
+                  </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

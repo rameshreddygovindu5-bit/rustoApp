@@ -45,17 +45,17 @@ export default function Feedback() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold text-navy">Guest Feedback</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-ink-500 text-sm mt-1">
             Post-stay surveys auto-requested on checkout. Submission links expire in 30 days.
           </p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowRequest(true)}
-                  className="bg-white hover:bg-gray-50 border border-gray-300 text-navy px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium">
+                  className="bg-white hover:bg-ink-50 border border-ink-300 text-navy px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium">
             <Send size={14}/> Send link
           </button>
           <button onClick={() => setShowStaffEntry(true)}
-                  className="bg-gold hover:bg-gold/90 text-white px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium shadow-sm">
+                  className="bg-gold hover:bg-gold/90 text-navy-dark px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium shadow-sm">
             <Plus size={14}/> Manual entry
           </button>
         </div>
@@ -83,7 +83,7 @@ export default function Feedback() {
 
       {/* Rating distribution */}
       {stats && stats.submitted > 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-2xl shadow-card border border-ink-100 p-4">
           <h3 className="font-semibold text-navy mb-3 text-sm">Rating Distribution</h3>
           <div className="space-y-1.5">
             {[5, 4, 3, 2, 1].map(n => {
@@ -92,11 +92,11 @@ export default function Feedback() {
               return (
                 <div key={n} className="flex items-center gap-2 text-xs">
                   <span className="w-6 font-medium">{n} ★</span>
-                  <div className="flex-1 h-3 bg-gray-100 rounded overflow-hidden">
+                  <div className="flex-1 h-3 bg-ink-100 rounded overflow-hidden">
                     <div className={`h-full ${n >= 4 ? 'bg-green-500' : n >= 3 ? 'bg-amber-500' : 'bg-red-500'}`}
                          style={{ width: `${pct}%` }} />
                   </div>
-                  <span className="w-12 text-right text-gray-500">{c} ({pct.toFixed(0)}%)</span>
+                  <span className="w-12 text-right text-ink-500">{c} ({pct.toFixed(0)}%)</span>
                 </div>
               )
             })}
@@ -105,11 +105,11 @@ export default function Feedback() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200">
+      <div className="flex gap-2 border-b border-ink-200">
         {[['all', 'All'], ['submitted', 'Submitted'], ['pending', 'Pending']].map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)}
                   className={`px-4 py-2 text-sm font-medium border-b-2 ${
-                    tab === k ? 'border-gold text-gold' : 'border-transparent text-gray-500 hover:text-navy'
+                    tab === k ? 'border-gold text-gold' : 'border-transparent text-ink-500 hover:text-navy'
                   }`}>
             {l}
           </button>
@@ -117,11 +117,11 @@ export default function Feedback() {
       </div>
 
       {loading ? (
-        <div className="text-gray-400 text-center py-12">Loading…</div>
+        <div className="text-ink-400 text-center py-12">Loading…</div>
       ) : rows.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <MessageSquare size={40} className="mx-auto text-gray-300 mb-3"/>
-          <p className="text-gray-500">No feedback in this view.</p>
+          <MessageSquare size={40} className="mx-auto text-ink-300 mb-3"/>
+          <p className="text-ink-500">No feedback in this view.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -148,10 +148,10 @@ function StatCard({ label, value, subtitle, accent }) {
     red: 'text-red-600',
   }[accent] || 'text-navy'
   return (
-    <div className="bg-white rounded-xl shadow-sm p-4">
-      <div className="text-[11px] uppercase tracking-wide text-gray-500">{label}</div>
+    <div className="bg-white rounded-2xl shadow-card border border-ink-100 p-4">
+      <div className="text-[11px] uppercase tracking-wide text-ink-500">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${accentClass}`}>{value}</div>
-      {subtitle && <div className="text-[11px] text-gray-400 mt-0.5">{subtitle}</div>}
+      {subtitle && <div className="text-[11px] text-ink-400 mt-0.5">{subtitle}</div>}
     </div>
   )
 }
@@ -162,16 +162,16 @@ function FeedbackCard({ row, onResent }) {
   const submitted = !!row.submitted_at
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+    <div className="bg-white rounded-2xl shadow-card border border-ink-100 p-4">
       <div className="flex justify-between items-start mb-2">
         <div>
           <div className="font-semibold text-navy">{row.guest_name || '(unnamed guest)'}</div>
-          <div className="text-[11px] text-gray-400">
+          <div className="text-[11px] text-ink-400">
             {submitted
               ? `Submitted ${new Date(row.submitted_at).toLocaleString()}`
               : `Pending — requested ${new Date(row.created_at).toLocaleDateString()}`}
             {submitted && row.submission_source && (
-              <span className="ml-2 px-1.5 py-0.5 bg-gray-100 rounded text-[10px] uppercase">{row.submission_source}</span>
+              <span className="ml-2 px-1.5 py-0.5 bg-ink-100 rounded text-[10px] uppercase">{row.submission_source}</span>
             )}
           </div>
         </div>
@@ -186,14 +186,14 @@ function FeedbackCard({ row, onResent }) {
         <>
           <Stars n={row.overall_rating}/>
           {row.comment && (
-            <p className="text-sm text-gray-600 mt-2 italic">"{row.comment}"</p>
+            <p className="text-sm text-ink-600 mt-2 italic">"{row.comment}"</p>
           )}
           {(row.cleanliness_rating || row.service_rating || row.value_rating || row.location_rating) && (
-            <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-1 text-xs">
-              {row.cleanliness_rating && <div><span className="text-gray-500">Cleanliness:</span> <strong>{row.cleanliness_rating}★</strong></div>}
-              {row.service_rating && <div><span className="text-gray-500">Service:</span> <strong>{row.service_rating}★</strong></div>}
-              {row.value_rating && <div><span className="text-gray-500">Value:</span> <strong>{row.value_rating}★</strong></div>}
-              {row.location_rating && <div><span className="text-gray-500">Location:</span> <strong>{row.location_rating}★</strong></div>}
+            <div className="mt-3 pt-3 border-t border-ink-100 grid grid-cols-2 gap-1 text-xs">
+              {row.cleanliness_rating && <div><span className="text-ink-500">Cleanliness:</span> <strong>{row.cleanliness_rating}★</strong></div>}
+              {row.service_rating && <div><span className="text-ink-500">Service:</span> <strong>{row.service_rating}★</strong></div>}
+              {row.value_rating && <div><span className="text-ink-500">Value:</span> <strong>{row.value_rating}★</strong></div>}
+              {row.location_rating && <div><span className="text-ink-500">Location:</span> <strong>{row.location_rating}★</strong></div>}
             </div>
           )}
         </>
@@ -209,9 +209,9 @@ function Stars({ n }) {
     <div className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map(i => (
         <Star key={i} size={18}
-              className={i <= (n || 0) ? 'text-amber-400 fill-amber-400' : 'text-gray-200'} />
+              className={i <= (n || 0) ? 'text-amber-400 fill-amber-400' : 'text-ink-200'} />
       ))}
-      <span className="ml-2 font-semibold text-gray-700">{n}/5</span>
+      <span className="ml-2 font-semibold text-ink-700">{n}/5</span>
     </div>
   )
 }
@@ -239,7 +239,7 @@ function PendingRow({ row, onResent }) {
     }
   }
   return (
-    <div className="text-xs text-gray-500 space-y-2">
+    <div className="text-xs text-ink-500 space-y-2">
       <p>Awaiting guest submission. Link expires {row.token_expires_at ? new Date(row.token_expires_at).toLocaleDateString() : 'in 30 days'}.</p>
       <button onClick={handleResend}
               className="px-2.5 py-1 bg-gold/10 hover:bg-gold/20 text-gold rounded text-xs font-medium inline-flex items-center gap-1">
@@ -275,22 +275,22 @@ function RequestLinkModal({ onClose, onSent }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <form onSubmit={submit} className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-ink-100">
           <h2 className="font-display font-bold text-navy text-lg">Generate Feedback Link</h2>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
+          <button type="button" onClick={onClose} className="text-ink-400 hover:text-ink-600"><X size={20}/></button>
         </div>
         <div className="p-5 space-y-3">
           <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Check-in ID *</label>
+            <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Check-in ID *</label>
             <input type="number" value={checkinId} onChange={e => setCheckinId(e.target.value)}
-                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                   className="input-field"
                    placeholder="e.g. 142" autoFocus />
-            <p className="text-[11px] text-gray-400 mt-1">Find this in Check-ins → click the row to see its ID.</p>
+            <p className="text-[11px] text-ink-400 mt-1">Find this in Check-ins → click the row to see its ID.</p>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Expires in (days)</label>
+            <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Expires in (days)</label>
             <input type="number" min="1" max="90" value={days} onChange={e => setDays(e.target.value)}
-                   className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                   className="input-field" />
           </div>
           {generated && (
             <div className="bg-green-50 border border-green-200 rounded p-3">
@@ -299,13 +299,13 @@ function RequestLinkModal({ onClose, onSent }) {
             </div>
           )}
         </div>
-        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+        <div className="px-5 py-4 border-t border-ink-100 flex justify-end gap-2">
           <button type="button" onClick={() => { generated ? onSent() : onClose() }}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+                  className="px-4 py-2 text-ink-600 hover:bg-ink-100 rounded-lg">
             {generated ? 'Done' : 'Cancel'}
           </button>
           <button type="submit" disabled={saving}
-                  className="px-4 py-2 bg-gold text-white rounded-lg hover:bg-gold/90 disabled:opacity-50">
+                  className="px-4 py-2 bg-gold text-navy-dark rounded-lg hover:bg-gold/90 disabled:opacity-50">
             {saving ? '…' : 'Generate'}
           </button>
         </div>
@@ -351,23 +351,23 @@ function StaffEntryModal({ onClose, onSaved }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <form onSubmit={submit} className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-ink-100">
           <h2 className="font-display font-bold text-navy text-lg">Manual Feedback Entry</h2>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
+          <button type="button" onClick={onClose} className="text-ink-400 hover:text-ink-600"><X size={20}/></button>
         </div>
         <div className="p-5 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Guest Name</label>
+              <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Guest Name</label>
               <input type="text" value={form.guest_name}
                      onChange={e => set('guest_name', e.target.value)}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                     className="input-field" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Check-in ID</label>
+              <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Check-in ID</label>
               <input type="number" value={form.checkin_id}
                      onChange={e => set('checkin_id', e.target.value)}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                     className="input-field"
                      placeholder="optional" />
             </div>
           </div>
@@ -379,26 +379,26 @@ function StaffEntryModal({ onClose, onSaved }) {
             <StarPicker label="Location" value={form.location} onChange={n => set('location', n)} small />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Comment</label>
+            <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Comment</label>
             <textarea value={form.comment} onChange={e => set('comment', e.target.value)}
-                      rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                      rows={3} className="input-field" />
           </div>
           <div className="flex gap-2 items-center text-sm">
-            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Would recommend?</span>
+            <span className="text-xs font-semibold text-ink-600 uppercase tracking-wide">Would recommend?</span>
             <button type="button" onClick={() => set('would_recommend', true)}
-                    className={`px-3 py-1 rounded text-xs flex items-center gap-1 ${form.would_recommend === true ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                    className={`px-3 py-1 rounded text-xs flex items-center gap-1 ${form.would_recommend === true ? 'bg-green-500 text-white' : 'bg-ink-100 text-ink-600'}`}>
               <ThumbsUp size={12}/> Yes
             </button>
             <button type="button" onClick={() => set('would_recommend', false)}
-                    className={`px-3 py-1 rounded text-xs flex items-center gap-1 ${form.would_recommend === false ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                    className={`px-3 py-1 rounded text-xs flex items-center gap-1 ${form.would_recommend === false ? 'bg-red-500 text-white' : 'bg-ink-100 text-ink-600'}`}>
               <ThumbsDown size={12}/> No
             </button>
           </div>
         </div>
-        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+        <div className="px-5 py-4 border-t border-ink-100 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-ink-600 hover:bg-ink-100 rounded-lg">Cancel</button>
           <button type="submit" disabled={saving}
-                  className="px-4 py-2 bg-gold text-white rounded-lg hover:bg-gold/90 disabled:opacity-50">
+                  className="px-4 py-2 bg-gold text-navy-dark rounded-lg hover:bg-gold/90 disabled:opacity-50">
             {saving ? 'Saving…' : 'Save Feedback'}
           </button>
         </div>
@@ -410,12 +410,12 @@ function StaffEntryModal({ onClose, onSaved }) {
 function StarPicker({ label, value, onChange, small = false }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">{label}</label>
+      <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">{label}</label>
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map(n => (
           <button key={n} type="button" onClick={() => onChange(n === value ? 0 : n)}>
             <Star size={small ? 16 : 22}
-                  className={n <= value ? 'text-amber-400 fill-amber-400' : 'text-gray-200 hover:text-amber-200'} />
+                  className={n <= value ? 'text-amber-400 fill-amber-400' : 'text-ink-200 hover:text-amber-200'} />
           </button>
         ))}
       </div>

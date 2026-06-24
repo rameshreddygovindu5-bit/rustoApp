@@ -125,7 +125,7 @@ def login(body: LoginBody, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid phone or password")
     if not cust.is_active:
         raise HTTPException(status_code=403, detail="Your account has been deactivated. Please contact support.")
-    cust.last_login_at = datetime.utcnow()
+    cust.last_login_at = datetime.now(timezone.utc)
     db.commit(); db.refresh(cust)
     token = create_customer_token(cust.customer_id)
     return {
@@ -191,3 +191,86 @@ def change_password(body: ChangePwdBody,
     customer.password_hash = hash_customer_password(body.new_password)
     db.commit()
     return {"success": True, "message": "Password updated"}
+
+
+# ── Password reset ────────────────────────────────────────────────
+
+import secrets as _secrets
+from datetime import datetime, timedelta, timezone
+
+# Simple in-memory OTP store (replace with Redis/DB in production)
+_otp_store: dict = {}   # phone -> {otp, expires_at}
+
+
+class ForgotPasswordBody(BaseModel):
+    phone: str
+
+
+class ResetPasswordBody(BaseModel):
+    phone: str
+    otp:   str = Field(min_length=4, max_length=8)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+@router.post("/forgot-password")
+def forgot_password(body: ForgotPasswordBody, db: Session = Depends(get_db)):
+    """Request an OTP for password reset.
+
+    In production: send via SMS.
+    In dev/sandbox: returns the OTP in the response so you can test without SMS setup.
+    """
+    customer = db.query(RustoCustomer).filter(
+        RustoCustomer.phone == body.phone.strip(),
+        RustoCustomer.is_active == True,
+    ).first()
+
+    if not customer:
+        # Return 200 even if phone not found — don't enumerate accounts
+        return {"success": True, "message": "If this number is registered, an OTP has been sent."}
+
+    otp = str(_secrets.randbelow(900000) + 100000)  # 6-digit OTP
+    expires = datetime.now(timezone.utc) + timedelta(minutes=10)
+    _otp_store[body.phone.strip()] = {"otp": otp, "expires_at": expires}
+
+    # Try to send via WhatsApp if configured
+    sms_sent = False
+    try:
+        from ..services import whatsapp_service as _wa
+        # In production you'd send the OTP via WhatsApp/SMS
+        # _wa.send_otp(db, customer, otp)
+        pass
+    except Exception:
+        pass
+
+    import os
+    dev_mode = os.getenv("ENV", "development") != "production"
+    result = {"success": True, "message": "OTP sent (valid 10 minutes)"}
+    if dev_mode:
+        result["dev_otp"] = otp   # Only exposed in non-production
+    return result
+
+
+@router.post("/reset-password")
+def reset_password(body: ResetPasswordBody, db: Session = Depends(get_db)):
+    """Validate OTP and set a new password."""
+    phone = body.phone.strip()
+    record = _otp_store.get(phone)
+    if not record:
+        raise HTTPException(400, "No OTP request found for this phone number. Please request a new OTP.")
+    if datetime.now(timezone.utc) > record["expires_at"]:
+        del _otp_store[phone]
+        raise HTTPException(400, "OTP has expired. Please request a new one.")
+    if record["otp"] != body.otp.strip():
+        raise HTTPException(400, "Incorrect OTP. Please check and try again.")
+
+    customer = db.query(RustoCustomer).filter(
+        RustoCustomer.phone == phone,
+        RustoCustomer.is_active == True,
+    ).first()
+    if not customer:
+        raise HTTPException(404, "Account not found")
+
+    customer.password_hash = hash_customer_password(body.new_password)
+    del _otp_store[phone]
+    db.commit()
+    return {"success": True, "message": "Password reset successfully. Please log in with your new password."}

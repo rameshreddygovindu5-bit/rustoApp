@@ -37,9 +37,15 @@ import re
 import json
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional, Dict, Any, List
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from sqlalchemy.orm import Session
 
@@ -184,7 +190,7 @@ class MockProvider(WhatsAppProvider):
     provider_name = "mock"
 
     def send_template(self, *, to_phone, template_name, template_lang, params):
-        fake_id = f"mock.{int(datetime.utcnow().timestamp() * 1000)}.{to_phone[-4:]}"
+        fake_id = f"mock.{int(_utcnow().timestamp() * 1000)}.{to_phone[-4:]}"
         logger.info("WhatsApp[mock] → %s template=%s params=%s",
                     to_phone, template_name, params)
         return {
@@ -348,11 +354,11 @@ def _send_template(db: Session, *, lodge: Lodge, customer: Optional[RustoCustome
 
     if result["ok"]:
         msg.status = WhatsAppMessageStatus.sent.value
-        msg.sent_at = datetime.utcnow()
+        msg.sent_at = _utcnow()
         msg.provider_message_id = result["provider_message_id"]
     else:
         msg.status = WhatsAppMessageStatus.failed.value
-        msg.failed_at = datetime.utcnow()
+        msg.failed_at = _utcnow()
         msg.error_code = result.get("error_code")
         msg.error_detail = result.get("error_detail")
         logger.warning("WhatsApp send failed lodge=%s phone=%s reason=%s: %s",
@@ -510,7 +516,7 @@ def apply_status_update(db: Session, *, provider_message_id: str,
         logger.warning("WhatsApp status webhook: unknown message id %s",
                        provider_message_id)
         return False
-    now = timestamp or datetime.utcnow()
+    now = timestamp or _utcnow()
 
     if new_status == WhatsAppMessageStatus.failed.value:
         # Failure is always honoured regardless of monotonic order — a

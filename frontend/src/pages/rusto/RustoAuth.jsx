@@ -1,375 +1,261 @@
-import React, { useState } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
-import { Phone, Lock, User, Mail,
-         ArrowRight, Loader2, Eye, EyeOff,
-         ShieldCheck, CheckCircle2, ArrowLeft, AlertCircle } from "lucide-react";
-import { toast } from "react-toastify";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Eye, EyeOff, Phone, Lock, User, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
 import { useCustomerAuth } from "../../context/CustomerAuthContext";
-import { RustoMark } from "../../components/RustoLogo/RustoLogo";
-import { useSettings } from "../../context/SettingsContext";
+import { toast } from "react-toastify";
 
-/**
- * Customer login + signup pages — split-screen cinematic design.
- *
- * Design intent: feel premium and welcoming, not transactional.
- *   - Left: a navy hero with brand mark, value proposition, and stats
- *     (filled background image-style with animated atmosphere)
- *   - Right: clean white form with progressive disclosure
- *   - Mobile: stacked, hero collapses to a slim branded header
- *
- * Honors the ?next= query param so we can deep-link the user back to
- * the page they were trying to reach (e.g., a lodge detail page).
- */
-export function RustoLogin()  { return <Auth mode="login"/>; }
-export function RustoSignup() { return <Auth mode="signup"/>; }
+export function RustoLogin()  { return <AuthPage mode="login"/>; }
+export function RustoSignup() { return <AuthPage mode="signup"/>; }
 
-function Auth({ mode }) {
-  const isSignup = mode === "signup";
-  const { login, signup } = useCustomerAuth();
-  const { settings } = useSettings();
-  const nav = useNavigate();
-  const loc = useLocation();
-  const nextUrl = new URLSearchParams(loc.search).get("next") || "/account";
+function AuthPage({ mode }) {
+  const [params]   = useSearchParams();
+  const navigate   = useNavigate();
+  const { customer, login, signup } = useCustomerAuth();
+  const isSignup   = mode === "signup";
+  const next       = params.get("next") || "/";
 
-  const [form, setForm] = useState({
-    full_name: "", phone: "", email: "", password: "",
-  });
-  const [submitting, setSubmitting] = useState(false);
-  const [showPwd, setShowPwd] = useState(false);
-  const [error, setError] = useState("");
+  const [form, setForm]         = useState({phone:"", password:"", full_name:""});
+  const [showPwd, setShowPwd]   = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState("");
+  const [fieldErr, setFieldErr] = useState({});
 
-  const submit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    setError("");
-    try {
-      if (isSignup) {
-        if (form.full_name.trim().length < 2 || form.phone.length < 7 || form.password.length < 8) {
-          setError("Fill all fields — password must be 8+ chars");
-          setSubmitting(false); return;
-        }
-        await signup(form);
-        toast.success(`Welcome to Rusto, ${form.full_name.split(" ")[0]}!`);
-      } else {
-        if (!form.phone || !form.password) {
-          setError("Please enter your phone number and password");
-          setSubmitting(false); return;
-        }
-        await login({ phone: form.phone, password: form.password });
-        toast.success("Welcome back");
-      }
-      nav(nextUrl);
-    } catch (err) {
-      let errMsg = "";
-      if (err.response?.data?.detail) {
-        const detail = err.response.data.detail;
-        if (typeof detail === "string") {
-          errMsg = detail;
-        } else if (Array.isArray(detail)) {
-          errMsg = detail.map(item => {
-            const field = item.loc ? item.loc[item.loc.length - 1] : "";
-            return `${field ? field + ": " : ""}${item.msg || "Invalid value"}`;
-          }).join(", ");
-        } else if (typeof detail === "object") {
-          errMsg = JSON.stringify(detail);
-        } else {
-          errMsg = String(detail);
-        }
-      } else {
-        errMsg = isSignup ? "Signup failed. Please try again." : "Invalid phone number or password. Please try again.";
-      }
-      setError(errMsg);
-      toast.error(errMsg);
-    } finally { setSubmitting(false); }
+  const [showForgot, setShowForgot] = useState(false);
+  const [fPhone, setFPhone]   = useState("");
+  const [fStep, setFStep]     = useState(1);
+  const [fOtp, setFOtp]       = useState("");
+  const [fPwd, setFPwd]       = useState("");
+  const [fLoading, setFLoading] = useState(false);
+  const [fMsg, setFMsg]       = useState({text:"", ok:false});
+
+  useEffect(()=>{ if(customer) navigate(next,{replace:true}); },[customer,navigate,next]);
+
+  const validate = () => {
+    const e = {};
+    if(isSignup && !form.full_name.trim()) e.full_name = "Your name is required";
+    if(!form.phone.match(/^\d{10}$/)) e.phone = "Enter a valid 10-digit number";
+    if(form.password.length < 8) e.password = "Must be at least 8 characters";
+    setFieldErr(e);
+    return !Object.keys(e).length;
   };
 
+  const submit = async e => {
+    e.preventDefault(); setError("");
+    if(!validate()) return;
+    setLoading(true);
+    try {
+      if(isSignup) await signup({phone:form.phone, password:form.password, full_name:form.full_name});
+      else          await login({phone:form.phone, password:form.password});
+      toast.success(isSignup ? "Account created! Welcome to Rusto." : "Welcome back!");
+      navigate(next,{replace:true});
+    } catch(e) {
+      const d = e.response?.data?.detail;
+      setError(typeof d==="string" ? d : Array.isArray(d) ? d.map(x=>x.msg).join(", ") :
+               isSignup ? "Signup failed — please try again." : "Incorrect phone or password.");
+    } finally { setLoading(false); }
+  };
+
+  const forgotSubmit = async () => {
+    setFLoading(true); setFMsg({text:"",ok:false});
+    try {
+      const { rustoAuthAPI } = await import("../../services/api");
+      if(fStep===1){
+        await rustoAuthAPI.forgotPassword({phone:fPhone});
+        setFStep(2); setFMsg({text:"OTP sent to your phone.",ok:true});
+      } else {
+        await rustoAuthAPI.resetPassword({phone:fPhone, otp:fOtp, new_password:fPwd});
+        setFMsg({text:"Password reset. You can sign in now.",ok:true});
+        setTimeout(()=>{ setShowForgot(false); setFStep(1); setFMsg({text:"",ok:false}); },2000);
+      }
+    } catch(e) {
+      setFMsg({text:e.response?.data?.detail||(fStep===1?"Phone not found.":"Reset failed."),ok:false});
+    } finally { setFLoading(false); }
+  };
+
+  const inp = (hasErr) => ({
+    display:"block", width:"100%", padding:"11px 14px 11px 40px", borderRadius:"var(--r-sm)",
+    fontSize:14, color:"var(--text-primary,#0F172A)", outline:"none", boxSizing:"border-box",
+    border: hasErr ? "1.5px solid var(--brand-error,#991B1B)" : "1.5px solid var(--border,#E2E8F0)",
+    background:"var(--surface,#FFFFFF)", fontFamily:"var(--font-body)", transition:"border-color .15s",
+  });
+
   return (
-    <div className="-mt-16 md:-mt-20 min-h-screen grid grid-cols-1 lg:grid-cols-2 relative overflow-hidden">
-      <style>{`
-        .hero-cinema::after {
-          background: linear-gradient(180deg, transparent 75%, #06151A 100%) !important;
-        }
-        @keyframes orb-float-1 {
-          0% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(40px, -60px) scale(1.15); }
-          100% { transform: translate(0, 0) scale(1); }
-        }
-        @keyframes orb-float-2 {
-          0% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(-30px, 40px) scale(0.9); }
-          100% { transform: translate(0, 0) scale(1); }
-        }
-        @keyframes card-glow {
-          0% { box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35); border-color: rgba(255, 255, 255, 0.1); }
-          50% { box-shadow: 0 8px 32px 0 rgba(212, 175, 55, 0.05), 0 0 20px rgba(212, 175, 55, 0.15); border-color: rgba(212, 175, 55, 0.35); }
-          100% { box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35); border-color: rgba(255, 255, 255, 0.1); }
-        }
-        .luxury-glow-card {
-          animation: card-glow 6s infinite ease-in-out !important;
-        }
-        .animated-orb-1 {
-          animation: orb-float-1 20s infinite ease-in-out !important;
-        }
-        .animated-orb-2 {
-          animation: orb-float-2 25s infinite ease-in-out !important;
-        }
-        .breathe-logo {
-          animation: logo-breathe 4s infinite ease-in-out !important;
-        }
-        @keyframes logo-breathe {
-          0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(212, 175, 55, 0.2)); }
-          50% { transform: scale(1.05); filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.5)); }
-        }
-        .btn-amber-glow-animated {
-          background: linear-gradient(135deg, #D4AF37 0%, #AA7C11 100%) !important;
-          color: #081C22 !important;
-          border-radius: 12px !important;
-          font-weight: 700 !important;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        }
-        .btn-amber-glow-animated:hover {
-          background: linear-gradient(135deg, #F5E7C4 0%, #D4AF37 100%) !important;
-          transform: translateY(-2px) !important;
-          box-shadow: 0 10px 25px rgba(212, 175, 55, 0.45) !important;
-        }
-        .luxury-glow-input:focus {
-          border-color: #D4AF37 !important;
-          box-shadow: 0 0 15px rgba(212, 175, 55, 0.25) !important;
-          background: rgba(255, 255, 255, 0.07) !important;
-        }
-      `}</style>
+    <div className="customer-page" style={{display:"flex", alignItems:"center", justifyContent:"center",
+      padding:"72px 20px", minHeight:"100vh"}}>
 
-      {/* Floating background elements */}
-      <div className="absolute top-[15%] left-[5%] w-80 h-80 rounded-full bg-gradient-to-br from-[#D4AF37]/10 to-transparent blur-[100px] pointer-events-none animated-orb-1 z-0" />
-      <div className="absolute bottom-[10%] right-[5%] w-96 h-96 rounded-full bg-gradient-to-br from-[#0B252C]/30 to-transparent blur-[120px] pointer-events-none animated-orb-2 z-0" />
+      {/* Forgot password modal */}
+      {showForgot && (
+        <div style={{position:"fixed",inset:0,zIndex:50,background:"rgba(0,0,0,0.5)",
+          display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div className="card" style={{maxWidth:400,width:"100%",padding:28,
+            boxShadow:"var(--s-xl)"}}>
+            <h2 style={{fontFamily:"var(--font-display)",fontWeight:700,
+              color:"var(--text-primary,#0F172A)",fontSize:20,marginBottom:8}}>
+              {fStep===1 ? "Reset password" : "Enter OTP"}
+            </h2>
+            <p style={{fontSize:13,color:"var(--text-body,#475569)",marginBottom:20}}>
+              {fStep===1 ? "We'll send a one-time code to your phone."
+                         : `Enter the code sent to +91 ${fPhone}.`}
+            </p>
+            {fStep===1 ? (
+              <>
+                <input value={fPhone} onChange={e=>setFPhone(e.target.value)}
+                  placeholder="10-digit phone" maxLength={10}
+                  style={{...inp(false), paddingLeft:14, marginBottom:12}}/>
+                <button onClick={forgotSubmit} disabled={fLoading||fPhone.length!==10}
+                  className="btn btn-p" style={{width:"100%",padding:"11px",borderRadius:"var(--r-sm)"}}>
+                  {fLoading?"Sending…":"Send OTP"}
+                </button>
+              </>
+            ) : (
+              <>
+                <input value={fOtp} onChange={e=>setFOtp(e.target.value)} placeholder="6-digit OTP"
+                  maxLength={6} style={{...inp(false), paddingLeft:14, textAlign:"center",
+                    fontSize:24,fontWeight:700,letterSpacing:"0.2em",marginBottom:10}}/>
+                <input value={fPwd} onChange={e=>setFPwd(e.target.value)} placeholder="New password"
+                  type="password" style={{...inp(false), paddingLeft:14, marginBottom:12}}/>
+                <button onClick={forgotSubmit} disabled={fLoading||!fOtp||!fPwd}
+                  className="btn btn-p" style={{width:"100%",padding:"11px",borderRadius:"var(--r-sm)"}}>
+                  {fLoading?"Resetting…":"Reset password"}
+                </button>
+              </>
+            )}
+            {fMsg.text && (
+              <p style={{marginTop:12, fontSize:13, display:"flex", alignItems:"center", gap:6,
+                color: fMsg.ok?"var(--brand-success,#166534)":"var(--brand-error,#991B1B)"}}>
+                {fMsg.ok?<CheckCircle size={14}/>:<AlertCircle size={14}/>}{fMsg.text}
+              </p>
+            )}
+            <button onClick={()=>{setShowForgot(false);setFStep(1);setFMsg({text:"",ok:false});}}
+              style={{display:"block",width:"100%",marginTop:14,fontSize:13,
+                color:"var(--text-muted,#94A3B8)",background:"none",border:"none",cursor:"pointer"}}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
-      {/* ═════════ LEFT: brand hero ═════════ */}
-      <aside className="relative hero-cinema text-white px-8 py-12 lg:py-16 lg:px-16
-                          flex flex-col justify-between overflow-hidden z-10">
-        <div className="hero-stars"/>
-        <div className="absolute top-1/3 -right-32 w-96 h-96 rounded-full bg-gold/20 blur-3xl
-                          animate-parallax-slow pointer-events-none"/>
-        <div className="absolute bottom-0 -left-24 w-96 h-96 rounded-full bg-navy/40 blur-3xl
-                          animate-parallax-slow pointer-events-none" style={{ animationDelay: "-9s" }}/>
-
-        <div className="relative">
-          {/* Brand */}
-          <Link to="/" className="inline-flex items-center gap-2.5 group">
-            <div className="group-hover:scale-105 transition-transform duration-300 animate-breathe">
-              <RustoMark size={44}/>
-            </div>
-            <div className="leading-tight">
-              <div className="font-display text-2xl font-bold tracking-tight">Rusto</div>
-              <div className="text-2xs tracking-eyebrow uppercase font-semibold text-gold/90">
-                Rest Everywhere
-              </div>
-            </div>
+      <div style={{width:"100%", maxWidth:420}}>
+        {/* Brand */}
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <Link to="/" style={{display:"inline-flex",alignItems:"center",gap:10,textDecoration:"none"}}>
+            <div style={{width:42,height:42,borderRadius:12,background:"var(--brand-navy,#1B2A4A)",
+              display:"flex",alignItems:"center",justifyContent:"center",
+              fontFamily:"var(--font-display)",fontWeight:800,fontSize:20,color:"var(--brand-gold,#C9A84C)"}}>R</div>
+            <span style={{fontFamily:"var(--font-display)",fontWeight:700,fontSize:22,color:"var(--text-primary,#0F172A)"}}>Rusto</span>
           </Link>
+          <h1 style={{fontFamily:"var(--font-display)",fontSize:24,fontWeight:700,
+            color:"var(--text-primary,#0F172A)",marginTop:28,marginBottom:6,letterSpacing:"-0.02em"}}>
+            {isSignup ? "Create your account" : "Sign in"}
+          </h1>
+          <p style={{fontSize:14,color:"var(--text-body,#475569)"}}>
+            {isSignup ? "Start booking and earn points on every stay." : "Book lodges, track stays, earn rewards."}
+          </p>
         </div>
 
-        <div className="relative max-w-md hidden lg:block">
-          {/* Headline */}
-          <p className="text-2xs uppercase tracking-eyebrow font-bold text-gold mb-3 animate-rise-up">
-            {isSignup ? "Join thousands of travellers" : "Welcome back to Rusto"}
-          </p>
-          <h2 className="font-display text-4xl xl:text-5xl font-bold leading-tight mb-4 animate-rise-up"
-              style={{ animationDelay: "150ms" }}>
-            {isSignup ? (
-              <>Your next great <span className="text-gold-drift">escape</span> awaits.</>
-            ) : (
-              <>Pick up <span className="text-gold-drift">right where</span> you left off.</>
-            )}
-          </h2>
-          <p className="text-white/70 leading-relaxed animate-rise-up"
-              style={{ animationDelay: "300ms" }}>
-            {isSignup
-              ? "From heritage havelis to seaside retreats — discover handpicked lodges across India with real availability and the best price guaranteed."
-              : "Sign in to access your bookings, saved lodges, and exclusive member rates."}
-          </p>
-
-          {/* Bullet list of perks (signup) or quick stats (login) */}
-          {isSignup ? (
-            <ul className="mt-8 space-y-3">
-              {[
-                "Member-only rates on every booking",
-                "Priority WhatsApp concierge",
-                "Free cancellation on most stays",
-                "Early access to new lodges",
-              ].map((b, i) => (
-                <li key={i} className="flex items-start gap-2.5 animate-rise-up"
-                    style={{ animationDelay: `${450 + i * 80}ms` }}>
-                  <CheckCircle2 size={18} className="text-gold flex-shrink-0 mt-0.5"/>
-                  <span className="text-white/85">{b}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="mt-8 grid grid-cols-3 gap-3">
-              {[
-                { value: `${settings.stat_lodges || "12"}+`, label: "Verified lodges" },
-                { value: `${settings.stat_customers || "2,480"}+`,  label: "Happy Guests" },
-                { value: "24/7", label: "Support" },
-              ].map((s, i) => (
-                <div key={i} className="glass-dark rounded-2xl p-4 text-center animate-rise-up"
-                      style={{ animationDelay: `${450 + i * 80}ms` }}>
-                  <p className="font-display text-2xl font-bold text-gold">{s.value}</p>
-                  <p className="text-2xs uppercase tracking-eyebrow font-semibold text-white/60 mt-1">
-                    {s.label}
-                  </p>
-                </div>
-              ))}
+        <div className="card" style={{padding:28}}>
+          {error && (
+            <div style={{padding:"12px 16px",background:"var(--brand-error-bg,#FEF2F2)",
+              border:"1px solid var(--brand-error-border,#FECACA)",borderRadius:"var(--r-sm)",
+              marginBottom:20,display:"flex",alignItems:"flex-start",gap:10}}>
+              <AlertCircle size={15} style={{color:"var(--brand-error,#991B1B)",marginTop:1,flexShrink:0}}/>
+              <p style={{fontSize:13,color:"var(--brand-error,#991B1B)"}}>{error}</p>
             </div>
           )}
-        </div>
 
-        <div className="relative hidden lg:flex items-center gap-2 text-2xs text-white/40">
-          <ShieldCheck size={13} className="text-green-400"/>
-          Bank-grade 256-bit encryption ·  Razorpay-secured payments
-        </div>
-      </aside>
-
-      {/* ═════════ RIGHT: form ═════════ */}
-      <div className="flex items-center justify-center p-4 sm:p-8 relative">
-        <div className="absolute top-6 right-6">
-          <Link to="/" className="btn-back-home">
-            <ArrowLeft size={13} /> Back to Home
-          </Link>
-        </div>
-        <div className="w-full max-w-md mt-12 lg:mt-0">
-          {/* Mobile brand (since left hero hidden) */}
-          <div className="lg:hidden text-center mb-6">
-            <Link to="/" className="inline-flex items-center gap-2">
-              <RustoMark size={44}/>
-              <span className="font-display text-2xl font-bold text-white">Rusto</span>
-            </Link>
-          </div>
-
-          {/* Form heading */}
-          <div className="text-center lg:text-left mb-6 animate-rise-up">
-            <h1 className="font-display text-3xl md:text-4xl font-bold text-white">
-              {isSignup ? "Create your account" : "Sign in"}
-            </h1>
-            <p className="text-white/60 mt-2 text-sm">
-              {isSignup
-                ? "Get started in under a minute. No payment required."
-                : "Welcome back. Enter your phone and password to continue."}
-            </p>
-          </div>
-
-          {/* Form card */}
-          <form onSubmit={submit}
-                className="glass-panel-lux luxury-glow-card p-6 md:p-8 space-y-4 animate-rise-scale"
-                style={{ animationDelay: "100ms" }}>
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/30 text-red-200 rounded-xl px-4 py-3 text-sm mb-4 flex items-center gap-2.5 animate-fade-in">
-                <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
-                <span>{error}</span>
+          <form onSubmit={submit}>
+            {isSignup && (
+              <div style={{marginBottom:16}}>
+                <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--text-secondary,#334155)",marginBottom:6}}>Full name</label>
+                <div style={{position:"relative"}}>
+                  <User size={14} style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",color:"var(--text-muted,#94A3B8)"}}/>
+                  <input value={form.full_name} placeholder="Your full name"
+                    onChange={e=>{setForm(p=>({...p,full_name:e.target.value}));setFieldErr(p=>({...p,full_name:""}));}}
+                    style={inp(fieldErr.full_name)}/>
+                </div>
+                {fieldErr.full_name&&<p style={{fontSize:12,color:"var(--brand-error,#991B1B)",marginTop:4}}>{fieldErr.full_name}</p>}
               </div>
             )}
-            {isSignup && (
-              <FormField label="Full name" required>
-                <FormInput Icon={User} placeholder="Arjun Mehta"
-                            value={form.full_name}
-                            onChange={v => setForm(f => ({...f, full_name: v}))}/>
-              </FormField>
-            )}
 
-            <FormField label="Phone number" required>
-              <FormInput Icon={Phone} type="tel" placeholder="9123456789" mono
-                          value={form.phone}
-                          onChange={v => setForm(f => ({...f, phone: v}))}/>
-            </FormField>
+            <div style={{marginBottom:16}}>
+              <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--text-secondary,#334155)",marginBottom:6}}>Phone number</label>
+              <div style={{position:"relative"}}>
+                <Phone size={14} style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",color:"var(--text-muted,#94A3B8)"}}/>
+                <input value={form.phone} placeholder="10-digit mobile" type="tel" inputMode="numeric" maxLength={10}
+                  onChange={e=>{setForm(p=>({...p,phone:e.target.value.replace(/\D/g,"").slice(0,10)}));setFieldErr(p=>({...p,phone:""}));}}
+                  style={inp(fieldErr.phone)}/>
+              </div>
+              {fieldErr.phone&&<p style={{fontSize:12,color:"var(--brand-error,#991B1B)",marginTop:4}}>{fieldErr.phone}</p>}
+            </div>
 
-            {isSignup && (
-              <FormField label="Email" hint="(optional — for receipts & updates)">
-                <FormInput Icon={Mail} type="email" placeholder="you@example.com"
-                            value={form.email}
-                            onChange={v => setForm(f => ({...f, email: v}))}/>
-              </FormField>
-            )}
-
-            <FormField label="Password" required>
-              <div className="relative">
-                <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40"/>
-                <input value={form.password} type={showPwd ? "text" : "password"}
-                        onChange={e => setForm(f => ({...f, password: e.target.value}))}
-                        className="glass-input pl-9 pr-12 w-full py-2.5 text-sm"
-                        placeholder={isSignup ? "Min 8 characters" : "Enter your password"}/>
-                <button type="button" onClick={() => setShowPwd(s => !s)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-white/40
-                                    hover:text-white transition-colors">
-                  {showPwd ? <EyeOff size={15}/> : <Eye size={15}/>}
+            <div style={{marginBottom: !isSignup ? 0 : 20}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                <label style={{fontSize:13,fontWeight:600,color:"var(--text-secondary,#334155)"}}>Password</label>
+                {!isSignup&&(
+                  <button type="button" onClick={()=>setShowForgot(true)}
+                    style={{fontSize:13,fontWeight:600,color:"var(--brand-cta,#1E3A8A)",background:"none",border:"none",cursor:"pointer"}}>
+                    Forgot password?
+                  </button>
+                )}
+              </div>
+              <div style={{position:"relative"}}>
+                <Lock size={14} style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",color:"var(--text-muted,#94A3B8)"}}/>
+                <input value={form.password} type={showPwd?"text":"password"}
+                  placeholder={isSignup?"8+ characters":"Your password"}
+                  onChange={e=>{setForm(p=>({...p,password:e.target.value}));setFieldErr(p=>({...p,password:""}));}}
+                  style={{...inp(fieldErr.password), paddingRight:44}}/>
+                <button type="button" onClick={()=>setShowPwd(v=>!v)}
+                  style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",
+                    background:"none",border:"none",cursor:"pointer",color:"var(--text-muted,#94A3B8)"}}>
+                  {showPwd?<EyeOff size={15}/>:<Eye size={15}/>}
                 </button>
               </div>
-            </FormField>
+              {fieldErr.password&&<p style={{fontSize:12,color:"var(--brand-error,#991B1B)",marginTop:4}}>{fieldErr.password}</p>}
+            </div>
 
-            {/* Submit */}
-            <button type="submit" disabled={submitting}
-                    className="w-full px-6 py-3.5 btn-amber-glow-animated text-navy font-bold text-base uppercase tracking-eyebrow
-                                hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200
-                                disabled:opacity-60 disabled:cursor-wait
-                                flex items-center justify-center gap-2 mt-4 shadow-md">
-              {submitting ? (
-                <>
-                  <Loader2 size={18} className="animate-spin"/>
-                  {isSignup ? "Creating account…" : "Signing in…"}
-                </>
-              ) : (
-                <>
-                  {isSignup ? "Create account" : "Sign in"}
-                  <ArrowRight size={16}/>
-                </>
-              )}
+            <button type="submit" disabled={loading} className="btn btn-p"
+              style={{width:"100%",padding:"13px",fontSize:15,borderRadius:"var(--r-sm)",marginTop:20,
+                background: loading ? "var(--text-muted,#94A3B8)" : "var(--brand-cta,#1E3A8A)"}}>
+              {loading
+                ? <span style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{width:15,height:15,border:"2.5px solid rgba(255,255,255,0.4)",
+                      borderTopColor:"#fff",borderRadius:"50%",animation:"spin .7s linear infinite"}}/>
+                    Please wait…
+                  </span>
+                : <>{isSignup?"Create account":"Sign in"} <ArrowRight size={15}/></>
+              }
             </button>
           </form>
 
-          {/* Switch mode */}
-          <p className="text-center text-sm text-white/60 mt-6 animate-fade-in"
-              style={{ animationDelay: "300ms" }}>
-            {isSignup ? "Already on Rusto? " : "New to Rusto? "}
-            <Link to={isSignup ? `/signin${loc.search}` : `/signup${loc.search}`}
-                  className="font-bold text-amber-glow hover:underline relative inline-block group">
-              {isSignup ? "Sign in instead" : "Create an account"}
-              <span className="absolute -bottom-0.5 left-0 w-full h-px bg-amber-glow scale-x-0
-                                group-hover:scale-x-100 transition-transform origin-left duration-300"/>
+          {/* Demo */}
+          {!isSignup && (
+            <button onClick={()=>{setForm({phone:"9000000000",password:"Demo@1234",full_name:""});setError("");setFieldErr({});}}
+              style={{width:"100%",marginTop:12,padding:"11px 16px",borderRadius:"var(--r-sm)",
+                border:"1.5px dashed var(--brand-cta-border,#BFDBFE)",background:"var(--brand-cta-bg,#EFF6FF)",
+                cursor:"pointer",display:"flex",alignItems:"center",gap:12,transition:"background .15s"}}
+              onMouseEnter={e=>e.currentTarget.style.background=e.currentTarget.style.background="var(--brand-cta-bg,#EFF6FF)"}
+              onMouseLeave={e=>e.currentTarget.style.background="var(--brand-cta-bg,#EFF6FF)"}>
+              <div style={{width:34,height:34,borderRadius:8,background:"var(--brand-cta,#1E3A8A)",
+                display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <span style={{fontSize:15}}>⚡</span>
+              </div>
+              <div style={{textAlign:"left",flex:1}}>
+                <p style={{fontWeight:700,color:"var(--brand-cta,#1E3A8A)",fontSize:13}}>Try demo account</p>
+                <p style={{fontSize:12,color:"var(--text-body,#475569)"}}>9000000000 · Demo@1234</p>
+              </div>
+              <span style={{fontSize:12,fontWeight:700,color:"var(--brand-cta,#1E3A8A)"}}>Auto-fill →</span>
+            </button>
+          )}
+
+          <p style={{textAlign:"center",fontSize:13,color:"var(--text-body,#475569)",marginTop:20}}>
+            {isSignup ? "Already have an account? " : "New to Rusto? "}
+            <Link to={isSignup?"/signin":"/signup"}
+              style={{fontWeight:700,color:"var(--brand-cta,#1E3A8A)",textDecoration:"none"}}>
+              {isSignup?"Sign in":"Create account"}
             </Link>
           </p>
-
-          {/* Trust footer */}
-          <div className="text-center text-2xs text-white/40 mt-6 flex items-center justify-center gap-1.5">
-            <ShieldCheck size={11} className="text-amber-glow"/>
-            By continuing you agree to Rusto's
-            <Link to="#" className="underline hover:text-white transition-colors">Terms</Link>
-            &
-            <Link to="#" className="underline hover:text-white transition-colors">Privacy Policy</Link>
-          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────────────
-function FormField({ label, hint, required, children }) {
-  return (
-    <label className="block">
-      <span className="label flex items-center gap-1 !text-amber-glow">
-        {label}
-        {required && <span className="text-red-400">*</span>}
-        {hint && <span className="text-white/40 font-normal text-2xs normal-case tracking-normal">{hint}</span>}
-      </span>
-      {children}
-    </label>
-  );
-}
-
-function FormInput({ Icon, value, onChange, type = "text", placeholder, mono }) {
-  return (
-    <div className="relative">
-      <Icon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40"/>
-      <input value={value} type={type} placeholder={placeholder}
-              onChange={e => onChange(e.target.value)}
-              className={`glass-input pl-9 ${mono ? "font-mono" : ""} w-full py-2.5 text-sm`}/>
     </div>
   );
 }

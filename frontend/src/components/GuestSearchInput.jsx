@@ -66,11 +66,11 @@ export default function GuestSearchInput({
 
   return (
     <div ref={wrapperRef} className={`relative ${className}`}>
-      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none z-10" />
       <input
         type="text"
         autoFocus={autoFocus}
-        className={`w-full pl-10 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-navy focus:ring-1 focus:ring-navy/20 outline-none transition-all ${inputClassName}`}
+        className={`w-full pl-10 pr-8 py-2.5 border border-ink-200 rounded-xl text-sm focus:border-navy focus:ring-1 focus:ring-gold/20 outline-none transition-all ${inputClassName}`}
         placeholder={placeholder}
         value={value}
         onChange={e => onChange(e.target.value)}
@@ -81,16 +81,16 @@ export default function GuestSearchInput({
       )}
 
       {open && suggestions.length > 0 && (
-        <div className="absolute z-50 w-full bg-white border border-gray-200 rounded-xl shadow-2xl mt-1 overflow-hidden max-h-72 overflow-y-auto">
+        <div className="absolute z-50 w-full bg-white border border-ink-200 rounded-xl shadow-2xl mt-1 overflow-hidden max-h-72 overflow-y-auto">
           {suggestions.map(s => (
             <button
               key={s.customer_id}
               type="button"
-              className={`w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-gray-50 last:border-0 ${s.blacklisted ? 'bg-red-50/40' : ''}`}
+              className={`w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-ink-100 last:border-0 ${s.blacklisted ? 'bg-red-50/40' : ''}`}
               onClick={() => handleSelect(s)}
             >
               <div className="flex items-center gap-2">
-                <User size={14} className="text-gray-400 flex-shrink-0" />
+                <User size={14} className="text-ink-400 flex-shrink-0" />
                 <span className="font-semibold text-navy text-sm flex-1 truncate">{s.full_name}</span>
                 {s.blacklisted && (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
@@ -103,7 +103,7 @@ export default function GuestSearchInput({
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
+              <div className="flex items-center gap-3 mt-0.5 text-xs text-ink-500">
                 <span className="inline-flex items-center gap-1"><Phone size={10} /> {s.phone}</span>
                 <span>{s.total_visits} visit{s.total_visits !== 1 ? 's' : ''}</span>
                 {s.last_room && <span>Last: Room {s.last_room}</span>}

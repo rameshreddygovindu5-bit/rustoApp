@@ -11,8 +11,14 @@ Endpoints:
 import secrets
 import string
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
@@ -41,7 +47,7 @@ def _generate_ticket_ref() -> str:
     Not strictly globally unique but a daily collision is astronomically
     unlikely; we add a uniqueness check on insert."""
     suffix = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(4))
-    return f"TKT-{datetime.utcnow().strftime('%Y%m%d')}-{suffix}"
+    return f"TKT-{_utcnow().strftime('%Y%m%d')}-{suffix}"
 
 
 def _ticket_to_dict(t: SupportTicket, db: Session, include_messages: bool = False) -> dict:
@@ -276,7 +282,7 @@ def add_message(ticket_id: int, body: MessageBody, request: Request,
     if new_status:
         t.status = new_status
         if new_status == SupportTicketStatus.resolved.value:
-            t.resolved_at = datetime.utcnow()
+            t.resolved_at = _utcnow()
     db.commit(); db.refresh(t)
 
     try:
@@ -323,7 +329,7 @@ def update_ticket(ticket_id: int, body: PatchBody, request: Request,
             raise HTTPException(status_code=400, detail=f"Invalid status: {body.status}")
         t.status = body.status
         if body.status == SupportTicketStatus.resolved.value:
-            t.resolved_at = datetime.utcnow()
+            t.resolved_at = _utcnow()
         changes["status"] = body.status
     if body.priority:
         if body.priority not in PRIORITIES:

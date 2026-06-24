@@ -9,13 +9,20 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from ..database import get_db
 from ..models import (MaintenanceTicket, MaintenanceStatus, MaintenancePriority,
                       MaintenanceCategory, Room, User, RoomStatus)
 from ..auth import get_current_user, require_admin, resolve_lodge_scope
+from ..permissions import require_permission
 from ..services.audit_service import log_audit
 
 router = APIRouter(prefix="/api/maintenance", tags=["maintenance"])
@@ -46,7 +53,7 @@ def _to_dict(t: MaintenanceTicket) -> dict:
     }
 
 
-@router.get("/tickets")
+@router.get("/tickets", dependencies=[Depends(require_permission("maintenance.read"))])
 def list_tickets(status: Optional[str] = Query(None),
                   priority: Optional[str] = None,
                   room_id: Optional[int] = None,
@@ -65,7 +72,7 @@ def list_tickets(status: Optional[str] = Query(None),
     return [_to_dict(t) for t in q.limit(500).all()]
 
 
-@router.get("/stats")
+@router.get("/stats", dependencies=[Depends(require_permission("maintenance.read"))])
 def stats(db: Session = Depends(get_db),
           current_user=Depends(get_current_user),
           lodge_id: int = Depends(resolve_lodge_scope)):
@@ -90,7 +97,7 @@ def stats(db: Session = Depends(get_db),
     return {"by_status": by_status, "open_by_priority": by_priority}
 
 
-@router.get("/tickets/{ticket_id}")
+@router.get("/tickets/{ticket_id}", dependencies=[Depends(require_permission("maintenance.read"))])
 def get_ticket(ticket_id: int, db: Session = Depends(get_db),
                 current_user=Depends(get_current_user),
                 lodge_id: int = Depends(resolve_lodge_scope)):
@@ -115,7 +122,7 @@ class TicketCreate(BaseModel):
     vendor_name: Optional[str] = None
 
 
-@router.post("/tickets")
+@router.post("/tickets", dependencies=[Depends(require_permission("maintenance.write"))])
 def create_ticket(body: TicketCreate, request: Request,
                    db: Session = Depends(get_db),
                    current_user=Depends(get_current_user),
@@ -189,7 +196,7 @@ class TicketUpdate(BaseModel):
     blocks_room_availability: Optional[bool] = None
 
 
-@router.patch("/tickets/{ticket_id}")
+@router.patch("/tickets/{ticket_id}", dependencies=[Depends(require_permission("maintenance.manage"))])
 def update_ticket(ticket_id: int, body: TicketUpdate, request: Request,
                    db: Session = Depends(get_db),
                    current_user=Depends(get_current_user),
@@ -201,16 +208,16 @@ def update_ticket(ticket_id: int, body: TicketUpdate, request: Request,
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     prev_status = t.status
-    fields = body.dict(exclude_unset=True)
+    fields = body.model_dump(exclude_unset=True)
     if "status" in fields:
         if fields["status"] not in {s.value for s in MaintenanceStatus}:
             raise HTTPException(status_code=400, detail="Invalid status")
         t.status = fields["status"]
         # Status-change side effects.
         if fields["status"] == "in_progress" and not t.started_at:
-            t.started_at = datetime.utcnow()
+            t.started_at = _utcnow()
         if fields["status"] == "resolved":
-            t.resolved_at = datetime.utcnow()
+            t.resolved_at = _utcnow()
             # Free up the room if this ticket was blocking it.
             if t.blocks_room_availability and t.room_id:
                 room = db.query(Room).filter(Room.room_id == t.room_id).first()

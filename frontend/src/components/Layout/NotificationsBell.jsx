@@ -18,7 +18,7 @@ const LEVEL_COLORS = {
   error: 'bg-red-50 border-red-200 text-red-800',
 }
 
-export default function NotificationsBell() {
+export default function NotificationsBell({ isSuperAdmin = false }) {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState([])
   const [unread, setUnread] = useState(0)
@@ -29,6 +29,8 @@ export default function NotificationsBell() {
   const prevUnreadRef = useRef(0)
   const firstLoadRef = useRef(true)
   const [loading, setLoading] = useState(false)
+  const [platformNotifs, setPlatformNotifs] = useState([])
+  const [platformUrgent, setPlatformUrgent] = useState(0)
   const ref = useRef(null)
   const navigate = useNavigate()
 
@@ -59,6 +61,25 @@ export default function NotificationsBell() {
     const t = setInterval(refresh, 30000)
     return () => { cancelled = true; clearInterval(t) }
   }, [])
+
+  // Super-admin: poll platform notifications every 60s
+  useEffect(() => {
+    if (!isSuperAdmin) return
+    let cancelled = false
+    const pollPlatform = async () => {
+      try {
+        const { platformAnalyticsAPI } = await import('../../services/api')
+        const res = await platformAnalyticsAPI.notifications()
+        if (!cancelled) {
+          setPlatformNotifs(res.data.notifications || [])
+          setPlatformUrgent(res.data.urgent_count || 0)
+        }
+      } catch {}
+    }
+    pollPlatform()
+    const t = setInterval(pollPlatform, 60000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [isSuperAdmin])
 
   // Close dropdown on outside click — without this, the panel stays
   // hovering even after the user moves on to other interactions.
@@ -129,11 +150,11 @@ export default function NotificationsBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-hidden flex flex-col">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-xl border border-ink-200 z-50 max-h-[70vh] overflow-hidden flex flex-col">
+          <div className="px-4 py-3 border-b border-ink-100 flex items-center justify-between">
             <h3 className="font-semibold text-navy text-sm">Notifications</h3>
             <div className="flex items-center gap-2">
-              {unread > 0 && (
+              {(unread + (isSuperAdmin ? platformUrgent : 0)) > 0 && (
                 <button
                   onClick={handleMarkAll}
                   className="text-xs text-gold hover:text-gold/80 font-medium flex items-center gap-1"
@@ -142,7 +163,7 @@ export default function NotificationsBell() {
                   <CheckCheck size={12}/> Mark all read
                 </button>
               )}
-              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setOpen(false)} className="text-ink-400 hover:text-ink-600">
                 <X size={16}/>
               </button>
             </div>
@@ -150,10 +171,10 @@ export default function NotificationsBell() {
 
           <div className="overflow-y-auto flex-1">
             {loading ? (
-              <div className="p-6 text-center text-gray-400 text-sm">Loading…</div>
+              <div className="p-6 text-center text-ink-400 text-sm">Loading…</div>
             ) : items.length === 0 ? (
-              <div className="p-6 text-center text-gray-400 text-sm">
-                <Bell size={32} className="mx-auto text-gray-200 mb-2"/>
+              <div className="p-6 text-center text-ink-400 text-sm">
+                <Bell size={32} className="mx-auto text-ink-200 mb-2"/>
                 Nothing yet.
               </div>
             ) : (
@@ -161,7 +182,7 @@ export default function NotificationsBell() {
                 <button
                   key={n.notification_id}
                   onClick={() => handleClick(n)}
-                  className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-l-2 ${
+                  className={`w-full text-left px-4 py-3 hover:bg-ink-50 transition-colors border-l-2 ${
                     n.is_read ? 'border-transparent' : 'border-gold bg-amber-50/30'
                   }`}
                 >
@@ -170,13 +191,13 @@ export default function NotificationsBell() {
                       {n.level}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className={`text-sm ${n.is_read ? 'text-gray-600' : 'text-navy font-semibold'} truncate`}>
+                      <div className={`text-sm ${n.is_read ? 'text-ink-600' : 'text-navy font-semibold'} truncate`}>
                         {n.title}
                       </div>
                       {n.message && (
-                        <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</div>
+                        <div className="text-xs text-ink-500 mt-0.5 line-clamp-2">{n.message}</div>
                       )}
-                      <div className="text-[11px] text-gray-400 mt-1">
+                      <div className="text-[11px] text-ink-400 mt-1">
                         {new Date(n.created_at).toLocaleString()}
                       </div>
                     </div>

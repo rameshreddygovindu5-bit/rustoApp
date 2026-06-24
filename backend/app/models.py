@@ -6,12 +6,18 @@ import enum
 
 
 class UserRole(str, enum.Enum):
-    # `super_admin` can create lodges, see across all lodges, and assign users.
-    # `admin` is scoped to one lodge but has full rights inside it.
-    # `staff` is also scoped to one lodge with reduced rights.
-    super_admin = "super_admin"
-    admin = "admin"
-    staff = "staff"
+    # `super_admin`  — cross-tenant platform administrator (Rusto internal).
+    # `app_owner`    — application owner / Tygonix team; like super_admin + audit access.
+    # `admin`        — lodge admin: full rights inside one lodge.
+    # `lodge_owner`  — property owner with billing/analytics access but no staff mgmt.
+    # `staff`        — lodge staff: operational modules only, restricted per permissions.
+    # `vendor`       — integration partner (API key auth, read-mostly scoped to their lodges).
+    super_admin  = "super_admin"
+    app_owner    = "app_owner"
+    admin        = "admin"
+    lodge_owner  = "lodge_owner"
+    staff        = "staff"
+    vendor       = "vendor"
 
 
 class Lodge(Base):
@@ -99,10 +105,11 @@ class BookingStatus(str, enum.Enum):
 
 
 class BookingSource(str, enum.Enum):
-    walk_in = "walk_in"
-    direct = "direct"
-    agency = "agency"
-    corporate = "corporate"
+    walk_in  = "walk_in"
+    direct   = "direct"
+    agency   = "agency"
+    corporate= "corporate"
+    online   = "online"     # v10.2: Booked via Rusto customer marketplace
 
 
 class AgencyStatus(str, enum.Enum):
@@ -160,6 +167,23 @@ class User(Base):
     # admin/super_admin always have full access regardless.
     permissions = Column(Text)                # JSON array as string
     created_at = Column(DateTime, default=func.now())
+    # ── v10.0 staff OTP login (location-agnostic security) ───────────
+    # When `require_login_otp` is True on the lodge's admin, every staff
+    # login for that lodge requires a 6-digit OTP sent to the admin's
+    # phone AFTER the password check. This prevents staff from logging in
+    # from outside the lodge premises (or any unauthorised device) without
+    # the admin's knowledge.
+    login_otp          = Column(String(6))        # current pending OTP
+    login_otp_expires  = Column(DateTime)          # OTP expiry (5 min window)
+    login_otp_attempts = Column(Integer, default=0)  # misattempt counter
+    # Per-user flag: if True, this user's login always needs OTP.
+    require_login_otp  = Column(Boolean, default=False)
+    # IP of the last OTP-verified login (for staff audit trail)
+    last_otp_login_ip  = Column(String(45))
+    # Admin-set static PIN that staff can use instead of the live SMS OTP.
+    # 4–8 digit code; admin sets it from the Users page. NULL = not configured.
+    # When set, this is ALWAYS accepted (no expiry) — useful for lodges without SMS.
+    static_login_pin   = Column(String(16))
 
     checkins_done = relationship("Checkin", foreign_keys="Checkin.checked_in_by", back_populates="checkin_staff")
     checkouts_done = relationship("Checkin", foreign_keys="Checkin.checked_out_by", back_populates="checkout_staff")
@@ -490,6 +514,9 @@ class Booking(Base):
     cancelled_at = Column(DateTime)
     cancellation_reason = Column(Text)
     special_requests = Column(Text)
+    meal_plan      = Column(String(20))      # ep/cp/map/ap
+    promo_code     = Column(String(40))      # promo code used
+    promo_discount = Column(Numeric(10, 2), default=0)  # discount applied
 
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -1681,6 +1708,9 @@ class LodgeRegistrationRequest(Base):
     rooms_non_ac = Column(Integer, nullable=False, default=0)
     rooms_deluxe = Column(Integer, nullable=False, default=0)
     rooms_suite = Column(Integer, nullable=False, default=0)
+    # v10 — property type and enabled module set from onboarding wizard
+    property_category = Column(String(40))          # lodge/hotel/resort/motel etc.
+    enabled_modules   = Column(Text)                # JSON array of module IDs
     # Pricing plan the applicant selected during onboarding.
     # Values: 'starter', 'growth', 'pro' — see pricing_service.PLANS.
     # billing_cycle: 'monthly' | 'annual' (annual = 12 months prepaid, 2 months free)
@@ -1701,6 +1731,17 @@ class LodgeRegistrationRequest(Base):
     # can click through from the registrations page to the new lodge.
     created_lodge_id = Column(Integer, ForeignKey("lodges.lodge_id"))
     created_admin_user_id = Column(Integer, ForeignKey("users.user_id"))
+    # ── v11 — Payment tracking ───────────────────────────────────
+    # Payment captured during onboarding (UPI/PhonePe/GPay/Razorpay)
+    payment_status   = Column(String(20), default="pending")  # pending/paid/failed/waived/offline_collected
+    payment_method   = Column(String(40))   # upi/phonepe/googlepay/razorpay/offline/waived
+    payment_ref      = Column(String(120))  # UTR / transaction ID / Razorpay order ID
+    payment_amount   = Column(Numeric(12, 2))
+    payment_date     = Column(DateTime)
+    payment_notes    = Column(Text)         # call notes, offline collection notes, etc.
+    follow_up_at     = Column(DateTime)     # next follow-up scheduled (for failed payments)
+    follow_up_count  = Column(Integer, default=0)
+    assigned_to      = Column(String(80))   # RUSTO team member handling follow-up
     # Submission metadata.
     created_at = Column(DateTime, default=func.now(), nullable=False)
     submitter_ip = Column(String(45))           # for spam investigation
@@ -1853,6 +1894,21 @@ class LodgePhoto(Base):
     uploaded_at = Column(DateTime, default=func.now())
 
 
+class RoomPhoto(Base):
+    """Photos for individual room types within a lodge."""
+    __tablename__ = "rusto_room_photos"
+    __table_args__ = (
+        Index("ix_room_photo_lodge_type", "lodge_id", "room_type"),
+    )
+    id          = Column(Integer, primary_key=True, autoincrement=True)
+    lodge_id    = Column(Integer, ForeignKey("lodges.lodge_id"), nullable=False)
+    room_type   = Column(String(40), nullable=False)   # matches Room.room_type
+    url         = Column(String(500), nullable=False)
+    caption     = Column(String(200))
+    sort_order  = Column(Integer, default=0)
+    created_at  = Column(DateTime, default=func.now())
+
+
 class CustomerBookingStatus(str, enum.Enum):
     """Status flow for a customer-side booking:
     initiated → payment_pending → confirmed → checked_in → checked_out
@@ -1918,12 +1974,18 @@ class CustomerBooking(Base):
     contact_phone = Column(String(20), nullable=False)
     contact_email = Column(String(160))
     special_requests = Column(Text)
+    meal_plan        = Column(String(20))
+    promo_code       = Column(String(40))
+    promo_discount   = Column(Numeric(10, 2), default=0)
     status = Column(String(30), nullable=False,
                      default=CustomerBookingStatus.initiated.value)
     # When the lodge confirms the actual room assignment, we link to the
     # internal Checkin row so the lodge's operational dashboards work
     # unchanged.
     linked_checkin_id = Column(Integer, ForeignKey("checkins.checkin_id"))
+    # v10.2 — once we auto-create a PMS Booking for this customer booking,
+    # we store its ID here so the lodge admin can find it in their PMS.
+    linked_pms_booking_id = Column(Integer, ForeignKey("bookings.booking_id"), nullable=True)
     cancelled_at = Column(DateTime)
     cancellation_reason = Column(Text)
     created_at = Column(DateTime, default=func.now(), nullable=False, index=True)
@@ -2521,6 +2583,130 @@ class SelfCheckinToken(Base):
 
 
 # ── Platform Analytics snapshot ──────────────────────────────────
+
+class RustoMembershipTier(str, enum.Enum):
+    """Rusto customer-facing membership tiers."""
+    explorer  = "explorer"   # free — just signed up
+    silver    = "silver"     # 2+ stays or ₹5K+ spent
+    gold      = "gold"       # 5+ stays or ₹15K+ spent
+    elite     = "elite"      # 10+ stays or ₹50K+ spent
+
+
+class RustoMembership(Base):
+    """Rusto customer membership & rewards account.
+
+    Tracks:
+      - tier: explorer → silver → gold → elite
+      - rusto_points: earned per booking (1pt per ₹100 spent)
+      - lifetime_spent_inr: total confirmed booking value
+      - total_stays: number of completed stays
+      - referral_code: unique code for referral programme
+      - referred_by: code used when signing up
+
+    Tier upgrades are evaluated on every booking completion.
+    Points can be redeemed at checkout (100 pts = ₹50 discount).
+    """
+    __tablename__ = "rusto_memberships"
+    __table_args__ = (
+        Index("ix_rusto_mem_customer", "customer_id", unique=True),
+        Index("ix_rusto_mem_referral", "referral_code", unique=True),
+    )
+    membership_id       = Column(Integer, primary_key=True, autoincrement=True)
+    customer_id         = Column(Integer, ForeignKey("rusto_customers.customer_id"), nullable=False)
+    tier                = Column(String(20), nullable=False, default="explorer")
+    rusto_points        = Column(Integer, nullable=False, default=0)      # redeemable balance
+    lifetime_points     = Column(Integer, nullable=False, default=0)      # never decrements
+    lifetime_spent_inr  = Column(Numeric(14, 2), nullable=False, default=0)
+    total_stays         = Column(Integer, nullable=False, default=0)
+    referral_code       = Column(String(20), unique=True)                 # e.g. RUSTO-ABC123
+    referred_by_code    = Column(String(20))                              # code they entered at signup
+    referral_credits    = Column(Integer, nullable=False, default=0)      # bonus points from referrals
+    created_at          = Column(DateTime, default=func.now())
+    updated_at          = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class RustoPointsLedger(Base):
+    """Immutable points transaction log for RustoMembership."""
+    __tablename__ = "rusto_points_ledger"
+    __table_args__ = (
+        Index("ix_rusto_ledger_member", "membership_id"),
+    )
+    ledger_id      = Column(Integer, primary_key=True, autoincrement=True)
+    membership_id  = Column(Integer, ForeignKey("rusto_memberships.membership_id"), nullable=False)
+    customer_id    = Column(Integer, ForeignKey("rusto_customers.customer_id"), nullable=False)
+    points         = Column(Integer, nullable=False)           # +earn, -redeem
+    txn_type       = Column(String(20), nullable=False)        # earn/redeem/referral/bonus/expire
+    booking_id     = Column(Integer, ForeignKey("rusto_customer_bookings.booking_id"))
+    description    = Column(String(200))
+    created_at     = Column(DateTime, default=func.now())
+
+
+class GlobalApiKeyStatus(str, enum.Enum):
+    active   = "active"
+    revoked  = "revoked"
+    suspended = "suspended"
+
+
+class GlobalApiKey(Base):
+    """Platform-level API credential for global OTA / channel partners.
+
+    Unlike the per-lodge Agency API keys, a GlobalApiKey holder can:
+      - Query availability across ALL published lodges in one call
+      - Create bookings at any lodge without needing per-lodge credentials
+      - Receive unified webhooks for all booking events platform-wide
+
+    Use case: MakeMyTrip, Goibibo, Booking.com aggregators who list
+    all Rusto properties, not just one lodge.
+
+    Created and managed by super_admin only.
+    """
+    __tablename__ = "global_api_keys"
+    __table_args__ = (
+        Index("ix_global_api_key", "api_key", unique=True),
+        Index("ix_global_api_partner", "partner_name"),
+    )
+    key_id           = Column(Integer, primary_key=True, autoincrement=True)
+    partner_name     = Column(String(120), nullable=False)   # "MakeMyTrip", "Goibibo"
+    partner_code     = Column(String(40),  nullable=False)   # "mmt", "goibibo"
+    contact_email    = Column(String(160))
+    contact_person   = Column(String(120))
+    api_key          = Column(String(64), unique=True, nullable=False)
+    api_secret_hash  = Column(String(255), nullable=False)
+    webhook_url      = Column(String(300))
+    webhook_secret   = Column(String(64))
+    # Scope — which lodges are included (NULL = all published lodges)
+    allowed_lodge_ids = Column(Text)                        # JSON array or NULL=all
+    # Rate limits
+    rate_limit_per_minute = Column(Integer, default=100)
+    daily_booking_limit   = Column(Integer, default=0)     # 0 = unlimited
+    # Markup applied on top of lodge tariff
+    rate_markup_pct       = Column(Numeric(5, 2), default=0.00)
+    commission_pct        = Column(Numeric(5, 2), default=10.00)
+    # Audit
+    status       = Column(String(20), default="active")    # active/revoked/suspended
+    total_calls  = Column(Integer, default=0)
+    last_used_at = Column(DateTime)
+    created_by   = Column(Integer, ForeignKey("users.user_id"))
+    created_at   = Column(DateTime, default=func.now())
+    updated_at   = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class GlobalApiCall(Base):
+    """Audit log for global API calls."""
+    __tablename__ = "global_api_calls"
+    __table_args__ = (
+        Index("ix_global_api_call_key", "key_id"),
+        Index("ix_global_api_call_ts", "created_at"),
+    )
+    call_id     = Column(Integer, primary_key=True, autoincrement=True)
+    key_id      = Column(Integer, ForeignKey("global_api_keys.key_id"), nullable=False)
+    method      = Column(String(10))
+    path        = Column(String(200))
+    status_code = Column(Integer)
+    response_ms = Column(Integer)
+    ip_address  = Column(String(45))
+    created_at  = Column(DateTime, default=func.now())
+
 
 class PlatformMetricSnapshot(Base):
     """Daily snapshot for platform-owner analytics dashboard."""

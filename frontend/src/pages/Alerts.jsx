@@ -97,13 +97,13 @@ export default function Alerts() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-playfair text-2xl font-bold text-navy">Alert Center</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Monitor and manage all notifications</p>
+          <h1 className="font-display text-2xl font-bold text-navy">Alert Center</h1>
+          <p className="text-sm text-ink-500 mt-0.5">Monitor and manage all notifications</p>
         </div>
         <div className="flex gap-3">
           <button
             onClick={handleRetryAll}
-            className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-sm border border-ink-200 rounded-xl text-ink-600 hover:bg-ink-50 transition-colors"
           >
             <RefreshCw size={14} /> Retry Failed
           </button>
@@ -129,22 +129,22 @@ export default function Alerts() {
       )}
 
       {/* Filters */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-ink-100 p-4">
         <div className="flex flex-wrap gap-3">
           <div className="relative flex-1 min-w-48">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
             <input
               type="text"
               placeholder="Search alerts..."
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
-              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+              className="w-full pl-9 pr-4 py-2 text-sm border border-ink-200 rounded-xl focus:outline-none focus:border-gold"
             />
           </div>
           <select
             value={typeFilter}
             onChange={e => { setTypeFilter(e.target.value); setPage(1); }}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-gold bg-white"
+            className="px-3 py-2 text-sm border border-ink-200 rounded-xl focus:outline-none focus:border-gold bg-white"
           >
             {EVENT_TYPES.map(t => (
               <option key={t.value} value={t.value}>{t.label}</option>
@@ -153,7 +153,7 @@ export default function Alerts() {
           <select
             value={statusFilter}
             onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-gold bg-white"
+            className="px-3 py-2 text-sm border border-ink-200 rounded-xl focus:outline-none focus:border-gold bg-white"
           >
             <option value="">All Status</option>
             <option value="sent">Delivered</option>
@@ -163,7 +163,7 @@ export default function Alerts() {
           </select>
           <button
             onClick={fetchAlerts}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+            className="px-3 py-2 text-sm border border-ink-200 rounded-xl text-ink-600 hover:bg-ink-50 transition-colors"
           >
             <RefreshCw size={14} />
           </button>
@@ -171,41 +171,41 @@ export default function Alerts() {
       </div>
 
       {/* Alert Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-ink-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Type</th>
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Channel</th>
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Recipient</th>
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Message</th>
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Status</th>
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Time</th>
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Actions</th>
+              <tr className="bg-ink-50 border-b border-ink-100">
+                <th className="text-left text-xs font-semibold text-ink-500 uppercase tracking-wider px-6 py-3">Type</th>
+                <th className="text-left text-xs font-semibold text-ink-500 uppercase tracking-wider px-6 py-3">Channel</th>
+                <th className="text-left text-xs font-semibold text-ink-500 uppercase tracking-wider px-6 py-3">Recipient</th>
+                <th className="text-left text-xs font-semibold text-ink-500 uppercase tracking-wider px-6 py-3">Message</th>
+                <th className="text-left text-xs font-semibold text-ink-500 uppercase tracking-wider px-6 py-3">Status</th>
+                <th className="text-left text-xs font-semibold text-ink-500 uppercase tracking-wider px-6 py-3">Time</th>
+                <th className="text-left text-xs font-semibold text-ink-500 uppercase tracking-wider px-6 py-3">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-ink-100">
               {loading ? (
                 Array(6).fill(0).map((_, i) => (
                   <tr key={i} className="animate-pulse">
                     {Array(7).fill(0).map((_, j) => (
-                      <td key={j} className="px-6 py-4"><div className="h-4 bg-gray-100 rounded" /></td>
+                      <td key={j} className="px-6 py-4"><div className="h-4 bg-ink-100 rounded" /></td>
                     ))}
                   </tr>
                 ))
               ) : alerts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
+                  <td colSpan={7} className="px-6 py-12 text-center text-ink-400">
                     <Bell size={32} className="mx-auto mb-2 opacity-40" />
                     <p className="text-sm">No alerts found</p>
                   </td>
                 </tr>
               ) : (
                 alerts.map(alert => (
-                  <tr key={alert.alert_id} className="hover:bg-gray-50 transition-colors group">
+                  <tr key={alert.alert_id} className="hover:bg-ink-50 transition-colors group">
                     <td className="px-6 py-4">
-                      <span className="text-xs font-medium text-gray-700 bg-gray-100 px-2 py-1 rounded-lg">
+                      <span className="text-xs font-medium text-ink-700 bg-ink-100 px-2 py-1 rounded-lg">
                         {alert.event_type?.replace(/_/g, " ")}
                       </span>
                     </td>
@@ -213,15 +213,15 @@ export default function Alerts() {
                       <ChannelBadge channel={alert.alert_type} />
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-gray-800">{alert.recipient || "—"}</p>
+                      <p className="text-sm text-ink-800">{alert.recipient || "—"}</p>
                     </td>
                     <td className="px-6 py-4 max-w-xs">
-                      <p className="text-sm text-gray-600 truncate">{alert.message_content}</p>
+                      <p className="text-sm text-ink-600 truncate">{alert.message_content}</p>
                     </td>
                     <td className="px-6 py-4">
                       <AlertStatusBadge status={alert.status} error={alert.error_message} />
                     </td>
-                    <td className="px-6 py-4 text-xs text-gray-500">
+                    <td className="px-6 py-4 text-xs text-ink-500">
                       {new Date(alert.created_at).toLocaleString("en-IN", {
                         day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
                       })}
@@ -245,13 +245,13 @@ export default function Alerts() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between">
-            <p className="text-xs text-gray-500">Page {page} of {totalPages} · {total} total</p>
+          <div className="px-6 py-3 border-t border-ink-100 flex items-center justify-between">
+            <p className="text-xs text-ink-500">Page {page} of {totalPages} · {total} total</p>
             <div className="flex gap-2">
               <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-                className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">Prev</button>
+                className="px-3 py-1.5 text-xs border border-ink-200 rounded-lg disabled:opacity-40 hover:bg-ink-50">Prev</button>
               <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)}
-                className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">Next</button>
+                className="px-3 py-1.5 text-xs border border-ink-200 rounded-lg disabled:opacity-40 hover:bg-ink-50">Next</button>
             </div>
           </div>
         )}
@@ -273,13 +273,13 @@ function StatCard({ label, value, icon, color }) {
     amber: "bg-amber-50 text-amber-600",
   };
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
+    <div className="bg-white rounded-2xl shadow-sm border border-ink-100 p-5 flex items-center gap-4">
       <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${colors[color]}`}>
         {icon}
       </div>
       <div>
-        <p className="text-2xl font-playfair font-bold text-gray-800">{value ?? "—"}</p>
-        <p className="text-xs text-gray-500">{label}</p>
+        <p className="text-2xl font-display font-bold text-ink-800">{value ?? "—"}</p>
+        <p className="text-xs text-ink-500">{label}</p>
       </div>
     </div>
   );
@@ -296,17 +296,17 @@ function ChannelBadge({ channel }) {
       <Mail size={11} /> Email
     </span>
   );
-  return <span className="text-xs text-gray-400 italic">{channel || "—"}</span>;
+  return <span className="text-xs text-ink-400 italic">{channel || "—"}</span>;
 }
 
 function AlertStatusBadge({ status, error }) {
   const map = {
     sent: { cls: "bg-green-100 text-green-700", icon: <CheckCircle size={11} />, label: "Sent" },
     failed: { cls: "bg-red-100 text-red-700", icon: <XCircle size={11} />, label: "Failed" },
-    skipped: { cls: "bg-gray-100 text-gray-600", icon: <AlertTriangle size={11} />, label: "Skipped" },
+    skipped: { cls: "bg-ink-100 text-ink-600", icon: <AlertTriangle size={11} />, label: "Skipped" },
     pending: { cls: "bg-amber-100 text-amber-700", icon: <Clock size={11} />, label: "Pending" },
   };
-  const s = map[status] || { cls: "bg-gray-100 text-gray-600", icon: null, label: status };
+  const s = map[status] || { cls: "bg-ink-100 text-ink-600", icon: null, label: status };
   return (
     <div className="flex items-center gap-1.5">
       <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${s.cls}`}>
@@ -316,9 +316,9 @@ function AlertStatusBadge({ status, error }) {
         <div className="group relative">
           <Info
             size={12}
-            className={`cursor-help ${status === "sent" ? "text-gray-400" : "text-red-400"}`}
+            className={`cursor-help ${status === "sent" ? "text-ink-400" : "text-red-400"}`}
           />
-          <div className="absolute bottom-full left-0 mb-1 w-64 bg-gray-800 text-white text-xs rounded-lg p-2 hidden group-hover:block z-10 shadow-lg break-words">
+          <div className="absolute bottom-full left-0 mb-1 w-64 bg-navy text-white text-xs rounded-lg p-2 hidden group-hover:block z-10 shadow-lg break-words">
             {error}
           </div>
         </div>
@@ -359,12 +359,12 @@ function ComposeAlertModal({ onClose, onSent }) {
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-slide-up">
         <div className="bg-navy text-white px-6 py-4 flex items-center justify-between">
-          <h3 className="font-playfair text-lg font-bold">Send Custom Alert</h3>
+          <h3 className="font-display text-lg font-bold">Send Custom Alert</h3>
           <button onClick={onClose} className="text-white/70 hover:text-white"><XCircle size={18} /></button>
         </div>
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Channel</label>
+            <label className="block text-xs font-semibold text-ink-500 uppercase tracking-wider mb-1.5">Channel</label>
             <div className="flex gap-3">
               {[["sms", "SMS", <MessageSquare size={14} />], ["email", "Email", <Mail size={14} />]].map(([val, label, icon]) => (
                 <button
@@ -373,7 +373,7 @@ function ComposeAlertModal({ onClose, onSent }) {
                   className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-medium transition-colors ${
                     form.channel === val
                       ? "border-navy bg-navy text-white"
-                      : "border-gray-200 text-gray-600 hover:border-gray-300"
+                      : "border-ink-200 text-ink-600 hover:border-ink-300"
                   }`}
                 >
                   {icon} {label}
@@ -382,7 +382,7 @@ function ComposeAlertModal({ onClose, onSent }) {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-ink-500 uppercase tracking-wider mb-1.5">
               {form.channel === "sms" ? "Phone Number" : "Email Address"}
             </label>
             <input
@@ -390,36 +390,36 @@ function ComposeAlertModal({ onClose, onSent }) {
               placeholder={form.channel === "sms" ? "+91 XXXXXXXXXX" : "guest@example.com"}
               value={form.recipient}
               onChange={e => setForm(f => ({ ...f, recipient: e.target.value }))}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-gold"
+              className="w-full px-4 py-2.5 border border-ink-200 rounded-xl text-sm focus:outline-none focus:border-gold"
             />
           </div>
           {form.channel === "email" && (
             <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Subject</label>
+              <label className="block text-xs font-semibold text-ink-500 uppercase tracking-wider mb-1.5">Subject</label>
               <input
                 type="text"
                 placeholder="Message from Hotel"
                 value={form.subject}
                 onChange={e => setForm(f => ({ ...f, subject: e.target.value }))}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-gold"
+                className="w-full px-4 py-2.5 border border-ink-200 rounded-xl text-sm focus:outline-none focus:border-gold"
               />
             </div>
           )}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Message</label>
+            <label className="block text-xs font-semibold text-ink-500 uppercase tracking-wider mb-1.5">Message</label>
             <textarea
               rows={4}
               placeholder="Enter alert message..."
               value={form.message}
               onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-gold resize-none"
+              className="w-full px-4 py-2.5 border border-ink-200 rounded-xl text-sm focus:outline-none focus:border-gold resize-none"
             />
             {form.channel === "sms" && (
-              <p className="text-xs text-gray-400 mt-1">{form.message.length} chars</p>
+              <p className="text-xs text-ink-400 mt-1">{form.message.length} chars</p>
             )}
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-gray-700 text-sm hover:bg-gray-50">
+            <button onClick={onClose} className="flex-1 py-2.5 border border-ink-200 rounded-xl text-ink-700 text-sm hover:bg-ink-50">
               Cancel
             </button>
             <button

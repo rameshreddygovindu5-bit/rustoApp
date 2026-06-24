@@ -1,12 +1,24 @@
 /**
  * Axios client + secure JWT storage for the Rusto mobile app.
  *
+ * SETUP FOR EXPO GO ON A PHYSICAL DEVICE:
+ *   The device cannot reach `localhost` — set EXPO_PUBLIC_API_URL to your
+ *   machine's LAN IP address before starting Expo:
+ *
+ *     # Find your LAN IP (macOS)
+ *     ipconfig getifaddr en0
+ *
+ *     # Start with the correct URL
+ *     EXPO_PUBLIC_API_URL=http://192.168.1.xxx:8000 npx expo start
+ *
+ *   Or copy .env.example to .env and set the value there.
+ *
  * - Token stored in expo-secure-store (encrypted iOS keychain / Android keystore).
  * - Sent as `Authorization: Bearer <token>` on every authenticated call.
- * - 401 → silently clear token; the AuthContext will detect logout via the
- *   refresh flow and bounce the user to /signin.
+ * - 401 → silently clear token so AuthContext resets to logged-out.
+ * - Network errors produce a clear message rather than a generic failure.
  */
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosInstance, AxiosError } from "axios";
 import * as SecureStore from "expo-secure-store";
 
 const RAW_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
@@ -15,16 +27,15 @@ const BASE = RAW_BASE.replace(/\/$/, "") + "/api";
 
 const TOKEN_KEY = "rusto_customer_token";
 
-// One axios instance for AUTHED customer requests (Bearer injected).
+// One axios instance — Bearer injected by interceptor for auth calls,
+// skipped for public calls tagged with { _public: true } config option.
 export const api: AxiosInstance = axios.create({
   baseURL: BASE,
   timeout: 30_000,
   headers: { Accept: "application/json" },
 });
 
-// Public requests share the same instance but skip the token interceptor —
-// they're tagged via a custom request flag. Simpler than maintaining two
-// instances with different baseURLs.
+// ── Request interceptor: attach Bearer token ──────────────────────────────────
 api.interceptors.request.use(async (cfg) => {
   if (cfg.headers && (cfg as any)._public) return cfg;
   const t = await getToken();
@@ -32,19 +43,34 @@ api.interceptors.request.use(async (cfg) => {
   return cfg;
 });
 
+// ── Response interceptor: handle 401 + network errors ────────────────────────
 api.interceptors.response.use(
   (resp) => resp,
-  async (err) => {
+  async (err: AxiosError) => {
     if (err?.response?.status === 401) {
-      // Token died — clear it so the next render of AuthContext sees logged-out.
+      // Token expired or invalid — clear it; next AuthContext render sees logged-out.
       await clearToken();
     }
+
+    // Improve the error message for network failures so the developer
+    // (and user in development) understands what went wrong.
+    if (!err.response && err.code === "ERR_NETWORK") {
+      const msg =
+        RAW_BASE.includes("localhost") || RAW_BASE.includes("127.0.0.1")
+          ? `Cannot reach server at ${RAW_BASE}. On a physical device, ` +
+            "set EXPO_PUBLIC_API_URL to your machine's LAN IP (e.g. http://192.168.x.x:8000). " +
+            "See .env.example for instructions."
+          : `Cannot reach server at ${RAW_BASE}. Check that the backend is running and reachable from this device.`;
+      // Attach a readable message to the error so errorMessage() picks it up.
+      (err as any).readableMessage = msg;
+      console.warn("[Rusto API] Network error:", msg);
+    }
+
     return Promise.reject(err);
   },
 );
 
-
-// ── Token helpers ─────────────────────────────────────────────────
+// ── Token helpers ─────────────────────────────────────────────────────────────
 
 export async function getToken(): Promise<string | null> {
   try { return await SecureStore.getItemAsync(TOKEN_KEY); }

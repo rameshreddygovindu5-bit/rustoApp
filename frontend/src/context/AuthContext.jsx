@@ -68,7 +68,7 @@ export function AuthProvider({ children }) {
     // and React Router redirects to /dashboard immediately; the dashboard
     // mounts and fires API calls while the scope is still empty, and the
     // super_admin code path then 400s with "X-Lodge-Id required".
-    if (res.data.user?.role === 'super_admin') {
+    if (['super_admin', 'app_owner'].includes(res.data.user?.role)) {
       // Super-admin has no fixed lodge. Without a selection, every
       // tenant-scoped endpoint returns 400 ("X-Lodge-Id required") and
       // the Dashboard fails immediately. Auto-pick the first available
@@ -115,18 +115,34 @@ export function AuthProvider({ children }) {
   // `admin` covers tenant admins; super_admin shouldn't be treated as a
   // tenant admin (their UX needs the lodge switcher), so we check role
   // explicitly where it matters and use both flags below.
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
-  const isSuperAdmin = user?.role === 'super_admin'
+  // Role helpers — covers all v10.0 roles
+  const isAdmin       = ['admin', 'super_admin', 'app_owner', 'lodge_owner'].includes(user?.role)
+  const isSuperAdmin  = ['super_admin', 'app_owner'].includes(user?.role)
+  const isAppOwner    = user?.role === 'app_owner'
+  const isLodgeOwner  = user?.role === 'lodge_owner'
+  const isStaff       = user?.role === 'staff'
+  const isVendor      = user?.role === 'vendor'
+
+  // Role display label
+  const roleLabel = {
+    super_admin:  'Super Admin',
+    app_owner:    'App Owner',
+    admin:        'Lodge Admin',
+    lodge_owner:  'Lodge Owner',
+    staff:        'Staff',
+    vendor:       'Vendor',
+  }[user?.role] || user?.role || 'Unknown'
 
   return (
     <AuthContext.Provider value={{
       user, login, logout, loading,
-      isAdmin, isSuperAdmin,
-      selectedLodgeId, setSelectedLodgeId,
+      isAdmin, isSuperAdmin, isAppOwner, isLodgeOwner, isStaff, isVendor,
+      roleLabel,
+      selectedLodgeId, setSelectedLodgeId, roleLabel,
       // Convenience: the effective lodge id to display in the header.
       // For tenant users it's their fixed lodge; for super_admin it's
       // whatever they last picked (or null if they haven't picked one).
-      effectiveLodgeId: user?.role === 'super_admin' ? selectedLodgeId : user?.lodge_id,
+      effectiveLodgeId: ['super_admin', 'app_owner'].includes(user?.role) ? selectedLodgeId : user?.lodge_id,
     }}>
       {children}
     </AuthContext.Provider>

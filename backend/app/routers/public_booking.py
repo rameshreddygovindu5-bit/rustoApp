@@ -17,12 +17,18 @@ trust the public payload for status/pricing — server computes both.
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from collections import defaultdict
 import secrets
 import time
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from ..database import get_db
 from ..models import (Lodge, Room, RoomType, Booking, BookingSource, BookingStatus,
@@ -151,8 +157,8 @@ def availability(lodge_code: str,
         # fall back to a room of that type
         sample = next((r for r in rooms
                        if getattr(r.room_type, "value", r.room_type) == rt
-                       and r.tariff), None)
-        return float(sample.tariff) if sample else 0.0
+                       and r.base_tariff), None)
+        return float(sample.base_tariff) if sample else 0.0
 
     by_type: dict[str, dict] = {}
     for r in rooms:
@@ -186,8 +192,7 @@ class BookingRequest(BaseModel):
     guest_email: Optional[str] = Field(default=None, max_length=160)
     special_requests: Optional[str] = Field(default=None, max_length=500)
 
-    class Config:
-        populate_by_name = True
+    model_config = {"populate_by_name": True}
 
 
 @router.post("/book")
@@ -281,7 +286,7 @@ def book(body: BookingRequest, request: Request,
 def _gen_booking_ref(db: Session, lodge_id: int) -> str:
     """Per-lodge unique reference like 'DIR-20260528-7F3A'."""
     for _ in range(10):
-        ref = f"DIR-{datetime.utcnow().strftime('%Y%m%d')}-{secrets.token_hex(2).upper()}"
+        ref = f"DIR-{_utcnow().strftime('%Y%m%d')}-{secrets.token_hex(2).upper()}"
         exists = (db.query(Booking)
                   .filter(Booking.lodge_id == lodge_id,
                           Booking.booking_ref == ref).first())

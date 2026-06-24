@@ -15,10 +15,11 @@ export default function AgentBadge() {
         onClick={() => setOpen(o => !o)}
         className={`fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full shadow-lg
                     transition-all duration-300 flex items-center justify-center
-                    group hover:scale-105 active:scale-95
+                    group hover:scale-110 active:scale-95
                     ${open
-                      ? 'bg-navy text-white'
-                      : 'bg-gradient-to-br from-gold to-gold-dark text-white hover:shadow-xl'}`}
+                      ? 'bg-navy text-white shadow-[0_4px_24px_rgba(13,31,45,0.4)]'
+                      : 'bg-navy-dark text-gold hover:shadow-[0_4px_24px_rgba(232,160,32,0.4)] hover:text-gold-light'}`}
+        aria-label={open ? 'Close AI assistant' : 'Open AI assistant'}
         title={open ? 'Close assistant' : 'Open AI assistant'}
       >
         {open ? (

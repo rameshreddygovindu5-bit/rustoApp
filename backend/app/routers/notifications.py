@@ -12,7 +12,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from ..database import get_db
 from ..models import Notification, NotificationLevel
@@ -115,7 +121,7 @@ def mark_read(notification_id: int,
         raise HTTPException(status_code=404, detail="Notification not found")
     if not n.is_read:
         n.is_read = True
-        n.read_at = datetime.utcnow()
+        n.read_at = _utcnow()
         db.commit()
         db.refresh(n)
     return _to_dict(n)
@@ -126,7 +132,7 @@ def mark_all_read(db: Session = Depends(get_db),
                    current_user=Depends(get_current_user),
                    lodge_id: int = Depends(resolve_lodge_scope)):
     """Bulk mark every unread notification visible to this user as read."""
-    now = datetime.utcnow()
+    now = _utcnow()
     rows = (db.query(Notification)
             .filter(Notification.lodge_id == lodge_id,
                     _visible_to_user_filter(current_user.user_id),

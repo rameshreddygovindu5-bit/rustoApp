@@ -47,14 +47,14 @@ export default function Shifts() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold text-navy">Shifts & Cash Drawer</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-ink-500 text-sm mt-1">
             Track opening/closing balance per shift. Cash invoices + expenses auto-reconcile.
           </p>
         </div>
       </div>
 
       {loading ? (
-        <div className="text-gray-400 text-center py-12">Loading…</div>
+        <div className="text-ink-400 text-center py-12">Loading…</div>
       ) : current ? (
         // ── Open shift card ───────────────────────────────────────────
         <div className="bg-gradient-to-br from-navy to-navy-light text-white rounded-2xl shadow-lg p-6">
@@ -101,7 +101,7 @@ export default function Shifts() {
             </div>
             <button
               onClick={() => setShowClose(true)}
-              className="bg-gold hover:bg-gold/90 text-navy font-semibold px-5 py-3 rounded-lg flex items-center gap-2"
+              className="bg-gold hover:bg-gold/90 text-navy-dark font-semibold px-5 py-3 rounded-lg flex items-center gap-2"
             >
               <Square size={16}/> Close Shift
             </button>
@@ -110,11 +110,11 @@ export default function Shifts() {
       ) : (
         // ── No open shift ────────────────────────────────────────────
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <Wallet size={40} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-gray-500 mb-4">No shift open. Open one to start your cash drawer.</p>
+          <Wallet size={40} className="mx-auto text-ink-300 mb-3" />
+          <p className="text-ink-500 mb-4">No shift open. Open one to start your cash drawer.</p>
           <button
             onClick={() => setShowOpen(true)}
-            className="bg-gold hover:bg-gold/90 text-white px-5 py-2.5 rounded-lg font-medium inline-flex items-center gap-2"
+            className="bg-gold hover:bg-gold/90 text-navy-dark px-5 py-2.5 rounded-lg font-medium inline-flex items-center gap-2"
           >
             <Play size={14}/> Open Shift
           </button>
@@ -126,12 +126,12 @@ export default function Shifts() {
         <h2 className="font-display font-bold text-navy text-lg flex items-center gap-2 mb-3">
           <History size={18}/> Recent Shifts
         </h2>
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-card border border-ink-100 overflow-hidden">
           {history.length === 0 ? (
-            <div className="text-gray-400 text-center py-8 text-sm">No prior shifts yet.</div>
+            <div className="text-ink-400 text-center py-8 text-sm">No prior shifts yet.</div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
+              <thead className="bg-ink-50 text-ink-600 text-xs uppercase tracking-wide">
                 <tr>
                   <th className="text-left px-4 py-3">Staff</th>
                   <th className="text-left px-4 py-3">Opened</th>
@@ -145,14 +145,14 @@ export default function Shifts() {
               <tbody>
                 {history.map(s => {
                   const disc = s.discrepancy ?? null
-                  const discColor = disc === null ? 'text-gray-400'
+                  const discColor = disc === null ? 'text-ink-400'
                     : Math.abs(disc) < 1 ? 'text-green-600'
                     : disc > 0 ? 'text-amber-600' : 'text-red-600'
                   return (
-                    <tr key={s.shift_id} className="border-t border-gray-100 hover:bg-gray-50/50">
+                    <tr key={s.shift_id} className="border-t border-ink-100 hover:bg-ink-50/50">
                       <td className="px-4 py-2.5 font-semibold text-navy">{s.staff_name}</td>
-                      <td className="px-4 py-2.5 text-gray-600 text-xs">{new Date(s.opened_at).toLocaleString()}</td>
-                      <td className="px-4 py-2.5 text-gray-600 text-xs">
+                      <td className="px-4 py-2.5 text-ink-600 text-xs">{new Date(s.opened_at).toLocaleString()}</td>
+                      <td className="px-4 py-2.5 text-ink-600 text-xs">
                         {s.closed_at ? new Date(s.closed_at).toLocaleString()
                           : <span className="text-green-600 font-medium">— open —</span>}
                       </td>
@@ -220,27 +220,27 @@ function OpenShiftModal({ onClose, onOpened }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <form onSubmit={submit} className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="px-5 py-4 border-b border-gray-100">
+        <div className="px-5 py-4 border-b border-ink-100">
           <h2 className="font-display font-bold text-navy text-lg">Open Shift</h2>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-ink-500 mt-1">
             Count the cash physically in the drawer right now and enter that amount.
           </p>
         </div>
         <div className="p-5">
-          <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
+          <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">
             Opening Cash Balance (₹) *
           </label>
           <input type="number" min="0" step="0.01" value={opening}
                  onChange={e => setOpening(e.target.value)}
                  autoFocus
-                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-lg"
+                 className="input-field text-base"
                  placeholder="0.00" />
         </div>
-        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+        <div className="px-5 py-4 border-t border-ink-100 flex justify-end gap-2">
           <button type="button" onClick={onClose}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                  className="px-4 py-2 text-ink-600 hover:bg-ink-100 rounded-lg">Cancel</button>
           <button type="submit" disabled={saving}
-                  className="px-4 py-2 bg-gold text-white rounded-lg hover:bg-gold/90 disabled:opacity-50">
+                  className="px-4 py-2 bg-gold text-navy-dark rounded-lg hover:bg-gold/90 disabled:opacity-50">
             {saving ? 'Opening…' : 'Open Shift'}
           </button>
         </div>
@@ -283,13 +283,13 @@ function CloseShiftModal({ shift, onClose, onClosed }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <form onSubmit={submit} className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="px-5 py-4 border-b border-gray-100">
+        <div className="px-5 py-4 border-b border-ink-100">
           <h2 className="font-display font-bold text-navy text-lg">Close Shift</h2>
         </div>
         <div className="p-5 space-y-3">
-          <div className="bg-gray-50 rounded-lg p-3 text-sm">
+          <div className="bg-ink-50 rounded-lg p-3 text-sm">
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Opening</span>
+              <span className="text-ink-500">Opening</span>
               <span className="font-medium">₹{Number(shift.opening_balance).toLocaleString('en-IN')}</span>
             </div>
             <div className="flex justify-between mb-1">
@@ -300,19 +300,19 @@ function CloseShiftModal({ shift, onClose, onClosed }) {
               <span className="text-red-600">− Cash Out</span>
               <span className="font-medium">₹{Number(shift.live_cash_out || 0).toLocaleString('en-IN')}</span>
             </div>
-            <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between font-bold text-navy">
+            <div className="border-t border-ink-200 mt-2 pt-2 flex justify-between font-bold text-navy">
               <span>Expected</span>
               <span>₹{Number(expected).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
+            <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">
               Actual Cash Counted (₹) *
             </label>
             <input type="number" min="0" step="0.01" value={closing}
                    onChange={e => setClosing(e.target.value)}
                    autoFocus
-                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-lg"
+                   className="input-field text-base"
                    placeholder="0.00" />
             {liveDiscrepancy !== null && (
               <p className={`text-xs mt-1 font-medium ${
@@ -326,16 +326,16 @@ function CloseShiftModal({ shift, onClose, onClosed }) {
             )}
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Handover Notes</label>
+            <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Handover Notes</label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)}
                       rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="input-field"
                       placeholder="Anything the next shift needs to know..." />
           </div>
         </div>
-        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+        <div className="px-5 py-4 border-t border-ink-100 flex justify-end gap-2">
           <button type="button" onClick={onClose}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                  className="px-4 py-2 text-ink-600 hover:bg-ink-100 rounded-lg">Cancel</button>
           <button type="submit" disabled={saving}
                   className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50">
             {saving ? 'Closing…' : 'Close Shift'}

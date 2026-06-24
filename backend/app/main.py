@@ -1,6 +1,11 @@
 from fastapi import FastAPI, Request, Depends
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
@@ -34,6 +39,8 @@ load_dotenv()
 
 from .database import Base, engine, get_db
 from .routers import (auth, customers, rooms, checkins, alerts, reports,
+                       portal_detection,
+                      plan_features,
                       settings, import_excel, agencies, partner_api,
                       bookings, audit, agent, lodges,
                       housekeeping, folio, expenses, shifts, notifications,
@@ -62,7 +69,7 @@ from .routers import (auth, customers, rooms, checkins, alerts, reports,
                       analytics,
                       # v9.0 enhanced RUSTO marketplace
                       rusto_wishlist, rusto_bundles, rusto_self_checkin,
-                      platform_analytics)
+                      platform_analytics, rusto_membership, global_partner_api)
 from .services.scheduler import start_scheduler, stop_scheduler
 
 # ─── Logging ──────────────────────────────────────────────────────────
@@ -209,6 +216,12 @@ def seed_initial_data():
                 ("partner_default_commission_pct", "10", "partner", "Default commission % for new agencies", False),
                 ("partner_webhook_max_attempts", "5", "partner", "Max webhook retry attempts", False),
 
+                # Razorpay (online payments)
+                ("razorpay_key_id",     os.getenv("RAZORPAY_KEY_ID",     ""),     "billing", "Razorpay Key ID",     True),
+                ("razorpay_key_secret", os.getenv("RAZORPAY_KEY_SECRET", ""),     "billing", "Razorpay Key Secret", True),
+                ("payment_mode",        "live" if os.getenv("RAZORPAY_KEY_ID","").startswith("rzp_live") else "test",
+                                                                                  "billing", "Payment mode: test | live", False),
+
                 # AI Agent
                 ("agent_provider", "auto", "agent",
                  "LLM backend: auto | anthropic | openai | heuristic", False),
@@ -229,6 +242,60 @@ def seed_initial_data():
                 db.add(Setting(lodge_id=1, setting_key=key, setting_value=val,
                                setting_group=group, description=desc, is_sensitive=sensitive))
             logger.info(f"Seeded {len(settings_data)} settings")
+
+        # ── Override settings from environment variables ──────────────────
+        # This lets production deployments configure integrations via env vars
+        # without manual database edits. Only updates if the env var is set.
+        env_settings = [
+            # SMS — Twilio
+            ("twilio_account_sid",  os.getenv("TWILIO_ACCOUNT_SID",  "")),
+            ("twilio_auth_token",   os.getenv("TWILIO_AUTH_TOKEN",   "")),
+            ("sms_from_number",     os.getenv("TWILIO_FROM_NUMBER",  "")),
+            # SMS — MSG91
+            ("msg91_auth_key",      os.getenv("MSG91_AUTH_KEY",      "")),
+            ("msg91_sender_id",     os.getenv("MSG91_SENDER_ID",     "")),
+            # Email
+            ("smtp_host",           os.getenv("SMTP_HOST",           "")),
+            ("smtp_port",           os.getenv("SMTP_PORT",           "")),
+            ("smtp_user",           os.getenv("SMTP_USER",           "")),
+            ("smtp_password",       os.getenv("SMTP_PASSWORD",       "")),
+            ("email_from_address",  os.getenv("SMTP_FROM_EMAIL",     "")),
+            ("email_from_name",     os.getenv("SMTP_FROM_NAME",      "")),
+            # AI
+            ("agent_anthropic_key", os.getenv("ANTHROPIC_API_KEY",  "")),
+            ("agent_openai_key",    os.getenv("OPENAI_API_KEY",      "")),
+            ("agent_provider",      os.getenv("AGENT_PROVIDER",      "")),
+            # Razorpay
+            ("razorpay_key_id",     os.getenv("RAZORPAY_KEY_ID",     "")),
+            ("razorpay_key_secret", os.getenv("RAZORPAY_KEY_SECRET", "")),
+        ]
+        for key, env_val in env_settings:
+            if not env_val:
+                continue  # skip empty env vars
+            existing = db.query(Setting).filter_by(lodge_id=1, setting_key=key).first()
+            if existing:
+                existing.setting_value = env_val
+            else:
+                db.add(Setting(lodge_id=1, setting_key=key,
+                               setting_value=env_val,
+                               setting_group="system",
+                               is_sensitive=True))
+        # Enable SMS/email if credentials are now present
+        if os.getenv("TWILIO_ACCOUNT_SID") or os.getenv("MSG91_AUTH_KEY"):
+            s = db.query(Setting).filter_by(lodge_id=1, setting_key="sms_enabled").first()
+            if s and s.setting_value == "false":
+                s.setting_value = "true"
+                logger.info("Auto-enabled SMS (credentials found in env)")
+        if os.getenv("SMTP_USER") and os.getenv("SMTP_PASSWORD"):
+            s = db.query(Setting).filter_by(lodge_id=1, setting_key="email_enabled").first()
+            if s and s.setting_value == "false":
+                s.setting_value = "true"
+                logger.info("Auto-enabled email (credentials found in env)")
+        if os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY"):
+            s = db.query(Setting).filter_by(lodge_id=1, setting_key="agent_enabled").first()
+            if s and s.setting_value == "false":
+                s.setting_value = "true"
+                logger.info("Auto-enabled AI agent (key found in env)")
 
         if db.query(User).count() == 0:
             admin_pass = os.getenv("DEFAULT_ADMIN_PASSWORD", "Admin@1234")
@@ -270,6 +337,9 @@ def seed_initial_data():
         db.close()
 
 
+# ─── Rate limiter ─────────────────────────────────────────────────────
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+
 app = FastAPI(
     title="Rusto",
     description="Multi-tenant lodge / small-hotel PMS with OTA / agency-partner API",
@@ -279,15 +349,31 @@ app = FastAPI(
 )
 
 # ─── CORS ─────────────────────────────────────────────────────────────
-cors_origins = os.getenv("CORS_ORIGINS",
-                         "http://localhost:3000,http://localhost:5173").split(",")
+# Default: localhost dev + any private network IP (lodge LANs need to call
+# the backend directly from the browser for portal detection to work).
+_default_origins = (
+    "http://localhost:3000,http://localhost:5173,"
+    "http://127.0.0.1:3000,http://127.0.0.1:5173"
+)
+cors_origins = os.getenv("CORS_ORIGINS", _default_origins).split(",")
+# Detect-portal is a public endpoint — allow all origins so the browser
+# can call the backend directly (not via proxy) to get the real client IP.
+# We use allow_origins=["*"] but restrict credentials to False for safety.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in cors_origins if o.strip()],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=["*"],          # ← allow any origin; detect-portal is public
+    allow_credentials=False,      # ← False required when allow_origins=["*"]
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
 )
+# Note: authenticated endpoints use the Authorization header (Bearer token),
+# not cookies, so allow_credentials=False does not affect auth behaviour.
+
+# ─── Rate limiting middleware ──────────────────────────────────────────
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # ─── Static / uploads ─────────────────────────────────────────────────
 os.makedirs("uploads/id_proofs", exist_ok=True)
@@ -304,7 +390,36 @@ async def add_request_id(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def limit_request_size(request: Request, call_next):
+    """Reject requests with excessively large bodies (prevent DoS)."""
+    MAX_SIZE = 10 * 1024 * 1024  # 10 MB
+    content_length = request.headers.get("content-length")
+    # Only check POST/PUT/PATCH with a Content-Length header
+    if (content_length and request.method in ("POST", "PUT", "PATCH")
+            and int(content_length) > MAX_SIZE):
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=413, content={"detail": "Request body too large"})
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Add security headers to all responses."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    # Only set HSTS in production
+    if not os.getenv("DEBUG", "false").lower() == "true":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
 # ─── Routers ──────────────────────────────────────────────────────────
+app.include_router(portal_detection.router)
 app.include_router(auth.router)
 app.include_router(lodges.router)
 app.include_router(customers.router)
@@ -377,6 +492,7 @@ app.include_router(billing.router)
 
 # v8.4 — per-lodge operational analytics dashboard
 app.include_router(analytics.router)
+app.include_router(plan_features.router)
 # v9.0 enhanced RUSTO marketplace
 app.include_router(rusto_wishlist.router)
 app.include_router(rusto_bundles.public_router)
@@ -384,6 +500,9 @@ app.include_router(rusto_bundles.admin_router)
 app.include_router(rusto_self_checkin.admin_router)
 app.include_router(rusto_self_checkin.customer_router)
 app.include_router(platform_analytics.router)
+app.include_router(rusto_membership.router)
+app.include_router(global_partner_api.partner_router)
+app.include_router(global_partner_api.admin_router)
 
 
 @app.get("/")
@@ -401,8 +520,32 @@ def root():
 def health(db: Session = Depends(get_db)):
     try:
         from sqlalchemy import text
+        from .models import Setting, Lodge
         db.execute(text("SELECT 1"))
-        return {"status": "healthy", "database": "connected", "version": "2.0.0"}
+
+        # Integration status (non-fatal)
+        integrations = {}
+        try:
+            sms_row = db.query(Setting).filter_by(
+                lodge_id=1, setting_key="sms_enabled").first()
+            integrations["sms"]   = (sms_row and sms_row.setting_value == "true")
+            email_row = db.query(Setting).filter_by(
+                lodge_id=1, setting_key="email_enabled").first()
+            integrations["email"] = (email_row and email_row.setting_value == "true")
+            agent_row = db.query(Setting).filter_by(
+                lodge_id=1, setting_key="agent_enabled").first()
+            integrations["ai"]    = (agent_row and agent_row.setting_value == "true")
+            lodge_count = db.query(Lodge).count()
+        except Exception:
+            lodge_count = 0
+
+        return {
+            "status":       "healthy",
+            "database":     "connected",
+            "version":      "2.1.0",
+            "lodges":       lodge_count,
+            "integrations": integrations,
+        }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return JSONResponse(

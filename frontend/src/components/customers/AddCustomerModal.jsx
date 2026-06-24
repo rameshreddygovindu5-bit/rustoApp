@@ -78,10 +78,10 @@ export default function AddCustomerModal({ onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[80] p-4 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-pop-in">
         <div className="bg-navy p-6 text-white flex justify-between items-center">
           <div>
-            <h3 className="text-xl font-bold font-playfair text-gold">Register New Guest</h3>
+            <h3 className="text-xl font-bold font-display text-gold">Register New Guest</h3>
             <p className="text-xs opacity-60 mt-1">Create a permanent customer record</p>
           </div>
           <button onClick={onClose} className="hover:bg-white/10 p-2 rounded-full transition-colors">
@@ -92,12 +92,12 @@ export default function AddCustomerModal({ onClose, onSuccess }) {
         <form onSubmit={handleSubmit} className="p-8 space-y-5 max-h-[75vh] overflow-y-auto custom-scrollbar">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">First Name *</label>
+              <label className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">First Name *</label>
               <div className="relative mt-1">
-                <User size={14} className="absolute left-3 top-3 text-gray-400" />
+                <User size={14} className="absolute left-3 top-3 text-ink-400" />
                 <input
                   type="text" required
-                  className={`w-full pl-9 pr-4 py-2.5 border ${errors.first_name ? 'border-red-400' : 'border-gray-200'} rounded-xl text-sm focus:border-navy outline-none transition-all`}
+                  className={`w-full pl-9 pr-4 py-2.5 border ${errors.first_name ? 'border-red-400' : 'border-ink-200'} rounded-xl text-sm focus:border-navy outline-none transition-all`}
                   placeholder="First name"
                   value={form.first_name}
                   onChange={e => setForm({ ...form, first_name: e.target.value })}
@@ -107,12 +107,12 @@ export default function AddCustomerModal({ onClose, onSuccess }) {
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Last Name *</label>
+              <label className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Last Name *</label>
               <div className="relative mt-1">
-                <User size={14} className="absolute left-3 top-3 text-gray-400" />
+                <User size={14} className="absolute left-3 top-3 text-ink-400" />
                 <input
                   type="text" required
-                  className={`w-full pl-9 pr-4 py-2.5 border ${errors.last_name ? 'border-red-400' : 'border-gray-200'} rounded-xl text-sm focus:border-navy outline-none transition-all`}
+                  className={`w-full pl-9 pr-4 py-2.5 border ${errors.last_name ? 'border-red-400' : 'border-ink-200'} rounded-xl text-sm focus:border-navy outline-none transition-all`}
                   placeholder="Last name"
                   value={form.last_name}
                   onChange={e => setForm({ ...form, last_name: e.target.value })}
@@ -122,12 +122,12 @@ export default function AddCustomerModal({ onClose, onSuccess }) {
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Phone *</label>
+              <label className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Phone *</label>
               <div className="relative mt-1">
-                <Phone size={14} className="absolute left-3 top-3 text-gray-400" />
+                <Phone size={14} className="absolute left-3 top-3 text-ink-400" />
                 <input
                   type="tel" required maxLength={10}
-                  className={`w-full pl-9 pr-4 py-2.5 border ${errors.phone ? 'border-red-400' : 'border-gray-200'} rounded-xl text-sm focus:border-navy outline-none transition-all`}
+                  className={`w-full pl-9 pr-4 py-2.5 border ${errors.phone ? 'border-red-400' : 'border-ink-200'} rounded-xl text-sm focus:border-navy outline-none transition-all`}
                   placeholder="10-digit mobile"
                   value={form.phone}
                   onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
@@ -137,12 +137,12 @@ export default function AddCustomerModal({ onClose, onSuccess }) {
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email</label>
+              <label className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Email</label>
               <div className="relative mt-1">
-                <Mail size={14} className="absolute left-3 top-3 text-gray-400" />
+                <Mail size={14} className="absolute left-3 top-3 text-ink-400" />
                 <input
                   type="email"
-                  className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-navy outline-none transition-all"
+                  className="w-full pl-9 pr-4 py-2.5 border border-ink-200 rounded-xl text-sm focus:border-navy outline-none transition-all"
                   placeholder="guest@email.com"
                   value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })}
@@ -151,11 +151,11 @@ export default function AddCustomerModal({ onClose, onSuccess }) {
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">ID Type *</label>
+              <label className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">ID Type *</label>
               <div className="relative mt-1">
-                <Shield size={14} className="absolute left-3 top-3 text-gray-400" />
+                <Shield size={14} className="absolute left-3 top-3 text-ink-400" />
                 <select
-                  className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-navy outline-none appearance-none"
+                  className="w-full pl-9 pr-4 py-2.5 border border-ink-200 rounded-xl text-sm focus:border-navy outline-none appearance-none"
                   value={form.id_type}
                   onChange={e => setForm({ ...form, id_type: e.target.value })}
                 >
@@ -165,12 +165,12 @@ export default function AddCustomerModal({ onClose, onSuccess }) {
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">ID Number *</label>
+              <label className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">ID Number *</label>
               <div className="relative mt-1">
-                <Shield size={14} className="absolute left-3 top-3 text-gray-400" />
+                <Shield size={14} className="absolute left-3 top-3 text-ink-400" />
                 <input
                   type="text" required
-                  className={`w-full pl-9 pr-4 py-2.5 border ${errors.id_number ? 'border-red-400' : 'border-gray-200'} rounded-xl text-sm focus:border-navy outline-none transition-all uppercase`}
+                  className={`w-full pl-9 pr-4 py-2.5 border ${errors.id_number ? 'border-red-400' : 'border-ink-200'} rounded-xl text-sm focus:border-navy outline-none transition-all uppercase`}
                   placeholder={ID_TYPES.find(t => t.value === form.id_type)?.placeholder}
                   value={form.id_number}
                   onChange={e => setForm({ ...form, id_number: e.target.value.toUpperCase() })}
@@ -180,11 +180,11 @@ export default function AddCustomerModal({ onClose, onSuccess }) {
             </div>
 
             <div className="col-span-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Address</label>
+              <label className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Address</label>
               <div className="relative mt-1">
-                <MapPin size={14} className="absolute left-3 top-3 text-gray-400" />
+                <MapPin size={14} className="absolute left-3 top-3 text-ink-400" />
                 <textarea
-                  className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-navy outline-none h-20 resize-none transition-all"
+                  className="w-full pl-9 pr-4 py-2.5 border border-ink-200 rounded-xl text-sm focus:border-navy outline-none h-20 resize-none transition-all"
                   placeholder="Full address..."
                   value={form.address}
                   onChange={e => setForm({ ...form, address: e.target.value })}
@@ -193,19 +193,19 @@ export default function AddCustomerModal({ onClose, onSuccess }) {
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nationality</label>
+              <label className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Nationality</label>
               <input
                 type="text"
-                className="w-full mt-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-navy outline-none"
+                className="w-full mt-1 px-4 py-2.5 border border-ink-200 rounded-xl text-sm focus:border-navy outline-none"
                 value={form.nationality}
                 onChange={e => setForm({ ...form, nationality: e.target.value })}
               />
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Gender</label>
+              <label className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Gender</label>
               <select
-                className="w-full mt-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-navy outline-none"
+                className="w-full mt-1 px-4 py-2.5 border border-ink-200 rounded-xl text-sm focus:border-navy outline-none"
                 value={form.gender}
                 onChange={e => setForm({ ...form, gender: e.target.value })}
               >
@@ -221,12 +221,12 @@ export default function AddCustomerModal({ onClose, onSuccess }) {
               capture the ID at customer creation and skip re-upload at first
               check-in. */}
           <div>
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-              ID Proof Image <span className="text-gray-400 font-normal normal-case">(JPG/PNG/PDF, max 5MB — optional, but speeds up first check-in)</span>
+            <label className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">
+              ID Proof Image <span className="text-ink-400 font-normal normal-case">(JPG/PNG/PDF, max 5MB — optional, but speeds up first check-in)</span>
             </label>
-            <label className="mt-1 flex items-center gap-3 border-2 border-dashed border-gray-300 rounded-lg p-3 cursor-pointer hover:border-navy transition-colors">
-              <Upload size={16} className="text-gray-400" />
-              <span className="text-sm text-gray-500 truncate">{idFile ? idFile.name : 'Click to attach ID image'}</span>
+            <label className="mt-1 flex items-center gap-3 border-2 border-dashed border-ink-300 rounded-lg p-3 cursor-pointer hover:border-navy transition-colors">
+              <Upload size={16} className="text-ink-400" />
+              <span className="text-sm text-ink-500 truncate">{idFile ? idFile.name : 'Click to attach ID image'}</span>
               <input type="file" className="hidden" accept=".jpg,.jpeg,.png,.pdf"
                 onChange={e => setIdFile(e.target.files[0])} />
             </label>
@@ -236,18 +236,18 @@ export default function AddCustomerModal({ onClose, onSuccess }) {
             <input
               type="checkbox"
               id="is_vip"
-              className="w-4 h-4 text-gold border-gray-300 rounded focus:ring-gold"
+              className="w-4 h-4 text-gold border-ink-300 rounded focus:ring-gold"
               checked={form.is_vip}
               onChange={e => setForm({ ...form, is_vip: e.target.checked })}
             />
-            <label htmlFor="is_vip" className="text-sm text-gray-700 font-medium cursor-pointer">Mark as VIP Guest ⭐</label>
+            <label htmlFor="is_vip" className="text-sm text-ink-700 font-medium cursor-pointer">Mark as VIP Guest ⭐</label>
           </div>
 
           <div className="flex gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 border border-gray-200 rounded-xl text-gray-600 font-bold hover:bg-gray-50 transition-all"
+              className="flex-1 py-3 border border-ink-200 rounded-xl text-ink-600 font-bold hover:bg-ink-50 transition-all"
             >
               Cancel
             </button>

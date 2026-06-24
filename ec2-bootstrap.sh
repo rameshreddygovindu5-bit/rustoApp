@@ -1,156 +1,179 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════
-#  EC2 BOOTSTRAP for Udumula's Grand LMS
-#  Run ONCE on a fresh Ubuntu 22.04+ EC2 instance to set up the host
-#  for the GitHub Actions auto-deploy workflow.
+# Rusto LMS — EC2 Bootstrap (run ONCE on a fresh Ubuntu 22.04 instance)
 #
-#  Usage on the EC2 instance (as the ubuntu user):
-#      curl -fsSL https://raw.githubusercontent.com/<your-repo>/main/ec2-bootstrap.sh | bash
-#  OR copy this file over and run:
-#      bash ec2-bootstrap.sh
+# What this does:
+#   1. Configures 2GB swap
+#   2. Installs Docker + Docker Compose v2
+#   3. Configures UFW firewall (80, 443, 22 only)
+#   4. Creates /opt/rusto-lms with correct permissions
+#   5. Generates .env.production from your inputs
+#   6. Configures log rotation
 #
-#  After this completes, push to main / master on GitHub and it auto-deploys.
+# Usage (on EC2 as ubuntu user):
+#   bash ec2-bootstrap.sh
 # ════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
 APP_DIR="/opt/rusto-lms"
 APP_USER="${SUDO_USER:-${USER:-ubuntu}}"
+CYAN='\033[0;36m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 
+echo -e "${CYAN}"
 echo "════════════════════════════════════════════════════════════"
-echo "  Udumula's Grand LMS — EC2 Bootstrap"
+echo "  Rusto LMS — EC2 Bootstrap"
 echo "  App dir: $APP_DIR"
 echo "  Owner:   $APP_USER"
 echo "════════════════════════════════════════════════════════════"
+echo -e "${NC}"
 
-# 1. Swap Space (to prevent out-of-memory errors on micro instances)
-echo ""
-echo ">> [0/5] Configuring 2GB Swap Space..."
+# ── 1. Swap ─────────────────────────────────────────────────────────
+echo -e "${CYAN}[1/6] Configuring 2 GB swap...${NC}"
 if ! swapon --show | grep -q "/swapfile"; then
   sudo fallocate -l 2G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
   sudo chmod 600 /swapfile
   sudo mkswap /swapfile
   sudo swapon /swapfile
   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-  echo "   ✓ Swap configured and enabled"
+  echo "  ✓ 2 GB swap enabled"
 else
-  echo "   ✓ Swap already configured"
+  echo "  ✓ Swap already configured"
 fi
 
-# 2. System update + base packages (NO host nginx — we use a container)
-echo ""
-echo ">> [1/5] Updating system packages..."
+# ── 2. System packages ───────────────────────────────────────────────
+echo -e "${CYAN}[2/6] Installing system packages...${NC}"
 sudo apt-get update -y
-sudo apt-get install -y curl ca-certificates gnupg lsb-release ufw rsync git \
-                        openssl
+sudo apt-get install -y curl ca-certificates gnupg lsb-release ufw rsync git openssl
 
-# Make absolutely sure host nginx is not running on port 80
-if dpkg -l nginx 2>/dev/null | grep -q ^ii ; then
-  sudo systemctl stop nginx 2>/dev/null || true
-  sudo systemctl disable nginx 2>/dev/null || true
-fi
+# Stop host nginx (we use containerized nginx)
+sudo systemctl stop nginx 2>/dev/null || true
+sudo systemctl disable nginx 2>/dev/null || true
 
-# 2. Install Docker (official)
-if ! command -v docker > /dev/null 2>&1; then
-  echo ""
-  echo ">> [2/5] Installing Docker..."
-  sudo install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-    sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  sudo chmod a+r /etc/apt/keyrings/docker.gpg
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-       https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-  sudo apt-get update -y
-  sudo apt-get install -y docker-ce docker-ce-cli containerd.io \
-                          docker-buildx-plugin docker-compose-plugin
+# ── 3. Docker ────────────────────────────────────────────────────────
+echo -e "${CYAN}[3/6] Installing Docker...${NC}"
+if ! command -v docker >/dev/null 2>&1; then
+  curl -fsSL https://get.docker.com | sudo bash
   sudo usermod -aG docker "$APP_USER"
-  echo "   ✓ Docker installed; '$APP_USER' added to docker group (re-login required)"
+  echo "  ✓ Docker installed"
 else
-  echo ">> [2/5] Docker already installed ✓"
+  echo "  ✓ Docker already installed"
 fi
 
-# 3. App directory
-echo ""
-echo ">> [3/5] Creating $APP_DIR ..."
+# Ensure Docker Compose v2
+if ! docker compose version >/dev/null 2>&1; then
+  sudo apt-get install -y docker-compose-plugin
+fi
+echo "  ✓ Docker Compose: $(docker compose version --short)"
+
+# ── 4. Firewall ──────────────────────────────────────────────────────
+echo -e "${CYAN}[4/6] Configuring firewall...${NC}"
+sudo ufw --force reset
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22/tcp   comment "SSH"
+sudo ufw allow 80/tcp   comment "HTTP"
+sudo ufw allow 443/tcp  comment "HTTPS"
+sudo ufw --force enable
+echo "  ✓ UFW: 22, 80, 443 open"
+
+# ── 5. App directory ─────────────────────────────────────────────────
+echo -e "${CYAN}[5/6] Creating app directory...${NC}"
 sudo mkdir -p "$APP_DIR"
 sudo chown -R "$APP_USER":"$APP_USER" "$APP_DIR"
 mkdir -p "$APP_DIR/nginx/conf.d" "$APP_DIR/nginx/certs"
+echo "  ✓ $APP_DIR ready"
 
-# 4. Generate .env.production from template if missing
-if [ ! -f "$APP_DIR/.env.production" ]; then
-  echo ""
-  echo ">> [4/5] Generating $APP_DIR/.env.production ..."
-  POSTGRES_PASSWORD=$(openssl rand -hex 24)
-  JWT_SECRET=$(openssl rand -hex 48)
-  PUBLIC_HOST=$(curl -fsS http://169.254.169.254/latest/meta-data/public-hostname 2>/dev/null \
-                || hostname -f 2>/dev/null || echo "localhost")
+# ── 6. .env.production ───────────────────────────────────────────────
+echo -e "${CYAN}[6/6] Creating .env.production...${NC}"
+if [ -f "$APP_DIR/.env.production" ]; then
+  echo -e "${YELLOW}  .env.production already exists — skipping${NC}"
+else
+  # Generate a secure JWT secret
+  JWT_SECRET=$(openssl rand -hex 32)
+  DB_PASSWORD=$(openssl rand -hex 16)
 
-  cat > "$APP_DIR/.env.production" <<EOF
-# ─────────── Auto-generated by ec2-bootstrap.sh — DO NOT COMMIT ───────────
+  cat > "$APP_DIR/.env.production" << ENVEOF
+# Auto-generated by ec2-bootstrap.sh
+# Fill in your real credentials below
+
 POSTGRES_USER=lms
-POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+POSTGRES_PASSWORD=${DB_PASSWORD}
 POSTGRES_DB=rusto_lms
-DATABASE_URL=postgresql://lms:${POSTGRES_PASSWORD}@db:5432/rusto_lms
+DATABASE_URL=postgresql://lms:${DB_PASSWORD}@db:5432/rusto_lms
 
 JWT_SECRET_KEY=${JWT_SECRET}
+JWT_EXPIRE_HOURS=8
+
 DEFAULT_ADMIN_USERNAME=admin
-DEFAULT_ADMIN_PASSWORD=Admin@1234
+DEFAULT_ADMIN_PASSWORD=CHANGE_THIS_before_first_deploy
 
-# Comma-separated origins allowed to call the API.
-# Edit this to your real domain(s) before going live.
-CORS_ORIGINS=http://${PUBLIC_HOST},http://localhost
+# Add your real domain names
+CORS_ORIGINS=http://localhost,http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo localhost)
 
-# Frontend reads VITE_API_URL at build time; nginx routes /api -> backend
+# Razorpay
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+
+# SMS
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
+MSG91_AUTH_KEY=
+MSG91_SENDER_ID=
+
+# Email
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM_EMAIL=
+SMTP_FROM_NAME=Rusto LMS
+
+# AI
+ANTHROPIC_API_KEY=
+AGENT_PROVIDER=auto
+
 VITE_API_URL=/api
-
-# Optional AI agent keys (uncomment + fill to enable full LLM mode)
-# ANTHROPIC_API_KEY=sk-ant-...
-# OPENAI_API_KEY=sk-...
-# AGENT_PROVIDER=auto
-
 TZ=Asia/Kolkata
-EOF
+ENVEOF
   chmod 600 "$APP_DIR/.env.production"
-  echo "   ✓ Wrote $APP_DIR/.env.production"
-  echo "   ⚠ Review CORS_ORIGINS once you point a real domain."
-else
-  echo ">> [4/5] .env.production already exists ✓ (leaving untouched)"
+  echo "  ✓ .env.production created at $APP_DIR/.env.production"
+  echo -e "${YELLOW}  ⚠  Edit .env.production and add your real credentials before deploying!${NC}"
 fi
 
-# 5. Firewall
+# ── Log rotation ─────────────────────────────────────────────────────
+sudo tee /etc/logrotate.d/docker-containers > /dev/null << 'LOGROTEOF'
+/var/lib/docker/containers/*/*.log {
+  daily
+  rotate 7
+  compress
+  delaycompress
+  missingok
+  notifempty
+  copytruncate
+}
+LOGROTEOF
+
+# ── Done ─────────────────────────────────────────────────────────────
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "YOUR_IP")
+
 echo ""
-echo ">> [5/5] Configuring firewall..."
-sudo ufw allow OpenSSH > /dev/null
-sudo ufw allow 80/tcp > /dev/null
-sudo ufw allow 443/tcp > /dev/null
-sudo ufw --force enable > /dev/null
-echo "   ✓ UFW: ssh, 80, 443 allowed"
-
-cat <<EOF
-
-════════════════════════════════════════════════════════════
-  Bootstrap complete!
-
-  Next steps:
-
-  1. Add these GitHub repository secrets (Settings → Secrets):
-        EC2_HOST       ← your EC2 public DNS or IP
-        EC2_USER       ← $APP_USER
-        EC2_SSH_KEY    ← contents of the private key matching the
-                         pubkey in ~/.ssh/authorized_keys on EC2
-
-  2. (Optional) Edit $APP_DIR/.env.production:
-        - Set CORS_ORIGINS to your real domain(s)
-        - Add ANTHROPIC_API_KEY for the AI agent
-
-  3. Push to main / master — the workflow auto-deploys.
-
-  4. (Optional) HTTPS with Let's Encrypt:
-        sudo apt-get install certbot
-        sudo certbot certonly --standalone -d your-domain.example.com
-        # then edit nginx/conf.d/default.conf to add a 443 server block
-        # and mount /etc/letsencrypt into the nginx container.
-
-  Default admin login: admin / Admin@1234   ← CHANGE IT IMMEDIATELY
-════════════════════════════════════════════════════════════
-EOF
+echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}  ✓ EC2 Bootstrap complete!                                ${NC}"
+echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}"
+echo ""
+echo "  Next steps:"
+echo ""
+echo "  1. Edit credentials:"
+echo -e "     ${YELLOW}nano $APP_DIR/.env.production${NC}"
+echo ""
+echo "  2. Add these GitHub Secrets in your repo Settings → Secrets → Actions:"
+echo -e "     ${CYAN}EC2_HOST${NC}     = $PUBLIC_IP"
+echo -e "     ${CYAN}EC2_USER${NC}     = $APP_USER"
+echo -e "     ${CYAN}EC2_SSH_KEY${NC}  = (contents of your .pem file)"
+echo ""
+echo "  3. Push to main/master to trigger auto-deploy:"
+echo -e "     ${CYAN}git push origin main${NC}"
+echo ""
+echo -e "  App will be available at: ${CYAN}http://$PUBLIC_IP${NC}"
+echo ""

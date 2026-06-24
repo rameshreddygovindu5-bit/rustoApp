@@ -233,19 +233,19 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
     }
   }
 
-  const inputCls = "w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-navy outline-none transition-all"
-  const inputWithIconCls = "w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-navy outline-none transition-all"
-  const labelCls = "text-[10px] font-bold text-gray-400 uppercase tracking-wider"
+  const inputCls = "w-full px-4 py-2.5 border border-ink-200 rounded-xl text-sm focus:border-navy outline-none transition-all"
+  const inputWithIconCls = "w-full pl-9 pr-4 py-2.5 border border-ink-200 rounded-xl text-sm focus:border-navy outline-none transition-all"
+  const labelCls = "text-[10px] font-bold text-ink-400 uppercase tracking-wider"
 
   return (
     <div
       className="fixed inset-0 bg-black/60 flex items-center justify-center z-[80] p-4 backdrop-blur-sm animate-fade-in"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-pop-in">
         <div className="bg-navy p-6 text-white flex justify-between items-center">
           <div>
-            <h3 className="text-xl font-bold font-playfair text-gold">
+            <h3 className="text-xl font-bold font-display text-gold">
               {isEdit ? `Edit Booking ${booking.booking_ref}` : 'New Advance Booking'}
             </h3>
             <p className="text-xs opacity-60 mt-1">
@@ -264,10 +264,10 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
           {!returningGuest && (
             <div className="relative">
               <label className={labelCls}>
-                Search Guest <span className="text-gray-300 font-normal normal-case">(type phone or name — min 3 chars)</span>
+                Search Guest <span className="text-ink-300 font-normal normal-case">(type phone or name — min 3 chars)</span>
               </label>
               <div className="relative mt-1">
-                <Search size={14} className="absolute left-3 top-3 text-gray-400" />
+                <Search size={14} className="absolute left-3 top-3 text-ink-400" />
                 <input
                   ref={phoneRef} autoFocus type="text"
                   className={inputWithIconCls}
@@ -279,10 +279,10 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
               </div>
 
               {suggestions.length > 0 && (
-                <div className="absolute z-30 w-full bg-white border border-gray-200 rounded-lg shadow-xl mt-1 overflow-hidden max-h-72 overflow-y-auto">
+                <div className="absolute z-30 w-full bg-white border border-ink-200 rounded-lg shadow-xl mt-1 overflow-hidden max-h-72 overflow-y-auto">
                   {suggestions.map(s => (
                     <button key={s.customer_id} type="button"
-                      className={`w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-gray-50 last:border-0 ${s.blacklisted ? 'bg-red-50/50' : ''}`}
+                      className={`w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-ink-100 last:border-0 ${s.blacklisted ? 'bg-red-50/50' : ''}`}
                       onClick={() => handleSelectCustomer(s)}>
                       <div className="flex items-center gap-2">
                         <p className="font-semibold text-navy text-sm flex-1">{s.full_name}</p>
@@ -297,7 +297,7 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
                           </span>
                         )}
                       </div>
-                      <p className="text-gray-500 text-xs mt-0.5">{s.phone} · {s.total_visits} visit{s.total_visits !== 1 ? 's' : ''}</p>
+                      <p className="text-ink-500 text-xs mt-0.5">{s.phone} · {s.total_visits} visit{s.total_visits !== 1 ? 's' : ''}</p>
                     </button>
                   ))}
                 </div>
@@ -309,7 +309,7 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
           <div>
             <label className={labelCls}>Phone *</label>
             <div className="relative mt-1">
-              <Phone size={14} className="absolute left-3 top-3 text-gray-400" />
+              <Phone size={14} className="absolute left-3 top-3 text-ink-400" />
               <input type="tel" required maxLength={10}
                 className={inputWithIconCls}
                 placeholder="10-digit mobile number"
@@ -340,7 +340,7 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
                     </span>
                   )}
                 </div>
-                <p className="text-gray-600 text-xs mt-0.5">
+                <p className="text-ink-600 text-xs mt-0.5">
                   {returningGuest.phone} · {returningGuest.total_visits} previous visit{returningGuest.total_visits !== 1 ? 's' : ''}
                   {returningGuest.email ? ` · ${returningGuest.email}` : ''}
                 </p>
@@ -358,7 +358,7 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
                 <div>
                   <label className={labelCls}>First Name *</label>
                   <div className="relative mt-1">
-                    <User size={14} className="absolute left-3 top-3 text-gray-400" />
+                    <User size={14} className="absolute left-3 top-3 text-ink-400" />
                     <input type="text" required
                       className={inputWithIconCls}
                       placeholder="First name"
@@ -380,7 +380,7 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
               <div>
                 <label className={labelCls}>Email</label>
                 <div className="relative mt-1">
-                  <Mail size={14} className="absolute left-3 top-3 text-gray-400" />
+                  <Mail size={14} className="absolute left-3 top-3 text-ink-400" />
                   <input type="email"
                     className={inputWithIconCls}
                     placeholder="guest@email.com (optional)"
@@ -413,7 +413,7 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
               <div>
                 <label className={labelCls}>Address</label>
                 <div className="relative mt-1">
-                  <MapPin size={14} className="absolute left-3 top-3 text-gray-400" />
+                  <MapPin size={14} className="absolute left-3 top-3 text-ink-400" />
                   <input type="text"
                     className={inputWithIconCls}
                     placeholder="City or full address"
@@ -452,7 +452,7 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
           )}
 
           {/* Reservation Details section */}
-          <div className="border-t border-gray-100 pt-5">
+          <div className="border-t border-ink-100 pt-5">
             <h4 className="text-xs font-bold text-navy uppercase tracking-wider mb-4">Reservation Details</h4>
 
             <div className="grid grid-cols-2 gap-4">
@@ -492,7 +492,7 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
               <div>
                 <label className={labelCls}>No. of Rooms *</label>
                 <div className="relative mt-1">
-                  <BedDouble size={14} className="absolute left-3 top-3 text-gray-400" />
+                  <BedDouble size={14} className="absolute left-3 top-3 text-ink-400" />
                   <input type="number" min={1} max={20} required
                     className={inputWithIconCls}
                     value={form.rooms_count}
@@ -513,7 +513,7 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
                   })()}
                 </label>
                 <div className="relative mt-1">
-                  <CreditCard size={14} className="absolute left-3 top-3 text-gray-400" />
+                  <CreditCard size={14} className="absolute left-3 top-3 text-ink-400" />
                   <input type="number" required min={0}
                     className={inputWithIconCls}
                     value={form.tariff_per_night}
@@ -541,13 +541,13 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
           </div>
 
           {/* Advance / Payment */}
-          <div className="border-t border-gray-100 pt-5">
+          <div className="border-t border-ink-100 pt-5">
             <h4 className="text-xs font-bold text-navy uppercase tracking-wider mb-4">Advance Payment</h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Advance Amount (₹)</label>
                 <div className="relative mt-1">
-                  <Wallet size={14} className="absolute left-3 top-3 text-gray-400" />
+                  <Wallet size={14} className="absolute left-3 top-3 text-ink-400" />
                   <input type="number" min={0}
                     className={inputWithIconCls}
                     value={form.advance_amount}
@@ -571,9 +571,9 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
           <div>
             <label className={labelCls}>Special Requests</label>
             <div className="relative mt-1">
-              <Clipboard size={14} className="absolute left-3 top-3 text-gray-400" />
+              <Clipboard size={14} className="absolute left-3 top-3 text-ink-400" />
               <textarea
-                className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-navy outline-none h-20 resize-none transition-all"
+                className="w-full pl-9 pr-4 py-2.5 border border-ink-200 rounded-xl text-sm focus:border-navy outline-none h-20 resize-none transition-all"
                 placeholder="Any preferences or notes..."
                 value={form.special_requests}
                 onChange={e => setForm({ ...form, special_requests: e.target.value })} />
@@ -602,7 +602,7 @@ export default function BookingModal({ booking, onClose, onSuccess }) {
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose}
-              className="flex-1 py-3 border border-gray-200 rounded-xl text-gray-600 font-bold hover:bg-gray-50 transition-all">
+              className="flex-1 py-3 border border-ink-200 rounded-xl text-ink-600 font-bold hover:bg-ink-50 transition-all">
               Cancel
             </button>
             <button type="submit" disabled={loading}

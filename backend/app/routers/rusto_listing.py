@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from ..database import get_db
-from ..models import Lodge, LodgePhoto, CustomerBooking, RustoCustomer
+from ..models import Lodge, LodgePhoto, CustomerBooking, CustomerBookingStatus, RustoCustomer
 from ..auth import get_current_user, require_admin, resolve_lodge_scope
 from ..services.audit_service import log_audit
 
@@ -100,6 +100,7 @@ def _publish_blockers(l: Lodge, photos: List[LodgePhoto]) -> List[str]:
 
 
 @router.get("")
+@router.get("/info")
 def get_my_listing(db: Session = Depends(get_db),
                     current_user=Depends(get_current_user),
                     lodge_id: int = Depends(resolve_lodge_scope)):
@@ -275,3 +276,64 @@ def list_incoming_bookings(status: Optional[str] = None,
             "created_at": b.created_at.isoformat() if b.created_at else None,
         })
     return out
+
+
+# ── Lodge-side booking actions ───────────────────────────────────────
+
+class BookingActionBody(BaseModel):
+    note: Optional[str] = None
+
+
+@router.post("/bookings/{booking_id}/confirm")
+def confirm_booking(booking_id: int,
+                    body: BookingActionBody,
+                    db: Session = Depends(get_db),
+                    current_user=Depends(get_current_user),
+                    lodge_id: int = Depends(resolve_lodge_scope)):
+    """Lodge admin confirms a pending customer booking.
+    Also creates a PMS Booking record so it appears in the operational system."""
+    bk = db.query(CustomerBooking).filter(
+        CustomerBooking.booking_id == booking_id,
+        CustomerBooking.lodge_id == lodge_id,
+    ).filter(
+        CustomerBooking.status.in_([
+            CustomerBookingStatus.payment_pending.value,
+            CustomerBookingStatus.confirmed.value,
+        ])
+    ).first()
+    if not bk:
+        raise HTTPException(404, "Booking not found for this lodge")
+    bk.status = CustomerBookingStatus.confirmed.value
+    db.commit()
+
+    # v10.2 — sync to PMS Booking table so lodge admin can check-in from PMS
+    try:
+        from .rusto_bookings import _sync_customer_booking_to_pms
+        pms_bk = _sync_customer_booking_to_pms(db, bk)
+        pms_ref = pms_bk.booking_ref if pms_bk else None
+    except Exception as _e:
+        import logging
+        logging.getLogger(__name__).error("PMS sync on confirm failed: %s", _e)
+        pms_ref = None
+
+    return {"booking_id": bk.booking_id, "status": bk.status,
+            "booking_ref": bk.booking_ref, "pms_booking_ref": pms_ref}
+
+
+@router.post("/bookings/{booking_id}/reject")
+def reject_booking(booking_id: int,
+                   body: BookingActionBody,
+                   db: Session = Depends(get_db),
+                   current_user=Depends(get_current_user),
+                   lodge_id: int = Depends(resolve_lodge_scope)):
+    """Lodge admin rejects a pending customer booking."""
+    bk = db.query(CustomerBooking).filter(
+        CustomerBooking.booking_id == booking_id,
+        CustomerBooking.lodge_id == lodge_id,
+        CustomerBooking.status == CustomerBookingStatus.payment_pending.value,
+    ).first()
+    if not bk:
+        raise HTTPException(404, "Pending booking not found for this lodge")
+    bk.status = CustomerBookingStatus.cancelled.value
+    db.commit()
+    return {"booking_id": bk.booking_id, "status": bk.status, "booking_ref": bk.booking_ref}

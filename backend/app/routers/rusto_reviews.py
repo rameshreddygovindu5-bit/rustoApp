@@ -21,8 +21,14 @@ customer owns AND whose status is checked_in / checked_out. This is the
 "verified stay" guarantee shown publicly with a badge.
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
@@ -410,7 +416,7 @@ def respond_to_review(review_id: int, body: ReviewResponseBody, request: Request
 
     is_edit = bool(review.response_body)
     review.response_body = body.body.strip()
-    review.response_at = datetime.utcnow()
+    review.response_at = _utcnow()
     review.response_by_user_id = current_user.user_id
     db.commit(); db.refresh(review)
 

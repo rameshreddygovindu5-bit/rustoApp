@@ -2,9 +2,494 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+
+  /* ── Missing vars used by pages ─────────────────────────────── */
+  --c-blue-50:      #EFF6FF;
+  --c-blue-100:     #DBEAFE;
+  --prop-primary:   #1B2A4A;   /* default property theme color */
+  --prop-accent:    #C9A84C;   /* default property accent */
+
+  /* ── New design system aliases ──────────────────────────────── */
+  --c-cta:          #1E3A8A;   /* primary CTA blue */
+  --c-cta-hover:    #1D4ED8;
+  --c-heart:        #EF4444;   /* saved/liked color */
+  --c-star:         #F59E0B;   /* star rating color */
+  --c-overlay:      rgba(15,23,42,0.6);
+  /* ── Brand Colors (Tailwind mappings) ── */
+  --navy-50:  #F0F3F8;
+  --navy-100: #DCE3EE;
+  --navy-200: #B9C5D8;
+  --navy-300: #8FA0BF;
+  --navy-400: #5A7099;
+  --navy-500: #3A4F7A;
+  --navy-600: #283C63;
+  --navy-700: #1B2A4A;
+  --navy-800: #0F1B33;
+  --navy-900: #0A1224;
+  --navy-950: #050912;
+  --navy-DEFAULT: var(--navy-700);
+  --navy-light:   var(--navy-400);
+  --navy-dark:    var(--navy-800);
+
+  --gold-50:  #FDFAF1;
+  --gold-100: #F7EFD7;
+  --gold-200: #EEDFA9;
+  --gold-300: #E2C470;
+  --gold-400: #D9B85F;
+  --gold-500: #C9A84C;
+  --gold-600: #B89540;
+  --gold-700: #A8873C;
+  --gold-800: #856B2E;
+  --gold-900: #5E4B20;
+  --gold-DEFAULT: var(--gold-500);
+  --gold-light:   var(--gold-300);
+  --gold-dark:    var(--gold-700);
+
+  --ink-50:  #F9FAFB;
+  --ink-100: #F2F4F7;
+  --ink-200: #E5E8EE;
+  --ink-300: #D0D5DD;
+  --ink-400: #98A2B3;
+  --ink-500: #667085;
+  --ink-600: #475467;
+  --ink-700: #344054;
+  --ink-800: #1D2939;
+  --ink-900: #101828;
+
+  /* ── Advanced Theme (Quiet Luxury & Misty Nature) ── */
+  --space-dark: #061519;
+  --space-surface: #0b252c;
+  --space-card: rgba(11, 37, 44, 0.65);
+  --accent-sun: #D69A80;
+  --accent-glow: rgba(214, 154, 128, 0.15);
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
+  --text-dark: #061519;
+  --status-ready: #10B981;
+  --status-occupied: #EF4444;
+  --status-cleaning: #3B82F6;
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --misty-dark: #0B252C;
+  --amber-glow: #D69A80;
+  --glass-white: rgba(255, 255, 255, 0.10);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --brand-teal-dark: #07171C;
+  --brand-teal-light: #0B252C;
+  --brand-copper: #D69A80;
+  --brand-amber: #E9B151;
+  --traveler-bg-start: #0B252C;
+  --traveler-bg-end: #051216;
+  --pms-bg-start: #0c1220;
+  --pms-bg-end: #030712;
+  --surface-glass-dark: rgba(15, 27, 40, 0.45);
+  --surface-panel-obsidian: #0C111D;
+  --color-success-bg: rgba(16, 185, 129, 0.12);
+  --color-success-text: #34D399;
+  --color-success-border: rgba(16, 185, 129, 0.25);
+  --color-occupied-bg: rgba(239, 68, 68, 0.12);
+  --color-occupied-text: #F87171;
+  --color-occupied-border: rgba(239, 68, 68, 0.25);
+  --color-checkout-bg: rgba(59, 130, 246, 0.12);
+  --color-checkout-text: #93C5FD;
+  --color-checkout-border: rgba(59, 130, 246, 0.25);
+  --color-maintenance-bg: rgba(245, 158, 11, 0.12);
+  --color-maintenance-text: #FBBF24;
+  --color-maintenance-border: rgba(245, 158, 11, 0.25);
+  --font-h1: clamp(28px, 1.13rem + 2.63vw, 56px);
+  --font-h2: clamp(20px, 0.9rem + 1.5vw, 36px);
+  --font-h3: clamp(16px, 0.74rem + 1.13vw, 28px);
+  --font-h4: clamp(15px, 0.83rem + 0.47vw, 20px);
+  --font-body: clamp(14px, 0.83rem + 0.19vw, 16px);
+  --font-micro: clamp(11px, 0.65rem + 0.1vw, 12px);
+  --font-badge: clamp(10px, 0.58rem + 0.1vw, 12px);
+  --fs-h1: clamp(28px, 1.13rem + 2.63vw, 56px);
+  --fs-h2: clamp(20px, 0.9rem + 1.5vw, 36px);
+  --fs-h3: clamp(16px, 0.74rem + 1.13vw, 28px);
+  --fs-h4: clamp(15px, 0.83rem + 0.47vw, 20px);
+  --fs-body: clamp(14px, 0.83rem + 0.19vw, 16px);
+  --font-stack: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-display: 'Outfit', 'Plus Jakarta Sans', 'Inter', sans-serif;
+  /* Warm PMS fonts */
+  --font-warm-display: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
+  --font-warm-body:    'Jost', 'Plus Jakarta Sans', 'Inter', sans-serif;
+
+  /* ── High-Contrast Luxury Redesign Overrides (2026 Elite Edition) ── */
+  --text-primary: #0A111F;      /* Midnight Eclipse (Deep Navy-Black) */
+  --text-body: #2A3649;         /* Slate Obsidian (Rich Steel Blue) */
+  --text-muted: #52627A;        /* Muted Timber (Sophisticated Gray) */
+
+  --lux-gold-solid: #A37F29;    /* Deep Liquid Gold: Perfect for links & active states on white */
+  --lux-copper-burn: #C2633E;   /* Crimson Copper: Buttons, accents, and highlights */
+  
+  --booking-cta: #0F3496;       /* Deep Royal Blue: "Book Now" buttons */
+  --booking-cta-hover: #0A2266; /* Shadow Blue: Darkens on hover */
+
+  --bg-surface-soft: #F6F8FA;   /* Soft Cloud Gray container background */
+  --border-crisp: #E2E7ED;      /* Clean crisp borders and lines */
+
+  --deep-ocean: #081C22;
+  --midnight: #102C34;
+  --gold: #D4AF37;
+  --champagne: #F5E7C4;
+  --ivory: #FCFCFA;
+  --mist: #EEF2F4;
+  --success: #00C48C;
+
+  /* ── Rusto Customer Portal Design Tokens (Mapped to High Contrast) ── */
+  --r-bg:          #FFFFFF;
+  --r-surface:     var(--bg-surface-soft);
+  --r-border:      var(--border-crisp);
+  --r-border-soft: #F1F5F9;
+  --r-text-primary:   var(--text-primary);
+  --r-text-secondary: var(--text-body);
+  --r-text-tertiary:  var(--text-muted);
+  --r-blue:        var(--booking-cta);
+  --r-blue-hover:  var(--booking-cta-hover);
+  --r-blue-light:  #EFF6FF;
+  --r-blue-50:     #DBEAFE;
+  --r-gold:        var(--lux-gold-solid);
+  --r-gold-bg:     #FFFBEB;
+  --r-green:       #166534;
+  --r-green-bg:    #F0FDF4;
+  --r-red:         #991B1B;
+  --r-red-bg:      #FEF2F2;
+  --r-amber:       #D97706;
+  --r-radius:      12px;
+  --r-radius-lg:   16px;
+  --r-radius-xl:   20px;
+  --r-shadow-sm:   0 1px 2px rgba(15,23,42,0.06);
+  --r-shadow:      0 1px 3px rgba(15,23,42,0.08), 0 4px 12px rgba(15,23,42,0.04);
+  --r-shadow-lg:   0 4px 16px rgba(15,23,42,0.10), 0 1px 4px rgba(15,23,42,0.06);
+
+  /* ── Rusto Design System Source of Truth (Mapped to High Contrast) ── */
+  --c-bg:          #FFFFFF;
+  --c-surface:     var(--bg-surface-soft);
+  --c-surface-2:   var(--bg-surface-soft);
+  --c-border:      var(--border-crisp);
+  --c-border-soft: #F1F5F9;
+  --c-text-1:      var(--text-primary);
+  --c-text-2:      var(--text-body);
+  --c-text-3:      var(--text-muted);
+  --c-text-4:      var(--text-muted);
+  --c-navy:        #1B2A4A;
+  --c-navy-2:      #243557;
+  --c-primary:     var(--booking-cta);
+  --c-primary-h:   var(--booking-cta-hover);
+  --c-primary-bg:  #EFF6FF;
+  --c-primary-bd:  #BFDBFE;
+  --c-gold:        var(--lux-gold-solid);
+  --c-gold-light:  var(--lux-gold-solid);
+  --c-gold-bg:     #FFFBEB;
+  --c-gold-bd:     #FDE68A;
+  --c-success:     #166534;
+  --c-success-bg:  #F0FDF4;
+  --c-success-bd:  #BBF7D0;
+  --c-error:       #991B1B;
+  --c-error-bg:    #FEF2F2;
+  --c-error-bd:    #FECACA;
+  --c-warn:        #92400E;
+  --c-warn-bg:     #FFFBEB;
+  --c-warn-bd:     #FDE68A;
+
+  /* Shadows */
+  --s-xs:  0 1px 2px rgba(15,23,42,0.05);
+  --s-sm:  0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
+  --s-md:  0 4px 12px rgba(15,23,42,0.06), 0 1px 3px rgba(15,23,42,0.04);
+  --s-lg:  0 10px 28px rgba(15,23,42,0.08), 0 2px 6px rgba(15,23,42,0.04);
+  --s-xl:  0 20px 48px rgba(15,23,42,0.12), 0 4px 12px rgba(15,23,42,0.06);
+
+  /* Radii */
+  --r-sm:  8px;
+  --r-md:  12px;
+  --r-lg:  16px;
+  --r-xl:  20px;
+  --r-2xl: 24px;
+
+  /* ══════════════════════════════════════════════════════════════
+     RUSTO DESIGN SYSTEM v2 — "Indian Dusk" Palette
+     Inspired by: the hour temple spires catch last saffron light
+     against deep indigo sky. Warm, unmistakably Indian, premium.
+     Synced with mobile/src/theme/index.ts — same hex values.
+     ══════════════════════════════════════════════════════════════ */
+
+  /* ── Core Indigo-Navy ─────────────────────────────────────── */
+  --dusk-900:   #07131C;   /* Obsidian Depth   — darkest bg       */
+  --dusk-800:   #0D1F2D;   /* Midnight Indigo  — hero surfaces     */
+  --dusk-700:   #122434;   /* Deep Teal-Indigo                    */
+  --dusk-600:   #162E42;   /* Dusk Indigo      — secondary surface */
+  --dusk-500:   #1E3D57;   /* Twilight Steel   — borders on dark   */
+  --dusk-400:   #2E5470;   /* Slate Blue                          */
+  --dusk-300:   #4A7A9B;   /* Mist Blue        — muted text        */
+  --dusk-200:   #7AAEC8;   /* Sky Steel                           */
+  --dusk-100:   #C2DFF0;   /* Pale Sky                            */
+  --dusk-50:    #EBF4FA;   /* Cloud Mist                          */
+
+  /* ── Saffron Gold ─────────────────────────────────────────── */
+  --saffron-900:  #5C3A00;
+  --saffron-800:  #7D5000;
+  --saffron-700:  #A36800;
+  --saffron-600:  #C4841A;   /* Aged Brass                          */
+  --saffron-500:  #D4951E;   /* Molten Gold                         */
+  --saffron-DEFAULT: #E8A020; /* Temple Saffron — THE accent color   */
+  --saffron-400:  #EDB84A;   /* Afternoon Amber                     */
+  --saffron-300:  #F2BF5E;   /* Golden Hour                         */
+  --saffron-200:  #F7D49A;   /* Warm Glow                           */
+  --saffron-100:  #FAE8C5;   /* Morning Champagne                   */
+  --saffron-50:   #FDF3DC;   /* Ivory Warmth                        */
+
+  /* ── Warm Ivory neutrals (replaces cold ink palette) ──────── */
+  --ivory-900:  #0F0E0B;
+  --ivory-800:  #201E17;
+  --ivory-700:  #38342A;
+  --ivory-600:  #524D41;
+  --ivory-500:  #736C5E;
+  --ivory-400:  #9B9486;
+  --ivory-300:  #C5C0B2;
+  --ivory-200:  #E0DDD4;
+  --ivory-100:  #F2F0EB;
+  --ivory-50:   #FAFAF8;
+
+  /* ── Terracotta accent ─────────────────────────────────────── */
+  --terra-DEFAULT: #C85D3A;   /* Temple Clay — special CTAs, elite   */
+  --terra-light:   #E8845F;
+  --terra-glow:    rgba(200,93,58,0.15);
+
+  /* ── Sage / Success ────────────────────────────────────────── */
+  --sage-DEFAULT:  #2A7D5F;
+  --sage-bg:       #DFFBEF;
+  --sage-border:   #A7F3D0;
+
+  /* ── Re-map existing vars to Indian Dusk ───────────────────── */
+  --navy-DEFAULT:  var(--dusk-800);
+  --navy-dark:     var(--dusk-900);
+  --navy-light:    var(--dusk-600);
+  --gold-DEFAULT:  var(--saffron-DEFAULT);
+  --gold-dark:     var(--saffron-600);
+  --gold-light:    var(--saffron-300);
+  --gold-50:       var(--saffron-50);
+
+  --brand-navy:        var(--dusk-800);
+  --brand-navy-dark:   var(--dusk-900);
+  --brand-navy-light:  var(--dusk-600);
+  --brand-gold:        var(--saffron-DEFAULT);
+  --brand-gold-dark:   var(--saffron-600);
+  --brand-gold-light:  var(--saffron-300);
+
+  /* Page surfaces — warm white instead of cold gray */
+  --page-bg:         #FAFAF8;
+  --surface:         #FFFFFF;
+  --surface-2:       var(--ivory-100);
+  --border:          var(--ivory-200);
+  --border-soft:     var(--ivory-100);
+
+  /* CTA — keep deep blue for conversion trust */
+  --brand-cta:        #1B3A6B;
+  --brand-cta-hover:  #142E56;
+
+  /* Text — warm dark instead of cold slate */
+  --text-primary:     #0D1F2D;
+  --text-secondary:   #2A3D52;
+  --text-body:        #3D5468;
+  --text-caption:     #5A7488;
+  --text-muted:       #8CA3B5;
+  --text-placeholder: #B8CDD8;
+
+  /* Stars and hearts with warmer tones */
+  --c-star:   var(--saffron-DEFAULT);
+  --c-heart:  #D94B3A;
+
+  /* Glass effects — indigo-tinted */
+  --glass-dark:   rgba(7,19,28,0.60);
+  --glass-light:  rgba(253,250,243,0.10);
+  --glass-border: rgba(253,250,243,0.16);
+
+  /* ── Advanced shadows (warm, indigo-tinted) ────────────────── */
+  --shadow-xs:  0 1px 2px rgba(13,31,45,.06);
+  --shadow-sm:  0 1px 3px rgba(13,31,45,.08), 0 1px 2px rgba(13,31,45,.04);
+  --shadow-md:  0 4px 12px rgba(13,31,45,.10), 0 1px 3px rgba(13,31,45,.05);
+  --shadow-lg:  0 10px 28px rgba(13,31,45,.12), 0 2px 8px rgba(13,31,45,.05);
+  --shadow-xl:  0 20px 48px rgba(13,31,45,.16), 0 4px 12px rgba(13,31,45,.06);
+  --shadow-gold: 0 8px 24px rgba(232,160,32,.40), 0 2px 6px rgba(232,160,32,.20);
+  --shadow-gold-lg: 0 16px 40px rgba(232,160,32,.35), 0 4px 12px rgba(232,160,32,.18);
+
+  /* ── Animation timing (mirrors mobile timing.ts) ───────────── */
+  --t-instant:  80ms;
+  --t-fast:     180ms;
+  --t-normal:   280ms;
+  --t-slow:     420ms;
+  --t-verySlow: 680ms;
+
+  /* ── Easing curves ─────────────────────────────────────────── */
+  --ease-out-cubic:  cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-back:   cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-in-out:     cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring:     cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
 /* ════════════════════════════════════════════════════════════════════
    BASE — typography, focus rings, page chrome.
    ──────────────────────────────────────────────────────────────────── */
+
+/* ══════════════════════════════════════════════════════════════════════
+   RUSTO HOTEL DESIGN SYSTEM — Color Reference & Visual Language
+   Based on: hotel-industry best practices for conversion + trust
+
+   COLOR LEGEND:
+   ─────────────────────────────────────────────────────────────────
+   --brand-navy    → Trust, authority        (nav, headings, footer)
+   --brand-gold    → Luxury, India warmth    (accents, badges, CTA-alt)
+   --brand-cta     → Primary action          (Book Now, Search, Submit)
+   --brand-success → Confirmed, available    (booking confirmed, open)
+   --brand-warn    → Pending, caution        (payment pending, almost full)
+   --brand-error   → Cancelled, unavailable  (cancelled, no rooms)
+   --brand-info    → Informational           (details, timestamps)
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Brand ────────────────────────────────────────────────────── */
+  --brand-navy:       #1B2A4A;
+  --brand-navy-dark:  #0F1B33;
+  --brand-navy-light: #243557;
+  --brand-gold:       #C9A84C;
+  --brand-gold-dark:  #A8873C;
+  --brand-gold-light: #E2C470;
+
+  /* ── Primary CTA — deep blue (trust + action) ─────────────────── */
+  --brand-cta:        #1E3A8A;
+  --brand-cta-hover:  #1D4ED8;
+  --brand-cta-bg:     #EFF6FF;
+  --brand-cta-border: #BFDBFE;
+  --brand-cta-text:   #1E3A8A;
+
+  /* ── Semantic status colors (hotel room/booking states) ────────── */
+  /* SUCCESS: confirmed booking, available room, checked-in */
+  --brand-success:        #166534;
+  --brand-success-bg:     #F0FDF4;
+  --brand-success-border: #BBF7D0;
+  --brand-success-dot:    #22C55E;
+
+  /* WARNING: pending payment, limited availability, caution */
+  --brand-warn:        #92400E;
+  --brand-warn-bg:     #FFFBEB;
+  --brand-warn-border: #FDE68A;
+  --brand-warn-dot:    #F59E0B;
+
+  /* ERROR: cancelled, rejected, unavailable */
+  --brand-error:        #991B1B;
+  --brand-error-bg:     #FEF2F2;
+  --brand-error-border: #FECACA;
+  --brand-error-dot:    #EF4444;
+
+  /* INFO: neutral, processing, informational */
+  --brand-info:        #1E40AF;
+  --brand-info-bg:     #EFF6FF;
+  --brand-info-border: #BFDBFE;
+  --brand-info-dot:    #3B82F6;
+
+  /* ── Room status (PMS + customer views) ───────────────────────── */
+  --room-available:   #16A34A;  /* green — book it */
+  --room-occupied:    #DC2626;  /* red — taken */
+  --room-cleaning:    #2563EB;  /* blue — being serviced */
+  --room-maintenance: #D97706;  /* amber — out of order */
+
+  /* ── Page & surface ───────────────────────────────────────────── */
+  --page-bg:         #F8FAFC;
+  --surface:         #FFFFFF;
+  --surface-2:       #F1F5F9;
+  --border:          #E2E8F0;
+  --border-soft:     #F1F5F9;
+
+  /* ── Typography ──────────────────────────────────────────────── */
+  --text-primary:    #0F172A;
+  --text-secondary:  #334155;
+  --text-body:       #475569;
+  --text-caption:    #64748B;
+  --text-muted:      #94A3B8;
+  --text-placeholder: #CBD5E1;
+
+  /* ── Decorative ───────────────────────────────────────────────── */
+  --star-color:      #F59E0B;  /* rating stars — amber */
+  --heart-color:     #EF4444;  /* saved/wishlist — red */
+
+  /* ── Shadows ─────────────────────────────────────────────────── */
+  --shadow-xs:  0 1px 2px rgba(15,23,42,.05);
+  --shadow-sm:  0 1px 3px rgba(15,23,42,.07), 0 1px 2px rgba(15,23,42,.04);
+  --shadow-md:  0 4px 12px rgba(15,23,42,.08), 0 1px 3px rgba(15,23,42,.04);
+  --shadow-lg:  0 10px 28px rgba(15,23,42,.10), 0 2px 8px rgba(15,23,42,.04);
+  --shadow-xl:  0 20px 48px rgba(15,23,42,.14), 0 4px 12px rgba(15,23,42,.06);
+}
+
+/* ── Hotel-grade status badges ─────────────────────────────────────
+   Used for room status, booking status, payment status.
+   VISUAL LANGUAGE: dot + label pattern = instantly scannable.     */
+.status-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 600;
+}
+.status-badge::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.status-confirmed   { background: var(--brand-success-bg); color: var(--brand-success); border: 1px solid var(--brand-success-border); }
+.status-confirmed::before   { background: var(--brand-success-dot); }
+.status-pending     { background: var(--brand-warn-bg);    color: var(--brand-warn);    border: 1px solid var(--brand-warn-border);    }
+.status-pending::before     { background: var(--brand-warn-dot);    }
+.status-cancelled   { background: var(--brand-error-bg);   color: var(--brand-error);   border: 1px solid var(--brand-error-border);   }
+.status-cancelled::before   { background: var(--brand-error-dot);   }
+.status-info        { background: var(--brand-info-bg);    color: var(--brand-info);    border: 1px solid var(--brand-info-border);    }
+.status-info::before        { background: var(--brand-info-dot);    }
+.status-neutral     { background: var(--surface-2);        color: var(--text-caption);  border: 1px solid var(--border); }
+.status-neutral::before     { background: var(--text-muted); }
+
+/* Room availability dots (used in availability grids) */
+.room-available   { color: var(--room-available); }
+.room-occupied    { color: var(--room-occupied); }
+.room-cleaning    { color: var(--room-cleaning); }
+.room-maintenance { color: var(--room-maintenance); }
+
+/* ── Primary CTA button — "BOOK NOW" style ─────────────────────────
+   Conversion-focused: large, high-contrast, unambiguous.           */
+.btn-book-now {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 28px; border-radius: 12px; border: none; cursor: pointer;
+  background: var(--brand-cta); color: #fff;
+  font-size: 16px; font-weight: 700; letter-spacing: -0.01em;
+  box-shadow: 0 4px 16px rgba(30,58,138,.25);
+  transition: all .15s; text-decoration: none; line-height: 1;
+}
+.btn-book-now:hover { background: var(--brand-cta-hover); box-shadow: 0 6px 20px rgba(30,58,138,.35); transform: translateY(-1px); }
+.btn-book-now:active { transform: translateY(0); }
+.btn-book-now:disabled { background: var(--text-muted); box-shadow: none; cursor: not-allowed; transform: none; }
+
+/* Price display — used on cards and sidebar */
+.price-display {
+  font-family: var(--font-stack, 'Plus Jakarta Sans', sans-serif);
+  font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em;
+}
+.price-display .currency { font-size: 0.65em; vertical-align: super; margin-right: 1px; font-weight: 600; }
+.price-per-night { font-size: 13px; color: var(--text-muted); font-weight: 400; }
+
+/* ── Light page wrapper — overrides dark cascade ─────────────────── */
+.customer-page {
+  background: var(--page-bg) !important;
+  color: var(--text-primary) !important;
+}
+.customer-page * { color: inherit; }
+/* Preserve explicit color utilities */
+.customer-page .text-white  { color: #fff !important; }
+.customer-page .bg-white    { background: #fff !important; color: var(--text-primary); }
+.customer-page .bg-gray-50  { background: var(--page-bg) !important; color: var(--text-primary); }
+.customer-page input, .customer-page textarea, .customer-page select {
+  color: var(--text-primary) !important;
+  background: var(--surface) !important;
+}
+.customer-page input::placeholder, .customer-page textarea::placeholder {
+  color: var(--text-placeholder) !important;
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
@@ -13,7 +498,7 @@
   }
   body {
     font-family: var(--font-stack);
-    background-color: #F9FAFB;
+    background-color: #FFFFFF;
     color: #111827;
     font-size: var(--font-body);
     line-height: 1.5;
@@ -86,13 +571,24 @@
   /* The gold CTA — used only for THE primary action (max one per surface).
      Hover triggers a sheen sweep across the button. */
   .btn-gold {
-    @apply relative overflow-hidden bg-gradient-to-br from-gold to-gold-dark text-white
+    @apply relative overflow-hidden bg-gradient-to-br from-gold to-gold-dark text-navy-dark
            px-5 py-2.5 rounded-xl font-semibold text-sm shadow-soft
            transition-all duration-200
            hover:shadow-gold-glow hover:-translate-y-0.5
            active:translate-y-0
            disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none;
   }
+
+  /* Customer-facing primary CTA — orange, consistent with booking.com-style CTAs */
+  .btn-cta {
+    @apply relative overflow-hidden px-5 py-2.5 rounded-xl font-bold text-sm text-white
+           shadow-sm transition-all duration-200
+           hover:-translate-y-0.5 active:translate-y-0
+           disabled:opacity-50 disabled:cursor-not-allowed;
+    background: #ea580c;
+  }
+  .btn-cta:hover { background: #c2410c; }
+  .btn-cta:active { background: #9a3412; }
   .btn-gold::after {
     content: '';
     @apply absolute inset-0 opacity-0 pointer-events-none
@@ -131,7 +627,7 @@
 
   /* ── Surfaces ──────────────────────────────────────────────────── */
   .card {
-    @apply bg-white rounded-2xl shadow-card border border-ink-100 p-6
+    @apply bg-[var(--c-surface)] rounded-2xl shadow-card border border-ink-100 p-6
            transition-all duration-200;
   }
   /* Interactive cards lift slightly on hover — invites clicking. */
@@ -141,7 +637,7 @@
   }
   /* Premium card with gold edge halo on hover. */
   .card-lux {
-    @apply relative bg-white rounded-2xl shadow-card border border-ink-100 p-6
+    @apply relative bg-[var(--c-surface)] rounded-2xl shadow-card border border-ink-100 p-6
            transition-all duration-300 overflow-hidden;
   }
   .card-lux::before {
@@ -351,6 +847,39 @@
     animation: lantern 3s ease-in-out infinite;
   }
 }
+
+  /* ── Design system button classes (aliases) ──────────────────── */
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    font-weight:600; font-size:14px; line-height:1; border:none; cursor:pointer;
+    text-decoration:none; transition:all .15s; white-space:nowrap; border-radius:var(--radius-sm,10px); padding:10px 20px; }
+  .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .btn-p  { background:var(--c-cta,#1E3A8A); color:#fff; }
+  .btn-p:hover:not(:disabled) { background:var(--c-cta-hover,#1D4ED8); }
+  .btn-s  { background:#fff; color:var(--navy-700,#1B2A4A); border:1.5px solid var(--ink-300,#D0D5DD); }
+  .btn-s:hover:not(:disabled) { border-color:var(--navy-700,#1B2A4A); }
+  .btn-g  { background:transparent; color:var(--ink-500,#667085); }
+  .btn-g:hover:not(:disabled) { background:var(--ink-100,#F2F4F7); color:var(--navy-700,#1B2A4A); }
+  .card   { background:#fff; border:1px solid var(--ink-200,#E5E8EE); border-radius:var(--radius-md,16px); box-shadow:0 1px 3px rgba(15,23,42,.06); }
+  .card-hover:hover { box-shadow:0 4px 16px rgba(15,23,42,.10); transform:translateY(-1px); transition:all .2s; }
+  .inp    { display:block; width:100%; padding:10px 14px; border-radius:var(--radius-sm,10px);
+    border:1.5px solid var(--ink-200,#E5E8EE); background:#fff; color:var(--navy-800,#0F172A);
+    font-size:14px; outline:none; transition:border-color .15s; box-sizing:border-box; }
+  .inp:focus { border-color:var(--c-cta,#1E3A8A); }
+  .inp::placeholder { color:var(--ink-400,#98A2B3); }
+  /* Semantic badge helpers */
+  .badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:999px;
+    font-size:11px; font-weight:600; letter-spacing:.02em; }
+  .badge-ok   { background:rgba(22,101,52,.08);  color:#166534; }
+  .badge-warn { background:rgba(146,64,14,.08);  color:#92400E; }
+  .badge-err  { background:rgba(153,27,27,.08);  color:#991B1B; }
+  .badge-info { background:rgba(30,58,138,.08);  color:#1E3A8A; }
+  .badge-grey { background:rgba(100,116,139,.1); color:#475569; }
+  /* Light page wrapper — overrides dark cascade */
+  .rp, .rusto-page-light {
+    background:var(--c-bg,#F8FAFC) !important;
+    color:var(--navy-800,#0F172A) !important;
+  }
+
 
 /* ════════════════════════════════════════════════════════════════════
    SCROLLBARS
@@ -667,21 +1196,18 @@ div[class*="fixed inset-0"][class*="flex"][class*="items-center"] > div > form,
 /* ── Premium lodge cards (search results, featured) ────────────── */
 .lodge-card-lux {
   position: relative;
-  background: rgba(15, 27, 40, 0.45) !important;
-  border-radius: 24px;
+  background: #ffffff;
+  border-radius: 16px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35) !important;
-  transition: all 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   isolation: isolate;
-  animation: card-glow 6s infinite ease-in-out !important;
 }
 .lodge-card-lux:hover {
-  transform: translateY(-6px);
-  border-color: rgba(255, 255, 255, 0.25) !important;
-  box-shadow: 0 12px 40px 0 rgba(233, 177, 81, 0.10), 0 8px 32px 0 rgba(0, 0, 0, 0.35) !important;
+  transform: translateY(-4px);
+  border-color: #d1d5db;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.12);
 }
 .lodge-card-lux .lodge-card-img {
   position: relative;
@@ -1036,90 +1562,8 @@ div[class*="fixed inset-0"][class*="flex"][class*="items-center"] > div > form,
 
 /* ════════════════════════════════════════════════════════════════════
    RUSTO ADVANCED THEME — QUIET LUXURY & MISTY NATURE
+   (Design tokens migrated to top of stylesheet)
    ──────────────────────────────────────────────────────────────────── */
-:root {
-  /* Ultra-modern color palette */
-  --space-dark: #061519;
-  --space-surface: #0b252c;
-  --space-card: rgba(11, 37, 44, 0.65);
-  
-  --accent-sun: #D69A80;
-  --accent-glow: rgba(214, 154, 128, 0.15);
-  
-  --text-main: #F8FAFC;
-  --text-muted: #94A3B8;
-  --text-dark: #061519;
-  
-  /* System status indicators */
-  --status-ready: #10B981;
-  --status-occupied: #EF4444;
-  --status-cleaning: #3B82F6;
-  
-  /* Smooth curves */
-  --radius-sm: 8px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
-
-  --misty-dark: #0B252C; /* Luxury Deep Teal */
-  --amber-glow: #D69A80; /* Elegant Rose Gold / Copper */
-  --glass-white: rgba(255, 255, 255, 0.10); /* Enhanced opacity glass for high visibility */
-  --glass-border: rgba(255, 255, 255, 0.16);
-
-  /* 🎨 RUSTO Premium Dual-Tone Color System */
-  
-  /* Brand Core Accents */
-  --brand-teal-dark: #07171C;      /* Deep Ambient Base */
-  --brand-teal-light: #0B252C;     /* Misty Deep Teal */
-  --brand-copper: #D69A80;         /* Rose Gold / Coppery Glow */
-  --brand-amber: #E9B151;          /* Cozy Amber Glow */
-  
-  /* Layout Base Backgrounds */
-  --traveler-bg-start: #0B252C;
-  --traveler-bg-end: #051216;
-  --pms-bg-start: #0c1220;
-  --pms-bg-end: #030712;
-  
-  /* Component Surfaces */
-  --surface-glass-dark: rgba(15, 27, 40, 0.45);
-  --surface-panel-obsidian: #0C111D;
-  
-  /* High-Contrast Semantic UI Colors (Optimized Muted-Glow for Dark Mode) */
-  --color-success-bg: rgba(16, 185, 129, 0.12);
-  --color-success-text: #34D399;
-  --color-success-border: rgba(16, 185, 129, 0.25);
-  
-  --color-occupied-bg: rgba(239, 68, 68, 0.12);
-  --color-occupied-text: #F87171;
-  --color-occupied-border: rgba(239, 68, 68, 0.25);
-  
-  --color-checkout-bg: rgba(59, 130, 246, 0.12);
-  --color-checkout-text: #93C5FD;
-  --color-checkout-border: rgba(59, 130, 246, 0.25);
-  
-  --color-maintenance-bg: rgba(245, 158, 11, 0.12);
-  --color-maintenance-text: #FBBF24;
-  --color-maintenance-border: rgba(245, 158, 11, 0.25);
-
-  /* Mathematically Sound Fluid Typography Scales (Viewport bounds: 375px to 1440px) */
-  --font-h1: clamp(28px, 1.13rem + 2.63vw, 56px); /* Desktop: 48px-56px, Mobile: 28px-32px */
-  --font-h2: clamp(20px, 0.9rem + 1.5vw, 36px);    /* Desktop: 32px-36px, Mobile: 20px-22px */
-  --font-h3: clamp(16px, 0.74rem + 1.13vw, 28px);  /* Desktop: 24px-28px, Mobile: 16px-18px */
-  --font-h4: clamp(15px, 0.83rem + 0.47vw, 20px);  /* Desktop: 18px-20px, Mobile: 14px-16px */
-  --font-body: clamp(14px, 0.83rem + 0.19vw, 16px);/* Desktop: 14px-16px, Mobile: 14px */
-  --font-micro: clamp(11px, 0.65rem + 0.1vw, 12px); /* Desktop: 11px-12px, Mobile: 10px-12px */
-  --font-badge: clamp(10px, 0.58rem + 0.1vw, 12px); /* Mobile Action/Badge: 10px-12px */
-
-  /* Global Fluid Typography Engine CSS Variables */
-  --fs-h1: clamp(28px, 1.13rem + 2.63vw, 56px);
-  --fs-h2: clamp(20px, 0.9rem + 1.5vw, 36px);
-  --fs-h3: clamp(16px, 0.74rem + 1.13vw, 28px);
-  --fs-h4: clamp(15px, 0.83rem + 0.47vw, 20px);
-  --fs-body: clamp(14px, 0.83rem + 0.19vw, 16px);
-
-  /* System Font Stack Code */
-  --font-stack: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-display: 'Outfit', 'Plus Jakarta Sans', 'Inter', sans-serif;
-}
 
 /* Isolate body style to the customer-facing layout with ambient light fields twilight deep-space glow */
 body,
@@ -1132,6 +1576,248 @@ body,
   background-size: cover !important;
   color: #FFFFFF !important;
   font-family: var(--font-stack) !important;
+}
+
+/* ── THE DEFINITIVE LIGHT SECTION FIX ───────────────────────────
+   rusto-layout sets color:#FFFFFF !important which cascades to ALL children.
+   We block that cascade here with equal !important specificity.
+   Inside these wrappers, Tailwind color classes work as designed.
+   ──────────────────────────────────────────────────────────────── */
+
+/* Reset inherited white color at the light section boundary */
+.rusto-page-light {
+  color: #111827 !important;
+  background: #f9fafb !important;
+}
+
+/* ── Customer light page reset ───────────────────────────────────
+   Any element inside a light-themed customer page gets dark text.
+   This overrides the body/rusto-layout white cascade. */
+.rusto-page-light *,
+.rusto-page-light p,
+.rusto-page-light span,
+.rusto-page-light h1,
+.rusto-page-light h2,
+.rusto-page-light h3,
+.rusto-page-light h4,
+.rusto-page-light label,
+.rusto-page-light li,
+.rusto-page-light a:not(.btn-cta):not(.btn-gold):not([style]) {
+  color: inherit;
+}
+.rusto-page-light .text-gray-900, .rp .text-gray-900  { color: #111827 !important; }
+.rusto-page-light .text-gray-800  { color: #1f2937 !important; }
+.rusto-page-light .text-gray-700  { color: #374151 !important; }
+.rusto-page-light .text-gray-600  { color: #4b5563 !important; }
+.rusto-page-light .text-gray-500  { color: #6b7280 !important; }
+.rusto-page-light .text-gray-400  { color: #9ca3af !important; }
+.rusto-page-light .text-orange-600 { color: #ea580c !important; }
+.rusto-page-light .text-orange-500 { color: #f97316 !important; }
+.rusto-page-light .text-orange-400 { color: #fb923c !important; }
+.rusto-page-light .text-green-600  { color: #16a34a !important; }
+.rusto-page-light .text-green-700  { color: #15803d !important; }
+.rusto-page-light .text-red-500    { color: #ef4444 !important; }
+.rusto-page-light .text-red-600    { color: #dc2626 !important; }
+.rusto-page-light .text-amber-500  { color: #f59e0b !important; }
+.rusto-page-light .text-amber-400  { color: #fbbf24 !important; }
+.rusto-page-light .text-blue-600   { color: #2563eb !important; }
+.rusto-page-light .text-white      { color: #ffffff !important; }
+.rusto-page-light .bg-white        { background-color: var(--c-surface) !important; }
+.rusto-page-light .bg-gray-50      { background-color: var(--c-bg) !important; }
+.rusto-page-light .bg-gray-100     { background-color: var(--c-surface-2) !important; }
+.rusto-page-light .border-gray-100 { border-color: var(--c-border-soft) !important; }
+.rusto-page-light .border-gray-200 { border-color: var(--c-border) !important; }
+.rusto-page-light input, 
+.rusto-page-light textarea, 
+.rusto-page-light select {
+  color: var(--c-text-1) !important;
+  background-color: var(--c-surface) !important;
+}
+.rusto-page-light input::placeholder,
+.rusto-page-light textarea::placeholder {
+  color: #9ca3af !important;
+}
+.account-light {
+  color: #111827 !important;
+  background: transparent;
+}
+.account-light *:not(.text-white):not([style*="color"]) { color: inherit; }
+.account-light .text-gray-900 { color: #111827 !important; }
+.account-light .text-gray-800 { color: #1f2937 !important; }
+.account-light .text-gray-700 { color: #374151 !important; }
+.account-light .text-gray-600 { color: #4b5563 !important; }
+.account-light .text-gray-500 { color: #6b7280 !important; }
+.account-light .text-gray-400 { color: #9ca3af !important; }
+.account-light .text-orange-600 { color: #ea580c !important; }
+.account-light .text-orange-500 { color: #f97316 !important; }
+.account-light .text-green-600 { color: #16a34a !important; }
+.account-light .text-green-700 { color: #15803d !important; }
+.account-light .text-red-500 { color: #ef4444 !important; }
+.account-light .text-white { color: #ffffff !important; }
+.account-light .bg-white { background-color: #ffffff !important; }
+.account-light .bg-gray-50 { background-color: #f9fafb !important; }
+.account-light .bg-gray-100 { background-color: #f3f4f6 !important; }
+.account-light input, .account-light textarea, .account-light select {
+  color: #111827 !important;
+  background-color: #ffffff !important;
+}
+.account-light input::placeholder, .account-light textarea::placeholder {
+  color: #9ca3af !important;
+}
+.checkout-light-col {
+  color: #1B2A4A !important;
+}
+
+/* Now Tailwind classes work because they specify color explicitly */
+/* These override the !important white from rusto-layout */
+.rusto-page-light .text-navy,
+.account-light .text-navy,
+.checkout-light-col .text-navy { color: #1B2A4A !important; }
+
+.rusto-page-light .text-gray-900, .rp .text-gray-900,
+.account-light .text-gray-900 { color: #111827 !important; }
+.rusto-page-light .text-gray-800,
+.account-light .text-gray-800 { color: #1f2937 !important; }
+.rusto-page-light .text-gray-700,
+.account-light .text-gray-700 { color: #374151 !important; }
+.rusto-page-light .text-gray-600,
+.account-light .text-gray-600 { color: #4b5563 !important; }
+.rusto-page-light .text-gray-500,
+.account-light .text-gray-500 { color: #6b7280 !important; }
+.rusto-page-light .text-gray-400,
+.account-light .text-gray-400 { color: #9ca3af !important; }
+.rusto-page-light .text-gray-300,
+.account-light .text-gray-300 { color: #d1d5db !important; }
+
+/* ink-* colors (defined in tailwind.config.js) */
+.rusto-page-light .text-ink-900,
+.account-light .text-ink-900 { color: #101828 !important; }
+.rusto-page-light .text-ink-800,
+.account-light .text-ink-800 { color: #1D2939 !important; }
+.rusto-page-light .text-ink-700,
+.account-light .text-ink-700 { color: #344054 !important; }
+.rusto-page-light .text-ink-600,
+.account-light .text-ink-600 { color: #475467 !important; }
+.rusto-page-light .text-ink-500,
+.account-light .text-ink-500 { color: #667085 !important; }
+.rusto-page-light .text-ink-400,
+.account-light .text-ink-400 { color: #98A2B3 !important; }
+.rusto-page-light .text-ink-300,
+.account-light .text-ink-300 { color: #D0D5DD !important; }
+
+/* Checkout summary uses these too */
+.checkout-light-col .text-ink-600 { color: #475467 !important; }
+.checkout-light-col .text-ink-500 { color: #667085 !important; }
+.checkout-light-col .text-ink-400 { color: #98A2B3 !important; }
+.checkout-light-col .text-navy    { color: #1B2A4A !important; }
+.checkout-light-col .text-gray-900 { color: #111827 !important; }
+
+/* Backgrounds */
+.rusto-page-light .bg-ink-50,
+.account-light .bg-ink-50  { background-color: #F9FAFB !important; }
+.rusto-page-light .bg-ink-100,
+.account-light .bg-ink-100 { background-color: #F2F4F7 !important; }
+.rusto-page-light .bg-ink-200,
+.account-light .bg-ink-200 { background-color: #E5E8EE !important; }
+.rusto-page-light .bg-white,
+.account-light .bg-white,
+.rp .bg-white              { background-color: var(--c-surface) !important; }
+.rusto-page-light .bg-gray-50,
+.account-light .bg-gray-50,
+.rp .bg-gray-50            { background-color: var(--c-bg) !important; }
+
+/* Borders */
+.rusto-page-light .border-ink-100,
+.account-light .border-ink-100 { border-color: var(--c-border-soft) !important; }
+.rusto-page-light .border-ink-200,
+.account-light .border-ink-200 { border-color: var(--c-border) !important; }
+.rusto-page-light .border-gray-100,
+.account-light .border-gray-100,
+.rp .border-gray-100 { border-color: var(--c-border-soft) !important; }
+.rusto-page-light .border-gray-200,
+.account-light .border-gray-200,
+.rp .border-gray-200 { border-color: var(--c-border) !important; }
+
+/* Card classes — rusto-layout makes them dark glass; restore to white */
+.rusto-layout .rusto-page-light .card,
+.rusto-layout .rusto-page-light .card-lux,
+.rusto-layout .account-light .card,
+.rusto-layout .account-light .card-lux,
+.rusto-layout .checkout-light-col .card {
+  background: var(--c-surface) !important;
+  border: 1px solid var(--c-border) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: var(--c-text-1) !important;
+}
+
+/* Inputs */
+.rusto-layout .rusto-page-light input:not([type="checkbox"]):not([type="radio"]),
+.rusto-layout .rusto-page-light select,
+.rusto-layout .rusto-page-light textarea,
+.rusto-layout .account-light input:not([type="checkbox"]):not([type="radio"]),
+.rusto-layout .account-light select,
+.rusto-layout .account-light textarea {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  color: #1B2A4A !important;
+  border: 1.5px solid #D0D5DD !important;
+  border-radius: 10px !important;
+}
+.rusto-layout .rusto-page-light input:not([type="checkbox"]):not([type="radio"]):focus,
+.rusto-layout .rusto-page-light select:focus,
+.rusto-layout .rusto-page-light textarea:focus,
+.rusto-layout .account-light input:not([type="checkbox"]):not([type="radio"]):focus,
+.rusto-layout .account-light select:focus,
+.rusto-layout .account-light textarea:focus {
+  border-color: #E8A020 !important;
+  box-shadow: 0 0 0 3px rgba(232,160,32,0.15) !important;
+  outline: none !important;
+}
+.rusto-layout .rusto-page-light ::placeholder,
+.rusto-layout .account-light ::placeholder { color: #9CA3AF !important; }
+
+/* Hover states */
+.rusto-page-light .hover\:bg-ink-50:hover,
+.account-light .hover\:bg-ink-50:hover { background-color: #F9FAFB !important; }
+.rusto-page-light .hover\:text-navy:hover,
+.account-light .hover\:text-navy:hover   { color: #1B2A4A !important; }
+
+/* Protected dark cards (membership tier, perks card) */
+.rusto-dark-card { /* keeps its own inline style colors */ }
+.rusto-layout .rusto-page-light .rusto-dark-card,
+.rusto-layout .account-light .rusto-dark-card {
+  background: revert-layer !important;
+  color: revert-layer !important;
+}
+
+/* Light-theme override — search results, checkout, account pages use white cards */
+.rusto-light-section {
+  color: #1B2A4A !important;
+  background: transparent !important;
+}
+.rusto-light-section h1,
+.rusto-light-section h2,
+.rusto-light-section h3,
+.rusto-light-section p,
+.rusto-light-section span:not(.badge-live span),
+.rusto-light-section label,
+.rusto-light-section button:not(.btn-gold):not(.btn-primary) {
+  color: inherit !important;
+}
+.rusto-light-section input:not([type="checkbox"]):not([type="radio"]),
+.rusto-light-section select,
+.rusto-light-section textarea {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  color: #1B2A4A !important;
+  backdrop-filter: none !important;
+}
+.rusto-light-section input:not([type="checkbox"]):not([type="radio"]):focus,
+.rusto-light-section select:focus,
+.rusto-light-section textarea:focus {
+  border-color: #1B2A4A !important;
+  box-shadow: 0 0 0 3px rgba(27,42,74,0.1) !important;
 }
 
 /* Glass Panels */
@@ -1262,10 +1948,10 @@ body,
 }
 
 /* Glass panel overrides for light-mode background classes */
-.rusto-layout .bg-white,
-.rusto-layout .bg-white\/95,
-.rusto-layout .bg-white\/90,
-.rusto-layout .bg-white\/80,
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white,
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white\/95,
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white\/90,
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white\/80,
 .rusto-layout header.bg-white\/95,
 .rusto-layout .card,
 .rusto-layout .kpi-card,
@@ -2532,19 +3218,8 @@ h1, h2, h3, .font-display {
 
 /* ════════════════════════════════════════════════════════════════════
    LUXURY REDESIGN UPGRADES (2026 ELITE EDITION)
+   (Design tokens migrated to top of stylesheet)
    ──────────────────────────────────────────────────────────────────── */
-:root {
-  --deep-ocean: #081C22;
-  --midnight: #102C34;
-  --gold: #D4AF37;
-  --champagne: #F5E7C4;
-  --ivory: #FCFCFA;
-  --mist: #EEF2F4;
-  --success: #00C48C;
-  
-  /* Reset the display font stack to our new Luxury display font */
-  --font-display: 'Cormorant Garamond', 'Plus Jakarta Sans', serif;
-}
 
 /* Glassmorphism System globally */
 .glass {
@@ -2609,7 +3284,7 @@ h1, h2, h3, .font-display {
 .btn-gold {
   background: linear-gradient(135deg, #D4AF37 0%, #A8873C 100%) !important;
   color: #081C22 !important;
-  font-weight: 750 !important;
+  font-weight: 700 !important;
 }
 
 .btn-gold:hover {
@@ -2688,3 +3363,1374 @@ h1, h2, h3, .font-display {
 }
 
 
+
+
+/* ── Search results area — white background like MMT / Booking.com ── */
+.search-results-area {
+  background: #f8f9fa;
+  min-height: 100vh;
+}
+.lodge-card-lux .lodge-card-img {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4/3;
+  background: #f3f4f6;
+}
+.lodge-card-lux .lodge-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lodge-card-lux:hover .lodge-card-img img {
+  transform: scale(1.06);
+}
+.lodge-card-lux .lodge-card-price {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  padding: 5px 10px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  color: #1B2A4A;
+  box-shadow: 0 2px 8px -2px rgba(0,0,0,0.2);
+}
+.lodge-card-lux .lodge-card-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: linear-gradient(135deg, #E2C470 0%, #C9A84C 100%);
+  color: #1B2A4A;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Horizontal card variant for search page — matches Booking.com layout */
+.lodge-card-h {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.lodge-card-h:hover {
+  box-shadow: 0 6px 24px rgba(0,0,0,0.10);
+  transform: translateY(-1px);
+}
+.lodge-card-h .card-img {
+  width: 240px;
+  min-width: 200px;
+  max-width: 280px;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.lodge-card-h .card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+.lodge-card-h:hover .card-img img { transform: scale(1.04); }
+@media (max-width: 640px) {
+  .lodge-card-h {
+    flex-direction: column;
+  }
+  .lodge-card-h .card-img {
+    width: 100%;
+    max-width: 100%;
+    height: 200px;
+  }
+}
+
+/* Filter sidebar — clean white style */
+.filter-sidebar {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+}
+.filter-section + .filter-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #f3f4f6;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RUSTO LIGHT PAGE ISOLATION
+   Pages rendered on white/gray bg inside rusto-layout need this class
+   on their root div to cancel out all the dark theme overrides.
+   ──────────────────────────────────────────────────────────────────── */
+
+/* Any element with rusto-page-light is treated as a white-bg surface */
+.rusto-page-light,
+.rusto-page-light * {
+  color: inherit;
+}
+.rusto-page-light {
+  background: #f8f9fa !important;
+  color: #1B2A4A !important;
+}
+/* Kill the dark card override */
+.rusto-page-light .card,
+.rusto-page-light .card-lux,
+.rusto-page-light [class*="glass"] {
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+  color: #1B2A4A !important;
+  backdrop-filter: none !important;
+}
+/* Kill the dark input override */
+.rusto-layout .rusto-page-light input:not([type="checkbox"]):not([type="radio"]),
+.rusto-layout .rusto-page-light select,
+.rusto-layout .rusto-page-light textarea {
+  background: #ffffff !important;
+  border: 1.5px solid #e5e7eb !important;
+  color: #1B2A4A !important;
+  border-radius: 10px !important;
+}
+.rusto-layout .rusto-page-light input:not([type="checkbox"]):not([type="radio"]):focus,
+.rusto-layout .rusto-page-light select:focus,
+.rusto-layout .rusto-page-light textarea:focus {
+  border-color: #1B2A4A !important;
+  box-shadow: 0 0 0 3px rgba(27,42,74,0.08) !important;
+  background: #ffffff !important;
+}
+.rusto-layout .rusto-page-light ::placeholder {
+  color: #9ca3af !important;
+}
+/* Fix text colors */
+.rusto-page-light h1, .rusto-page-light h2, .rusto-page-light h3,
+.rusto-page-light h4, .rusto-page-light h5, .rusto-page-light h6 {
+  color: #1B2A4A !important;
+}
+.rusto-page-light p, .rusto-page-light span, .rusto-page-light label,
+.rusto-page-light li, .rusto-page-light td, .rusto-page-light th {
+  color: inherit;
+}
+/* Fix checkout SectionCard dark background override */
+.rusto-page-light .card {
+  background-color: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+}
+/* Fix select dropdown text */
+.rusto-page-light select option {
+  background: #ffffff;
+  color: #1B2A4A;
+}
+
+/* Search page specific: white bg overrides rusto-layout dark bg */
+.rusto-search-page {
+  background: #f3f4f6 !important;
+  min-height: 100vh;
+}
+.rusto-search-page * {
+  color: inherit;
+}
+
+/* Checkout light: white bg for left column */
+.checkout-light-col .card {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  color: #1B2A4A !important;
+}
+.checkout-light-col .text-navy { color: #1B2A4A !important; }
+.checkout-light-col .text-ink-500 { color: #6b7280 !important; }
+.checkout-light-col .text-ink-700 { color: #374151 !important; }
+.checkout-light-col .text-ink-400 { color: #9ca3af !important; }
+.checkout-light-col .bg-ink-50 { background: #f9fafb !important; }
+.checkout-light-col .bg-gold-50 { background: #fefce8 !important; }
+.checkout-light-col .border-ink-100 { border-color: #f3f4f6 !important; }
+.checkout-light-col .border-ink-200 { border-color: #e5e7eb !important; }
+
+/* Account page light override */
+.account-light .card {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  color: #1B2A4A !important;
+}
+
+/* Lodge card horizontal: always light bg, dark text regardless of parent theme */
+.lodge-card-h {
+  color: #1B2A4A !important;
+}
+.lodge-card-h h3, .lodge-card-h p, .lodge-card-h span:not(.badge):not([class*="bg-"]) {
+  color: inherit;
+}
+.lodge-card-h .text-gray-900 { color: #111827 !important; }
+.lodge-card-h .text-gray-700 { color: #374151 !important; }
+.lodge-card-h .text-gray-600 { color: #4b5563 !important; }
+.lodge-card-h .text-gray-500 { color: #6b7280 !important; }
+.lodge-card-h .text-gray-400 { color: #9ca3af !important; }
+.lodge-card-h .text-blue-600 { color: #2563eb !important; }
+
+/* Search filter sidebar text */
+.filter-sidebar-wrap {
+  color: #1B2A4A !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   COMPREHENSIVE LIGHT PAGE ISOLATION v2
+   Overrides ALL dark rusto-layout color forces with equal specificity
+   ──────────────────────────────────────────────────────────────────── */
+
+/* Tailwind color overrides inside light sections */
+.rusto-layout .rusto-page-light,
+.rusto-layout .account-light,
+.rusto-layout .checkout-light-col {
+  color: #1B2A4A !important;
+}
+
+/* text-navy */
+.rusto-layout .rusto-page-light .text-navy,
+.rusto-layout .account-light .text-navy,
+.rusto-layout .checkout-light-col .text-navy { color: #1B2A4A !important; }
+
+/* text-ink-* */
+.rusto-layout .rusto-page-light .text-ink-400,
+.rusto-layout .account-light .text-ink-400,
+.rusto-layout .checkout-light-col .text-ink-400 { color: #98A2B3 !important; }
+
+.rusto-layout .rusto-page-light .text-ink-500,
+.rusto-layout .account-light .text-ink-500,
+.rusto-layout .checkout-light-col .text-ink-500 { color: #667085 !important; }
+
+.rusto-layout .rusto-page-light .text-ink-600,
+.rusto-layout .account-light .text-ink-600,
+.rusto-layout .checkout-light-col .text-ink-600 { color: #475467 !important; }
+
+.rusto-layout .rusto-page-light .text-ink-700,
+.rusto-layout .account-light .text-ink-700,
+.rusto-layout .checkout-light-col .text-ink-700 { color: #344054 !important; }
+
+/* bg-ink-* */
+.rusto-layout .rusto-page-light .bg-ink-50,
+.rusto-layout .account-light .bg-ink-50 { background-color: #F9FAFB !important; }
+
+.rusto-layout .rusto-page-light .bg-ink-100,
+.rusto-layout .account-light .bg-ink-100 { background-color: #F2F4F7 !important; }
+
+/* border-ink-* */
+.rusto-layout .rusto-page-light .border-ink-100,
+.rusto-layout .account-light .border-ink-100 { border-color: #F2F4F7 !important; }
+
+.rusto-layout .rusto-page-light .border-ink-200,
+.rusto-layout .account-light .border-ink-200 { border-color: #E5E8EE !important; }
+
+/* White backgrounds inside light sections */
+.rusto-layout .rusto-page-light .bg-white,
+.rusto-layout .account-light .bg-white { background-color: #ffffff !important; }
+
+.rusto-layout .rusto-page-light .card,
+.rusto-layout .account-light .card {
+  background-color: #ffffff !important;
+  color: #1B2A4A !important;
+  border-color: #E5E8EE !important;
+}
+
+/* hover states */
+.rusto-layout .rusto-page-light .hover\:text-navy:hover,
+.rusto-layout .account-light .hover\:text-navy:hover { color: #1B2A4A !important; }
+
+.rusto-layout .rusto-page-light .hover\:bg-ink-50:hover,
+.rusto-layout .account-light .hover\:bg-ink-50:hover { background-color: #F9FAFB !important; }
+
+/* text-navy-dark (avatar initials) */
+.rusto-layout .rusto-page-light .text-navy-dark { color: #0F1B33 !important; }
+
+/* Input overrides - highest specificity */
+.rusto-layout .rusto-page-light input,
+.rusto-layout .rusto-page-light select,
+.rusto-layout .rusto-page-light textarea,
+.rusto-layout .account-light input,
+.rusto-layout .account-light select,
+.rusto-layout .account-light textarea {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  color: #1B2A4A !important;
+  border: 1.5px solid #D0D5DD !important;
+  border-radius: 10px !important;
+}
+.rusto-layout .rusto-page-light input::placeholder,
+.rusto-layout .rusto-page-light textarea::placeholder,
+.rusto-layout .account-light input::placeholder,
+.rusto-layout .account-light textarea::placeholder { color: #98A2B3 !important; }
+
+/* About page specifics */
+.rusto-page-light .text-white { color: #1B2A4A !important; }
+.rusto-page-light .text-white\/70 { color: #475467 !important; }
+.rusto-page-light .text-white\/60 { color: #667085 !important; }
+.rusto-page-light .glass { 
+  background: #ffffff !important; 
+  border-color: #E5E8EE !important;
+  backdrop-filter: none !important;
+}
+
+/* ── Card override: inside light sections, restore white background ── */
+.rusto-layout .rusto-page-light .card,
+.rusto-layout .rusto-page-light .card-lux,
+.rusto-layout .account-light .card,
+.rusto-layout .account-light .card-lux,
+.rusto-layout .checkout-light-col .card,
+.rusto-layout .checkout-light-col .card-lux {
+  background: #ffffff !important;
+  border: 1px solid #E5E8EE !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #1B2A4A !important;
+}
+
+/* Membership page: keep the dark tier card but fix white sub-cards */
+.rusto-layout .rusto-page-light .card.animate-slide-up {
+  background: #ffffff !important;
+  border: 1px solid #E5E8EE !important;
+  backdrop-filter: none !important;
+  color: #1B2A4A !important;
+}
+
+/* Progress bars and small elements inside light sections */
+.rusto-layout .rusto-page-light .bg-ink-100 { background-color: #F2F4F7 !important; }
+.rusto-layout .rusto-page-light .bg-ink-50  { background-color: #F9FAFB !important; }
+.rusto-layout .rusto-page-light .border-ink-100 { border-color: #F2F4F7 !important; }
+.rusto-layout .rusto-page-light .border-ink-200 { border-color: #E5E8EE !important; }
+.rusto-layout .rusto-page-light .hover\:bg-ink-50:hover { background-color: #F9FAFB !important; }
+.rusto-layout .rusto-page-light .text-ink-400 { color: #98A2B3 !important; }
+
+/* Account and Membership page card backgrounds */
+.rusto-layout .account-light .card,
+.rusto-layout .account-light .card-lux {
+  background: #ffffff !important;
+  border: 1px solid #E5E8EE !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #1B2A4A !important;
+}
+.rusto-layout .account-light .bg-ink-50  { background-color: #F9FAFB !important; }
+.rusto-layout .account-light .bg-ink-100 { background-color: #F2F4F7 !important; }
+.rusto-layout .account-light .border-ink-100 { border-color: #F2F4F7 !important; }
+.rusto-layout .account-light .border-ink-200 { border-color: #E5E8EE !important; }
+
+/* rusto-dark-card: intentionally dark card inside a light section */
+.rusto-dark-card,
+.rusto-dark-card * {
+  /* Allow the card to keep its own colors */
+}
+.rusto-layout .rusto-page-light .rusto-dark-card.card,
+.rusto-layout .rusto-page-light .rusto-dark-card {
+  /* Override the white override back to allow inline styles */
+  background: revert !important;
+  border: revert !important;
+  color: revert !important;
+}
+
+/* bg-ink-50/opacity variants — these aren't covered by the base override */
+.rusto-page-light [class*="bg-ink-50/"],
+.rusto-page-light [class*="bg-ink-100/"] {
+  background-color: rgba(249, 250, 251, var(--tw-bg-opacity, 1)) !important;
+}
+.account-light [class*="bg-ink-50/"],
+.account-light [class*="bg-ink-100/"] {
+  background-color: rgba(249, 250, 251, var(--tw-bg-opacity, 1)) !important;
+}
+
+/* Also ensure text-navy in lodge detail renders correctly */
+.rusto-page-light .text-navy-dark { color: #0F1B33 !important; }
+.rusto-page-light .text-gold      { color: #C9A84C !important; }
+.rusto-page-light .text-gold-700  { color: #A8873C !important; }
+.rusto-page-light .text-gold-800  { color: #856B2E !important; }
+.rusto-page-light .text-ink-800   { color: #1D2939 !important; }
+
+/* Booking sidebar — white card inside dark rusto-layout */
+.rusto-layout .booking-sidebar {
+  color: #1B2A4A !important;
+}
+.rusto-layout .booking-sidebar .text-navy { color: #1B2A4A !important; }
+.rusto-layout .booking-sidebar .text-gray-500 { color: #6b7280 !important; }
+.rusto-layout .booking-sidebar .text-gray-700 { color: #374151 !important; }
+.rusto-layout .booking-sidebar .text-gray-800 { color: #1f2937 !important; }
+.rusto-layout .booking-sidebar input,
+.rusto-layout .booking-sidebar select {
+  color: #1B2A4A !important;
+  background: transparent !important;
+}
+.rusto-layout .booking-sidebar .text-gold,
+.rusto-layout .booking-sidebar .text-amber-500 { color: #C9A84C !important; }
+
+/* Mobile sticky booking bar — white bg */
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white.border-t.border-gray-200.shadow-lux {
+  color: #1B2A4A !important;
+}
+
+/* ── Global fix: bg-white inside dark layout gets dark text ──────────
+   Prevents white text on white background in light-themed pages.      */
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white,
+.rusto-layout .bg-gray-50,
+.rusto-layout .bg-gray-100,
+.rusto-layout section.bg-white,
+.rusto-layout div.bg-white {
+  color: #111827;
+}
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white *:not([class*="text-white"]):not([style*="color: white"]):not([style*="color:#fff"]):not([style*="color: #fff"]),
+.rusto-layout .bg-gray-50 *:not([class*="text-white"]):not([style*="color: white"]) {
+  color: inherit;
+}
+/* Specific utility overrides inside light sections */
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-gray-900,
+.rusto-layout .bg-gray-50 .text-gray-900  { color: #111827 !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-gray-800,
+.rusto-layout .bg-gray-50 .text-gray-800  { color: #1f2937 !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-gray-700,
+.rusto-layout .bg-gray-50 .text-gray-700  { color: #374151 !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-gray-600,
+.rusto-layout .bg-gray-50 .text-gray-600  { color: #4b5563 !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-gray-500,
+.rusto-layout .bg-gray-50 .text-gray-500  { color: #6b7280 !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-gray-400,
+.rusto-layout .bg-gray-50 .text-gray-400  { color: #9ca3af !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-orange-600,
+.rusto-layout .bg-gray-50 .text-orange-600 { color: #ea580c !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-orange-500,
+.rusto-layout .bg-gray-50 .text-orange-500 { color: #f97316 !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-orange-400  { color: #fb923c !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-green-600,
+.rusto-layout .bg-gray-50 .text-green-600  { color: #16a34a !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-green-700    { color: #15803d !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-red-500,
+.rusto-layout .bg-gray-50 .text-red-500    { color: #ef4444 !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-red-600      { color: #dc2626 !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-amber-500    { color: #f59e0b !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-amber-400    { color: #fbbf24 !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-amber-700    { color: #b45309 !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-blue-600     { color: #2563eb !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .text-purple-700   { color: #7e22ce !important; }
+/* White stays white (buttons, badges) */
+.rusto-layout .text-white                  { color: #ffffff !important; }
+/* Inputs inside light sections */
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white input,
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white textarea,
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white select,
+.rusto-layout .bg-gray-50 input,
+.rusto-layout .bg-gray-50 textarea {
+  color: #111827 !important;
+}
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white input::placeholder,
+.rusto-layout .bg-gray-50 input::placeholder,
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white textarea::placeholder {
+  color: #9ca3af !important;
+}
+/* Borders */
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .border-gray-100   { border-color: #f3f4f6 !important; }
+.rusto-layout .bg-white, .rusto-layout .rp .bg-white .border-gray-200   { border-color: #e5e7eb !important; }
+
+/* ══ RUSTO CUSTOMER PORTAL — PROFESSIONAL DESIGN TOKENS ════════════
+   Single source of truth for colors/spacing across all customer pages.
+   (Design tokens migrated to top of stylesheet)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Shared button classes ─────────────────────────────────────────── */
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px; padding: 10px 20px; border-radius: var(--r-radius);
+  background: var(--r-blue); color: white;
+  font-weight: 600; font-size: 14px; line-height: 1;
+  border: none; cursor: pointer; transition: background 0.15s, transform 0.1s;
+  text-decoration: none;
+}
+.btn-primary:hover { background: var(--r-blue-hover); }
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px; padding: 10px 20px; border-radius: var(--r-radius);
+  background: white; color: var(--r-text-primary);
+  font-weight: 600; font-size: 14px; line-height: 1;
+  border: 1.5px solid var(--r-border); cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-decoration: none;
+}
+.btn-secondary:hover { border-color: var(--r-text-primary); background: var(--r-bg); }
+
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: var(--r-radius);
+  background: transparent; color: var(--r-text-secondary);
+  font-weight: 500; font-size: 13px; border: none; cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-ghost:hover { background: var(--r-border-soft); color: var(--r-text-primary); }
+
+/* ── Shared card ────────────────────────────────────────────────────── */
+.r-card {
+  background: var(--r-surface);
+  border: 1px solid var(--r-border);
+  border-radius: var(--r-radius-lg);
+  box-shadow: var(--r-shadow-sm);
+}
+
+/* ── Form input ─────────────────────────────────────────────────────── */
+.r-input {
+  width: 100%; padding: 10px 14px; border-radius: var(--r-radius);
+  border: 1.5px solid var(--r-border); background: white;
+  color: var(--r-text-primary); font-size: 14px; outline: none;
+  transition: border-color 0.15s;
+}
+.r-input:focus { border-color: var(--r-blue); }
+.r-input::placeholder { color: var(--r-text-tertiary); }
+
+/* ── Badge ──────────────────────────────────────────────────────────── */
+.r-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   RUSTO DESIGN SYSTEM — single source of truth
+   (Design tokens migrated to top of stylesheet)
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Reset for customer pages ─────────────────────────────────────── */
+.rp {  /* "rusto page" — light customer page wrapper */
+  background: var(--c-bg);
+  color: var(--c-text-1);
+  min-height: 100vh;
+}
+.rp * { color: inherit; }
+.rp .t1  { color: var(--c-text-1) !important; }
+.rp .t2  { color: var(--c-text-2) !important; }
+.rp .t3  { color: var(--c-text-3) !important; }
+.rp .t4  { color: var(--c-text-4) !important; }
+.rp .tw  { color: #fff !important; }
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px; font-weight: 600; font-size: 14px; line-height: 1;
+  border: none; cursor: pointer; text-decoration: none;
+  transition: all 0.15s; white-space: nowrap; border-radius: var(--r-md);
+  padding: 10px 20px;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-p  { background: var(--c-primary);   color: #fff; }
+.btn-p:hover:not(:disabled)  { background: var(--c-primary-h); }
+.btn-s  { background: var(--c-surface);   color: var(--c-text-1); border: 1.5px solid var(--c-border); }
+.btn-s:hover:not(:disabled)  { border-color: var(--c-text-3); background: var(--c-bg); }
+.btn-g  { background: transparent; color: var(--c-text-3); }
+.btn-g:hover:not(:disabled)  { background: var(--c-surface-2); color: var(--c-text-1); }
+.btn-gold { background: var(--c-gold-light); color: var(--c-navy); font-weight: 700; }
+.btn-gold:hover:not(:disabled) { filter: brightness(1.05); }
+
+/* ── Card ─────────────────────────────────────────────────────────── */
+.card {
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--r-lg); box-shadow: var(--s-sm);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease;
+}
+.card-hover:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 30px rgba(10, 17, 31, 0.08), 0 0 15px rgba(163, 127, 41, 0.06);
+  border-color: var(--lux-gold-solid);
+}
+
+/* ── Form controls ────────────────────────────────────────────────── */
+.inp {
+  display: block; width: 100%; padding: 10px 14px; border-radius: var(--r-sm);
+  border: 1.5px solid var(--c-border); background: var(--c-surface);
+  color: var(--c-text-1); font-size: 14px; outline: none;
+  transition: border-color 0.15s; box-sizing: border-box;
+  font-family: var(--font-body);
+}
+.inp:focus { border-color: var(--c-primary); }
+.inp::placeholder { color: var(--c-text-4); }
+
+/* ── Section headers ──────────────────────────────────────────────── */
+.section-eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--c-primary); margin-bottom: 6px;
+}
+.section-title {
+  font-family: var(--font-display); font-size: clamp(20px, 2.5vw, 28px);
+  font-weight: 700; color: var(--c-text-1); letter-spacing: -0.02em;
+  line-height: 1.25; margin: 0;
+}
+
+/* ── Status badges ────────────────────────────────────────────────── */
+.badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+.badge-success { background: var(--c-success-bg); color: var(--c-success); }
+.badge-warn    { background: var(--c-warn-bg);    color: var(--c-warn);    }
+.badge-error   { background: var(--c-error-bg);   color: var(--c-error);   }
+.badge-info    { background: var(--c-primary-bg); color: var(--c-primary); }
+.badge-neutral { background: var(--c-surface-2);  color: var(--c-text-3);  }
+
+/* ── Divider ──────────────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--c-border-soft); margin: 0; border: none; }
+
+/* ── Lodge Card (Luxury High Contrast Layout) ─────────────────────── */
+.lodge-card {
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-crisp);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(10, 17, 31, 0.04); /* Ultra-soft luxury shadow */
+}
+.lodge-card h2 {
+  color: var(--text-primary); /* #0A111F - Sharp and visible */
+}
+.lodge-card p {
+  color: var(--text-body);    /* #2A3649 - Easy on the eyes */
+}
+.lodge-card a {
+  color: var(--lux-gold-solid); /* #A37F29 - Elegant, high-contrast gold link */
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   HIGH-CONTRAST LIGHT MODE RE-SPECIFICATION & RESTORATION
+   Forces all elements inside light-themed pages (.rusto-page-light, .rp,
+   .account-light, .rusto-light-section) to bypass the dark/white layout rules
+   and render crisp, high-contrast luxury text on white backgrounds.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* 1. Base Container Specifications */
+.rusto-page-light,
+.rp,
+.account-light,
+.rusto-light-section {
+  background-color: #FFFFFF !important;
+  background-image: none !important;
+  color: var(--text-body) !important;
+}
+
+/* 2. Heading Elements Direct Overrides */
+.rusto-layout .rusto-page-light h1,
+.rusto-layout .rusto-page-light h2,
+.rusto-layout .rusto-page-light h3,
+.rusto-layout .rusto-page-light h4,
+.rusto-layout .rusto-page-light h5,
+.rusto-layout .rusto-page-light h6,
+.rusto-layout .rp h1,
+.rusto-layout .rp h2,
+.rusto-layout .rp h3,
+.rusto-layout .rp h4,
+.rusto-layout .rp h5,
+.rusto-layout .rp h6,
+.rusto-layout .account-light h1,
+.rusto-layout .account-light h2,
+.rusto-layout .account-light h3,
+.rusto-layout .account-light h4,
+.rusto-layout .account-light h5,
+.rusto-layout .account-light h6,
+.rusto-layout .rusto-light-section h1,
+.rusto-layout .rusto-light-section h2,
+.rusto-layout .rusto-light-section h3,
+.rusto-layout .rusto-light-section h4,
+.rusto-layout .rusto-light-section h5,
+.rusto-layout .rusto-light-section h6 {
+  color: var(--text-primary) !important;
+}
+
+
+
+/* 4. Tailwind Text Class overrides to prevent white text leakage */
+.rusto-layout .rusto-page-light .text-gray-900,
+.rusto-layout .rusto-page-light .text-slate-900,
+.rusto-layout .rusto-page-light .text-ink-900,
+.rusto-layout .rp .text-gray-900,
+.rusto-layout .rp .text-slate-900,
+.rusto-layout .rp .text-ink-900,
+.rusto-layout .account-light .text-gray-900,
+.rusto-layout .account-light .text-slate-900,
+.rusto-layout .account-light .text-ink-900,
+.rusto-layout .rusto-light-section .text-gray-900,
+.rusto-layout .rusto-light-section .text-slate-900,
+.rusto-layout .rusto-light-section .text-ink-900 {
+  color: var(--text-primary) !important;
+}
+
+.rusto-layout .rusto-page-light .text-gray-800,
+.rusto-layout .rusto-page-light .text-slate-800,
+.rusto-layout .rusto-page-light .text-ink-800,
+.rusto-layout .rusto-page-light .text-gray-700,
+.rusto-layout .rusto-page-light .text-slate-700,
+.rusto-layout .rusto-page-light .text-ink-700,
+.rusto-layout .rusto-page-light .text-gray-600,
+.rusto-layout .rusto-page-light .text-slate-600,
+.rusto-layout .rusto-page-light .text-ink-600,
+.rusto-layout .rp .text-gray-800,
+.rusto-layout .rp .text-slate-800,
+.rusto-layout .rp .text-ink-800,
+.rusto-layout .rp .text-gray-700,
+.rusto-layout .rp .text-slate-700,
+.rusto-layout .rp .text-ink-700,
+.rusto-layout .rp .text-gray-600,
+.rusto-layout .rp .text-slate-600,
+.rusto-layout .rp .text-ink-600,
+.rusto-layout .account-light .text-gray-800,
+.rusto-layout .account-light .text-slate-800,
+.rusto-layout .account-light .text-ink-800,
+.rusto-layout .account-light .text-gray-700,
+.rusto-layout .account-light .text-slate-700,
+.rusto-layout .account-light .text-ink-700,
+.rusto-layout .account-light .text-gray-600,
+.rusto-layout .account-light .text-slate-600,
+.rusto-layout .account-light .text-ink-600,
+.rusto-layout .rusto-light-section .text-gray-800,
+.rusto-layout .rusto-light-section .text-slate-800,
+.rusto-layout .rusto-light-section .text-ink-800,
+.rusto-layout .rusto-light-section .text-gray-700,
+.rusto-layout .rusto-light-section .text-slate-700,
+.rusto-layout .rusto-light-section .text-ink-700,
+.rusto-layout .rusto-light-section .text-gray-600,
+.rusto-layout .rusto-light-section .text-slate-600,
+.rusto-layout .rusto-light-section .text-ink-600 {
+  color: var(--text-body) !important;
+}
+
+.rusto-layout .rusto-page-light .text-gray-500,
+.rusto-layout .rusto-page-light .text-slate-500,
+.rusto-layout .rusto-page-light .text-ink-500,
+.rusto-layout .rusto-page-light .text-gray-400,
+.rusto-layout .rusto-page-light .text-slate-400,
+.rusto-layout .rusto-page-light .text-ink-400,
+.rusto-layout .rp .text-gray-500,
+.rusto-layout .rp .text-slate-500,
+.rusto-layout .rp .text-ink-500,
+.rusto-layout .rp .text-gray-400,
+.rusto-layout .rp .text-slate-400,
+.rusto-layout .rp .text-ink-400,
+.rusto-layout .account-light .text-gray-500,
+.rusto-layout .account-light .text-slate-500,
+.rusto-layout .account-light .text-ink-500,
+.rusto-layout .account-light .text-gray-400,
+.rusto-layout .account-light .text-slate-400,
+.rusto-layout .account-light .text-ink-400,
+.rusto-layout .rusto-light-section .text-gray-500,
+.rusto-layout .rusto-light-section .text-slate-500,
+.rusto-layout .rusto-light-section .text-ink-500,
+.rusto-layout .rusto-light-section .text-gray-400,
+.rusto-layout .rusto-light-section .text-slate-400,
+.rusto-layout .rusto-light-section .text-ink-400 {
+  color: var(--text-muted) !important;
+}
+
+/* 5. Direct override for specific elements like icons/links */
+.rusto-layout .rusto-page-light a:not(.btn-cta):not(.btn-gold):not(.btn-p):not(.btn-s):not([style]),
+.rusto-layout .rp a:not(.btn-cta):not(.btn-gold):not(.btn-p):not(.btn-s):not([style]),
+.rusto-layout .account-light a:not(.btn-cta):not(.btn-gold):not(.btn-p):not(.btn-s):not([style]),
+.rusto-layout .rusto-light-section a:not(.btn-cta):not(.btn-gold):not(.btn-p):not(.btn-s):not([style]) {
+  color: var(--lux-gold-solid) !important;
+}
+
+/* 6. Dark Section resets (for hero/navy sections inside light pages) */
+.rusto-layout .dark-lux-section h1,
+.rusto-layout .dark-lux-section h2,
+.rusto-layout .dark-lux-section h3,
+.rusto-layout .dark-lux-section h4,
+.rusto-layout .dark-lux-section h5,
+.rusto-layout .dark-lux-section h6 {
+  color: #FFFFFF !important;
+}
+
+.rusto-layout .dark-lux-section p,
+.rusto-layout .dark-lux-section span:not([class*="badge"]):not([class*="status"]):not([style*="color"]),
+.rusto-layout .dark-lux-section li,
+.rusto-layout .dark-lux-section label {
+  color: rgba(255, 255, 255, 0.70) !important;
+}
+
+.rusto-layout .dark-lux-section .text-white {
+  color: #FFFFFF !important;
+}
+
+/* ══ RUSTO UTILITY ADDITIONS ══════════════════════════════════════
+   Shared classes to reduce repetitive inline styles across pages  */
+
+/* Lodge cards — used on Home and Search */
+.lodge-card-image-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* Skeleton pulse animation */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.skeleton { animation: skeleton-pulse 1.5s ease-in-out infinite; }
+
+/* Section layout */
+.section-header {
+  display: flex; align-items: flex-end;
+  justify-content: space-between; margin-bottom: 24px;
+}
+.section-header-left { flex: 1; }
+
+/* Trust strip item */
+.trust-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 28px; min-width: 150px;
+}
+
+/* Price large display */
+.price-lg {
+  font-size: 20px; font-weight: 800;
+  color: var(--text-primary,#0F172A); line-height: 1;
+}
+
+/* Chip/pill */
+.chip {
+  display: inline-flex; align-items: center;
+  padding: 4px 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 600;
+  white-space: nowrap;
+}
+.chip-blue   { background: var(--brand-cta-bg,#EFF6FF); color: var(--brand-cta,#1E3A8A); }
+.chip-green  { background: var(--brand-success-bg,#F0FDF4); color: var(--brand-success,#166534); }
+.chip-amber  { background: var(--brand-warn-bg,#FFFBEB); color: var(--brand-warn,#92400E); }
+.chip-gray   { background: var(--surface-2,#F1F5F9); color: var(--text-body,#475569); }
+.chip-navy   { background: var(--brand-navy,#1B2A4A); color: white; }
+
+/* Scrollbar hide */
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
+/* Focus visible — keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--brand-cta,#1E3A8A) !important;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Responsive grid helpers */
+.grid-cards { 
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+/* Text truncation */
+.truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.truncate-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Customer page cascade fix — comprehensive */
+.customer-page,
+.customer-page .bg-white,
+.customer-page .bg-gray-50,
+.customer-page section.bg-white {
+  color: var(--text-primary, #0F172A);
+}
+
+.customer-page .text-gray-900 { color: #111827 !important; }
+.customer-page .text-gray-800 { color: #1f2937 !important; }
+.customer-page .text-gray-700 { color: #374151 !important; }
+.customer-page .text-gray-600 { color: #4b5563 !important; }
+.customer-page .text-gray-500 { color: #6b7280 !important; }
+.customer-page .text-gray-400 { color: #9ca3af !important; }
+.customer-page .text-white    { color: #ffffff !important; }
+.customer-page .text-blue-600 { color: #2563eb !important; }
+.customer-page .text-blue-700 { color: #1d4ed8 !important; }
+.customer-page .text-red-500  { color: #ef4444 !important; }
+.customer-page .text-red-600  { color: #dc2626 !important; }
+.customer-page .text-green-600{ color: #16a34a !important; }
+.customer-page .text-amber-400{ color: #fbbf24 !important; }
+.customer-page .text-amber-500{ color: #f59e0b !important; }
+
+.customer-page input,
+.customer-page textarea,
+.customer-page select {
+  color: var(--text-primary,#0F172A) !important;
+}
+.customer-page input::placeholder,
+.customer-page textarea::placeholder {
+  color: var(--text-placeholder,#CBD5E1) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RUSTO ANIMATION SYSTEM v2 — "Indian Dusk" Motion Design
+   ─────────────────────────────────────────────────────────────────────────
+   Design principle: animate purposefully — entrances signal hierarchy,
+   hovers reward interaction, ambient motion creates atmosphere.
+   Always respect prefers-reduced-motion.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Keyframe library ──────────────────────────────────────────────────── */
+
+@keyframes duskFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes duskRiseUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes duskScaleIn {
+  from { opacity: 0; transform: scale(0.88); }
+  60%  { opacity: 1; transform: scale(1.03); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes duskSlideRight {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes duskSlideLeft {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Saffron shimmer — replaces the old silver shimmer on skeletons and CTAs */
+@keyframes saffronShimmer {
+  0%   { background-position: -300px 0; }
+  100% { background-position: 400px 0; }
+}
+
+/* Gold breathing pulse — on premium badges / CTA highlights */
+@keyframes goldBreath {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(232,160,32,0.40); }
+  50%       { box-shadow: 0 0 0 10px rgba(232,160,32,0); }
+}
+
+/* Lantern sway — ambient glow for hero elements */
+@keyframes lanternSway {
+  0%, 100% { box-shadow: 0 0 20px 4px rgba(232,160,32,0.25); }
+  33%       { box-shadow: 0 0 32px 8px rgba(232,160,32,0.45); }
+  66%       { box-shadow: 0 0 16px 2px rgba(232,160,32,0.20); }
+}
+
+/* Temple float — slow levitation for hero illustration elements */
+@keyframes templeFloat {
+  0%, 100% { transform: translateY(0px) rotate(-1deg); }
+  50%       { transform: translateY(-12px) rotate(1deg); }
+}
+
+/* Orb drift — ambient floating circles behind hero */
+@keyframes orbDrift1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(8px, -14px) scale(1.05); }
+  66%       { transform: translate(-6px, -8px) scale(0.97); }
+}
+@keyframes orbDrift2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40%       { transform: translate(-10px, 12px) scale(1.08); }
+  70%       { transform: translate(6px, -6px) scale(0.95); }
+}
+@keyframes orbDrift3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25%       { transform: translate(12px, 8px) scale(1.03); }
+  75%       { transform: translate(-8px, 14px) scale(1.06); }
+}
+
+/* Ken Burns — photo zoom (web hero images) */
+@keyframes kenBurnsDusk {
+  0%   { transform: scale(1)    translate(0, 0); }
+  100% { transform: scale(1.12) translate(-2%, -2%); }
+}
+
+/* Stagger cascade — counter-animated reveal for card grids */
+@keyframes cascadeReveal {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Heart pop — wishlist toggle */
+@keyframes heartPop {
+  0%  { transform: scale(1); }
+  40% { transform: scale(1.5); }
+  65% { transform: scale(0.88); }
+  100%{ transform: scale(1); }
+}
+
+/* Star burst — rating submitted */
+@keyframes starBurst {
+  0%  { transform: scale(0) rotate(0deg);   opacity: 0; }
+  50% { transform: scale(1.3) rotate(180deg); opacity: 1; }
+  100%{ transform: scale(1) rotate(360deg);  opacity: 1; }
+}
+
+/* Count reveal — numbers tick up (stats, KPIs) */
+@keyframes countReveal {
+  from { opacity: 0; transform: translateY(14px) rotateX(60deg); }
+  to   { opacity: 1; transform: translateY(0) rotateX(0); }
+}
+
+/* Underline grow — link hover animation */
+@keyframes underlineGrow {
+  from { transform: scaleX(0); transform-origin: left; }
+  to   { transform: scaleX(1); transform-origin: left; }
+}
+
+/* Booking confirmed — cinematic success reveal */
+@keyframes confirmedZoom {
+  0%  { opacity: 0; transform: scale(0.5) rotate(-8deg); }
+  60% { opacity: 1; transform: scale(1.1) rotate(3deg); }
+  80% { transform: scale(0.96) rotate(-1deg); }
+  100%{ transform: scale(1) rotate(0deg); }
+}
+
+/* Drawer slide up — mobile-style bottom sheet */
+@keyframes drawerSlideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+
+/* Marquee scroll — trust signals / partner logos */
+@keyframes marqueeScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Page bg gentle shift — hero gradient drift */
+@keyframes heroBgShift {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+
+
+/* ── Animation utility classes ─────────────────────────────────────────── */
+
+/* Entrance animations */
+.animate-dusk-fade   { animation: duskFadeIn   var(--t-slow) var(--ease-out-cubic) both; }
+.animate-dusk-rise   { animation: duskRiseUp   var(--t-slow) var(--ease-out-cubic) both; }
+.animate-dusk-scale  { animation: duskScaleIn  var(--t-slow) var(--ease-out-back)  both; }
+.animate-dusk-right  { animation: duskSlideRight var(--t-slow) var(--ease-out-cubic) both; }
+.animate-dusk-left   { animation: duskSlideLeft  var(--t-slow) var(--ease-out-cubic) both; }
+.animate-cascade     { animation: cascadeReveal var(--t-slow) var(--ease-out-cubic) both; }
+
+/* Ambient / looping */
+.animate-gold-pulse  { animation: goldBreath  2.4s ease-in-out infinite; }
+.animate-lantern     { animation: lanternSway 3.2s ease-in-out infinite; }
+.animate-float       { animation: templeFloat 7s   ease-in-out infinite; }
+.animate-float-slow  { animation: templeFloat 11s  ease-in-out infinite; }
+.animate-orb-1       { animation: orbDrift1 9s  ease-in-out infinite; }
+.animate-orb-2       { animation: orbDrift2 12s ease-in-out infinite; }
+.animate-orb-3       { animation: orbDrift3 8s  ease-in-out infinite; }
+.animate-marquee     { animation: marqueeScroll 24s linear infinite; }
+.animate-bg-shift    { animation: heroBgShift 12s ease-in-out infinite; background-size: 200% 200%; }
+
+/* Interaction */
+.animate-heart-pop   { animation: heartPop   0.42s var(--ease-out-back) both; }
+.animate-star-burst  { animation: starBurst  0.55s var(--ease-out-back) both; }
+.animate-confirmed   { animation: confirmedZoom 0.6s var(--ease-spring) both; }
+.animate-drawer-up   { animation: drawerSlideUp 0.38s var(--ease-out-cubic) both; }
+.animate-count       { animation: countReveal   0.5s  var(--ease-out-cubic) both; }
+
+/* Shimmer skeleton */
+.animate-saffron-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--ivory-100) 0%,
+    rgba(232,160,32,0.12) 40%,
+    rgba(232,160,32,0.22) 50%,
+    rgba(232,160,32,0.12) 60%,
+    var(--ivory-100) 100%
+  );
+  background-size: 700px 100%;
+  animation: saffronShimmer 1.6s ease-in-out infinite;
+}
+
+/* Stagger delay helpers — cascade your grid with data-delay or class */
+.delay-50   { animation-delay:  50ms; }
+.delay-100  { animation-delay: 100ms; }
+.delay-150  { animation-delay: 150ms; }
+.delay-200  { animation-delay: 200ms; }
+.delay-250  { animation-delay: 250ms; }
+.delay-300  { animation-delay: 300ms; }
+.delay-400  { animation-delay: 400ms; }
+.delay-500  { animation-delay: 500ms; }
+.delay-600  { animation-delay: 600ms; }
+.delay-700  { animation-delay: 700ms; }
+.delay-800  { animation-delay: 800ms; }
+
+
+/* ── Card hover upgrades — Indian Dusk style ───────────────────────────── */
+
+.dusk-card {
+  background: var(--surface);
+  border: 1px solid var(--ivory-200);
+  border-radius: 20px;
+  transition:
+    transform    var(--t-normal) var(--ease-out-cubic),
+    box-shadow   var(--t-normal) var(--ease-out-cubic),
+    border-color var(--t-normal) ease;
+  will-change: transform, box-shadow;
+}
+.dusk-card:hover {
+  transform: translateY(-4px) scale(1.005);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--ivory-300);
+}
+
+/* Gold-accent card — wishlist items, featured lodges */
+.dusk-card-gold {
+  background: var(--surface);
+  border: 1.5px solid var(--ivory-200);
+  border-radius: 20px;
+  transition:
+    transform    var(--t-normal) var(--ease-out-cubic),
+    box-shadow   var(--t-normal) var(--ease-out-cubic),
+    border-color var(--t-normal) ease;
+}
+.dusk-card-gold:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-gold);
+  border-color: var(--saffron-300);
+}
+
+/* Lodge image — Ken Burns on hover */
+.lodge-image-wrap {
+  overflow: hidden;
+  border-radius: inherit;
+}
+.lodge-image-wrap img {
+  transition: transform 0.7s var(--ease-in-out);
+  will-change: transform;
+}
+.dusk-card:hover .lodge-image-wrap img,
+.dusk-card-gold:hover .lodge-image-wrap img {
+  transform: scale(1.06);
+}
+
+
+/* ── Saffron CTA button ────────────────────────────────────────────────── */
+
+.btn-dusk-gold {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px 28px; border-radius: 14px; border: none; cursor: pointer;
+  background: var(--saffron-DEFAULT);
+  color: var(--dusk-900);
+  font-size: 15px; font-weight: 800; letter-spacing: -0.01em;
+  box-shadow: var(--shadow-gold);
+  transition:
+    transform   var(--t-fast) var(--ease-out-back),
+    box-shadow  var(--t-fast) ease,
+    background  var(--t-fast) ease;
+  text-decoration: none;
+}
+.btn-dusk-gold:hover {
+  background: var(--saffron-400);
+  box-shadow: var(--shadow-gold-lg);
+  transform: translateY(-2px) scale(1.01);
+}
+.btn-dusk-gold:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: var(--shadow-gold);
+}
+
+/* Navy CTA — "Book Now", "Search" */
+.btn-dusk-navy {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px 28px; border-radius: 14px; border: none; cursor: pointer;
+  background: var(--dusk-800);
+  color: var(--saffron-100);
+  font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
+  box-shadow: 0 4px 16px rgba(13,31,45,.22);
+  transition:
+    transform  var(--t-fast) var(--ease-out-back),
+    box-shadow var(--t-fast) ease;
+}
+.btn-dusk-navy:hover {
+  background: var(--dusk-700);
+  box-shadow: 0 8px 24px rgba(13,31,45,.28);
+  transform: translateY(-2px);
+}
+.btn-dusk-navy:active { transform: translateY(0) scale(0.98); }
+
+/* Terracotta — special / elite CTAs */
+.btn-dusk-terra {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px 28px; border-radius: 14px; border: none; cursor: pointer;
+  background: var(--terra-DEFAULT);
+  color: #fff;
+  font-size: 15px; font-weight: 700;
+  box-shadow: 0 4px 16px rgba(200,93,58,.32);
+  transition: transform var(--t-fast) var(--ease-out-back), box-shadow var(--t-fast) ease;
+}
+.btn-dusk-terra:hover {
+  background: var(--terra-light);
+  box-shadow: 0 8px 24px rgba(200,93,58,.40);
+  transform: translateY(-2px);
+}
+
+
+/* ── Floating orbs — ambient hero background ───────────────────────────── */
+
+.dusk-orb {
+  position: absolute; border-radius: 50%;
+  background: radial-gradient(circle, rgba(232,160,32,0.30) 0%, rgba(232,160,32,0) 70%);
+  pointer-events: none; will-change: transform;
+}
+.dusk-orb-1 { animation: orbDrift1  9s ease-in-out infinite; }
+.dusk-orb-2 { animation: orbDrift2 12s ease-in-out infinite; }
+.dusk-orb-3 { animation: orbDrift3  8s ease-in-out infinite; }
+.dusk-orb-terra {
+  background: radial-gradient(circle, rgba(200,93,58,0.20) 0%, rgba(200,93,58,0) 70%);
+}
+
+
+/* ── Skeleton with saffron shimmer ─────────────────────────────────────── */
+
+.skeleton-dusk {
+  background-color: var(--ivory-100);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+.skeleton-dusk::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(232,160,32,0.18) 40%,
+    rgba(232,160,32,0.30) 50%,
+    rgba(232,160,32,0.18) 60%,
+    transparent 100%
+  );
+  background-size: 500px 100%;
+  animation: saffronShimmer 1.6s ease-in-out infinite;
+}
+
+
+/* ── Hero section helpers ──────────────────────────────────────────────── */
+
+.dusk-hero {
+  background:
+    radial-gradient(ellipse at 80% 0%, rgba(232,160,32,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse at 20% 100%, rgba(200,93,58,0.08) 0%, transparent 50%),
+    linear-gradient(135deg, var(--dusk-900) 0%, var(--dusk-800) 50%, var(--dusk-700) 100%);
+  position: relative; overflow: hidden;
+}
+.dusk-hero::before {
+  content: "";
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(232,160,32,0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+}
+
+/* Indian motif border — subtle SVG-like dashes on section dividers */
+.dusk-border-motif {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--saffron-300) 20%,
+    var(--saffron-DEFAULT) 50%,
+    var(--saffron-300) 80%,
+    transparent 100%
+  );
+  border-radius: 999px;
+  margin: 32px 0;
+  position: relative;
+}
+.dusk-border-motif::before,
+.dusk-border-motif::after {
+  content: "◆";
+  position: absolute; top: 50%;
+  transform: translateY(-50%);
+  color: var(--saffron-DEFAULT);
+  font-size: 8px; line-height: 1;
+}
+.dusk-border-motif::before { left: -4px; }
+.dusk-border-motif::after  { right: -4px; }
+
+
+/* ── Wishlist heart button ─────────────────────────────────────────────── */
+
+.wishlist-heart {
+  transition: transform var(--t-fast) var(--ease-out-back), color var(--t-fast) ease;
+  cursor: pointer;
+}
+.wishlist-heart:hover { transform: scale(1.2); }
+.wishlist-heart.saved { color: var(--c-heart); }
+.wishlist-heart.saved:active { animation: heartPop 0.42s var(--ease-out-back) both; }
+
+
+/* ── Gold eyebrow / label ──────────────────────────────────────────────── */
+
+.eyebrow-dusk {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.20em;
+  text-transform: uppercase; color: var(--saffron-DEFAULT);
+  margin-bottom: 6px;
+}
+.eyebrow-dusk::before {
+  content: ""; display: block; width: 4px; height: 4px;
+  border-radius: 50%; background: var(--saffron-DEFAULT);
+  flex-shrink: 0;
+}
+
+
+/* ── Membership tier badges ────────────────────────────────────────────── */
+
+.tier-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+}
+.tier-explorer { background: var(--ivory-100); color: var(--ivory-600); }
+.tier-silver   { background: #E8E8E8; color: #555; }
+.tier-gold     {
+  background: var(--saffron-50); color: var(--saffron-600);
+  border: 1px solid var(--saffron-200);
+  animation: goldBreath 2.4s ease-in-out infinite;
+}
+.tier-elite    {
+  background: var(--dusk-800); color: var(--saffron-300);
+  border: 1px solid var(--saffron-700);
+  animation: goldBreath 2.4s ease-in-out infinite;
+}
+
+
+/* ── Price display — Indian Dusk style ────────────────────────────────── */
+
+.price-dusk {
+  display: inline-flex; align-items: baseline; gap: 2px;
+  font-weight: 800; color: var(--dusk-800); letter-spacing: -0.03em;
+}
+.price-dusk .symbol { font-size: 0.7em; font-weight: 700; margin-right: 1px; }
+.price-dusk .night  { font-size: 0.55em; font-weight: 500; color: var(--ivory-500); margin-left: 2px; }
+
+
+/* ── Reduced motion override ───────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-dusk-fade, .animate-dusk-rise, .animate-dusk-scale,
+  .animate-dusk-right, .animate-dusk-left, .animate-cascade,
+  .animate-gold-pulse, .animate-lantern, .animate-float, .animate-float-slow,
+  .animate-orb-1, .animate-orb-2, .animate-orb-3,
+  .animate-marquee, .animate-bg-shift, .animate-heart-pop,
+  .animate-star-burst, .animate-confirmed, .animate-drawer-up, .animate-count,
+  .animate-saffron-shimmer,
+  .dusk-orb, .dusk-orb-1, .dusk-orb-2, .dusk-orb-3,
+  .tier-gold, .tier-elite,
+  .skeleton-dusk::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .dusk-card:hover, .dusk-card-gold:hover { transform: none; }
+  .lodge-image-wrap img { transition: none; }
+}

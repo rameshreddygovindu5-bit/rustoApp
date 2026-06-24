@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..database import get_db, DATABASE_URL
 from ..auth import require_super_admin
@@ -78,5 +78,5 @@ def download_backup(request: Request, db: Session = Depends(get_db),
     except Exception:
         pass
 
-    fname = f"lms-backup-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.db"
+    fname = f"lms-backup-{datetime.now(timezone.utc).replace(tzinfo=None).strftime('%Y%m%d-%H%M%S')}.db"
     return FileResponse(path, media_type="application/octet-stream", filename=fname)

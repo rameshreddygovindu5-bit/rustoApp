@@ -1,492 +1,580 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { api, reportsAPI, bookingsAPI } from '../services/api'
-import { useSettings } from '../context/SettingsContext'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
-import { BedDouble, Users, DoorOpen, AlertCircle, DollarSign, TrendingUp, Clock, Zap, Ban, Wrench, Search, Calendar } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import { toast } from 'react-toastify'
-import GuestSearchInput from '../components/GuestSearchInput'
-import ActivityFeed from '../components/Dashboard/ActivityFeed'
+/**
+ * Dashboard.jsx — Lodge Operations Command Centre  v14.0
+ * Warm Neutrals palette — all colours inline for 100% reliability.
+ * v14: Full null-safety, error state with retry, all data.x → data?.x
+ */
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+} from "recharts";
+import {
+  BedDouble, Users, AlertTriangle, TrendingUp, Clock,
+  CheckCircle2, ArrowRight, LayoutGrid, LogIn, LogOut,
+  RefreshCw, Banknote, Percent, Calendar, NotebookPen, Save,
+  WifiOff,
+} from "lucide-react";
+import { reportsAPI, bookingsAPI } from "../services/api";
+import { useSettings } from "../context/SettingsContext";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "react-toastify";
+import GuestSearchInput from "../components/GuestSearchInput";
 
-const COLORS = ['#10B981', '#EF4444', '#3B82F6', '#F59E0B']
+// ── Warm Neutrals palette ─────────────────────────────────────────────
+const WN = {
+  canvas:    "#F2EDE4",
+  paper:     "#EAE4D7",
+  parchment: "#DDD5C4",
+  travert:   "#D6CAB2",
+  sand:      "#C9AE8A",
+  burlap:    "#B89A74",
+  suede:     "#8C6E54",
+  tobacco:   "#6B5040",
+  charcoal:  "#4E3D30",
+  espresso:  "#3A2718",
+  walnut:    "#231509",
+  sage:      "#4A7A5C",
+  terra:     "#9B4A38",
+  amber:     "#8B6A2A",
+};
 
-export default function Dashboard() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [filterCategory, setFilterCategory] = useState('all')
-  const [shiftNotes, setShiftNotes] = useState(() => localStorage.getItem('shiftNotes') || '')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [dueCheckouts, setDueCheckouts] = useState([])
-  const [advanceBookings, setAdvanceBookings] = useState([])
-  const { settings } = useSettings()
-  const navigate = useNavigate()
+const inr = (n) => "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
-  const handleSaveNotes = () => {
-    localStorage.setItem('shiftNotes', shiftNotes)
-    toast.success('Notes saved!')
-  }
+const card = {
+  background:   WN.paper,
+  border:       `1px solid ${WN.sand}`,
+  borderRadius: 16,
+  padding:      20,
+  boxShadow:    `0 1px 4px rgba(58,39,24,.06)`,
+};
 
-  const fetchDashboard = async () => {
-    try {
-      const res = await reportsAPI.dashboard()
-      setData(res.data)
-
-      // Fetch today's checkouts. If this sub-call fails (e.g. transient
-      // backend issue) we don't want to wipe the dashboard — degrade
-      // gracefully by showing an empty list.
-      try {
-        const checkinsRes = await api.get('/checkins?status=active&page_size=100')
-        const todayStr = new Date().toISOString().split('T')[0]
-        const due = (checkinsRes.data || []).filter(c =>
-          c.expected_checkout && c.expected_checkout.startsWith(todayStr)
-        )
-        setDueCheckouts(due)
-      } catch (e) {
-        console.warn('dueCheckouts fetch failed (non-fatal):', e)
-        setDueCheckouts([])
-      }
-
-      // Upcoming/advance bookings for the next 7 days, grouped by date below.
-      try {
-        const advRes = await bookingsAPI.upcomingArrivals(7)
-        setAdvanceBookings(advRes.data || [])
-      } catch {
-        setAdvanceBookings([])
-      }
-    } catch (e) {
-      // Surface the underlying server message so the user can see WHY
-      // ("X-Lodge-Id required", "401 expired token", etc.) instead of
-      // a generic toast that gives them nothing to act on.
-      const detail = e?.response?.data?.detail || e?.message || 'Unknown error'
-      console.error('Dashboard load failed:', e)
-      toast.error(`Failed to load dashboard: ${detail}`)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchDashboard()
-    const interval = setInterval(fetchDashboard, 120000) // refresh every 2 min
-    // R8a: refetch when the user comes back to this tab — covers the
-    // "checked in from Rooms, now looking at Dashboard" case so counts
-    // don't look stale until the next 2-minute tick.
-    const onFocus = () => fetchDashboard()
-    // The AI agent emits `lms:agent:data_changed` after any write tool
-    // succeeds — refresh so the dashboard reflects agent-driven mutations
-    // (check-ins, room state changes, bookings, etc.) immediately instead of
-    // waiting for the 2-minute tick.
-    const onAgentChange = () => fetchDashboard()
-    window.addEventListener('focus', onFocus)
-    window.addEventListener('lms:agent:data_changed', onAgentChange)
-    return () => {
-      clearInterval(interval)
-      window.removeEventListener('focus', onFocus)
-      window.removeEventListener('lms:agent:data_changed', onAgentChange)
-    }
-  }, [])
-
-  // Group upcoming bookings by check-in date so the dashboard can show how
-  // many advance reservations are landing on each upcoming day. Hook must run
-  // on every render (before any early return) to satisfy the Rules of Hooks.
-  const advanceByDate = useMemo(() => {
-    const map = new Map()
-    for (const b of advanceBookings) {
-      if (!b?.checkin_date) continue
-      const key = b.checkin_date
-      const cur = map.get(key) || { date: key, bookings: 0, rooms: 0, guests: 0 }
-      cur.bookings += 1
-      cur.rooms += b.rooms_count || 1
-      cur.guests += (b.adults || 0) + (b.children || 0)
-      map.set(key, cur)
-    }
-    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date))
-  }, [advanceBookings])
-
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="w-12 h-12 border-4 border-navy border-t-gold rounded-full animate-spin" />
-    </div>
-  )
-
-  const kpis = data?.kpis || {}
-
-  const totalAdvanceBookings = advanceBookings.length
-  const totalAdvanceRooms = advanceBookings.reduce((s, b) => s + (b.rooms_count || 1), 0)
-
-  // R4: cards ordered by ATTENTION PRIORITY, not just by category.
-  // "Things you need to act on" first (Overdue, Due Checkout, Available
-  // for the next walk-in), then revenue/utilisation, then reference counts.
-  const kpiCards = [
-    { label: 'Overdue', value: kpis.overdue_count, icon: AlertCircle, color: 'text-red-700', bg: 'bg-red-50', alert: kpis.overdue_count > 0, onClick: () => navigate('/checkins?status=overdue') },
-    { label: 'Due Checkout', value: kpis.due_checkout_today, icon: Clock, color: 'text-orange-600', bg: 'bg-orange-50', onClick: () => navigate('/rooms?filter=checkout_due') },
-    { label: 'Available', value: kpis.available_rooms, icon: DoorOpen, color: 'text-green-600', bg: 'bg-green-50', onClick: () => navigate('/rooms?filter=available') },
-    { label: 'Occupied', value: kpis.occupied_rooms, icon: Users, color: 'text-red-600', bg: 'bg-red-50', onClick: () => navigate('/rooms?filter=occupied') },
-    { label: "Today's Revenue", value: `₹${(kpis.today_revenue || 0).toLocaleString('en-IN')}`, icon: DollarSign, color: 'text-gold', bg: 'bg-amber-50' },
-    { label: 'Occupancy %', value: `${kpis.occupancy_rate || 0}%`, icon: TrendingUp, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { label: 'Total Guests', value: kpis.total_customers, icon: Users, color: 'text-purple-600', bg: 'bg-purple-50', onClick: () => navigate('/customers') },
-    { label: 'Total Rooms', value: kpis.total_rooms, icon: BedDouble, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Blocked', value: kpis.blocked_rooms ?? 0, icon: Ban, color: 'text-gray-600', bg: 'bg-gray-100', onClick: () => navigate('/rooms?filter=blocked') },
-    { label: 'Maintenance', value: kpis.maintenance_rooms ?? 0, icon: Wrench, color: 'text-amber-700', bg: 'bg-amber-50', onClick: () => navigate('/rooms?filter=maintenance') },
-  ]
-
-  // R4: relative-time formatter for the activity feed ("2h ago", "5m ago").
-  const relativeTime = (iso) => {
-    if (!iso) return ''
-    const diff = (Date.now() - new Date(iso).getTime()) / 1000
-    if (diff < 60) return 'just now'
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-    return `${Math.floor(diff / 86400)}d ago`
-  }
-
-  const roomTypeLabels = {
-    deluxe_ac: 'Deluxe AC', ac: 'AC', non_ac: 'Non-AC', house: 'House'
-  }
-
+// ── KPI Card ──────────────────────────────────────────────────────────
+function KpiCard({ icon: Icon, label, value, sub, color = WN.suede, alert = false, onClick }) {
+  const [hov, setHov] = useState(false);
   return (
-    <div className="space-y-6 max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 bg-ink-50 min-h-screen animate-fade-in">
-      {/* ── HERO ──────────────────────────────────────────────────────
-          Premium lodge hero with floating gold orbs, dot-grid texture,
-          a gold-drift sweep on the lodge name, and frosted-glass stat
-          panels. The orbs animate slowly (8–12s) for ambience without
-          becoming distracting. */}
-      <div className="hero-panel p-8 md:p-10">
-        {/* Floating atmospheric orbs */}
-        <div className="hero-orb -top-20 -right-20 w-72 h-72"/>
-        <div className="hero-orb-slow -bottom-32 -left-16 w-80 h-80"/>
-        {/* Subtle linen-style texture */}
-        <div className="absolute bottom-0 right-0 w-96 h-32 bg-gradient-to-l from-gold/5 to-transparent pointer-events-none"/>
-        <div className="hero-dotgrid"/>
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        ...card,
+        textAlign: "left",
+        transition: "all .2s",
+        cursor: onClick ? "pointer" : "default",
+        background:   hov ? WN.parchment : WN.paper,
+        borderColor:  alert ? WN.terra : hov ? WN.suede : WN.sand,
+        boxShadow:    hov ? `0 4px 16px rgba(58,39,24,.10)` : alert ? `0 0 0 2px ${WN.terra}20` : `0 1px 4px rgba(58,39,24,.06)`,
+        width:        "100%",
+      }}>
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:12 }}>
+        <div style={{ width:40, height:40, borderRadius:10, background:`${color}18`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <Icon size={18} style={{ color }} />
+        </div>
+        {alert && (
+          <span style={{ fontSize:9, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:WN.terra, background:`${WN.terra}12`, padding:"2px 8px", borderRadius:20, border:`1px solid ${WN.terra}30` }}>
+            Action needed
+          </span>
+        )}
+        {onClick && !alert && (
+          <ArrowRight size={14} style={{ color:WN.travert, opacity:hov?1:0, transition:"opacity .2s" }} />
+        )}
+      </div>
+      <p style={{ fontSize:26, fontWeight:600, lineHeight:1, fontFamily:"'Cormorant Garamond',Georgia,serif", color:WN.espresso, marginBottom:4 }}>{value}</p>
+      <p style={{ fontSize:13, fontWeight:600, color:WN.charcoal }}>{label}</p>
+      {sub && <p style={{ fontSize:10, color:WN.burlap, marginTop:3 }}>{sub}</p>}
+    </button>
+  );
+}
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-          <div className="animate-slide-up">
-            <div className="flex items-center gap-2 mb-3">
-              <p className="text-2xs uppercase tracking-eyebrow text-gold/90 font-bold">
-                Operational dashboard
-              </p>
-              {/* Live status dot */}
-              <span className="inline-flex items-center gap-1.5 text-2xs text-white/60 font-medium">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping"/>
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400"/>
-                </span>
-                Live
-              </span>
-            </div>
-            {/* Gold-drift on the lodge name — light catches the brass */}
-            <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight text-gold-drift">
-              {settings.hotel_name}
-            </h1>
-            <p className="text-white/60 text-sm mt-2 font-medium">
-              {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-            </p>
-          </div>
-          {/* Glass-panel stat strip */}
-          <div className="hidden md:flex items-center gap-2 animate-slide-up stagger-2">
-            <div className="glass rounded-2xl px-5 py-3 text-right">
-              <p className="text-2xs uppercase tracking-eyebrow text-gold/70 font-semibold">Available</p>
-              <p className="font-display text-3xl font-bold text-white mt-0.5 animate-pop-in stagger-3">{kpis.available_rooms ?? 0}</p>
-            </div>
-            <div className="glass rounded-2xl px-5 py-3 text-right">
-              <p className="text-2xs uppercase tracking-eyebrow text-gold/70 font-semibold">Occupied</p>
-              <p className="font-display text-3xl font-bold text-white mt-0.5 animate-pop-in stagger-4">{kpis.occupied_rooms ?? 0}</p>
-            </div>
-          </div>
+// ── Revenue KPI with breakdown ────────────────────────────────────────
+function RevenueKpiCard({ revenue, breakdown, onNavigate }) {
+  const [expanded, setExpanded] = useState(false);
+  const [hov, setHov] = useState(false);
+  const modes = [
+    { key:"cash",          label:"Cash",          icon:"💵" },
+    { key:"upi",           label:"UPI",           icon:"📱" },
+    { key:"card",          label:"Card",          icon:"💳" },
+    { key:"bank_transfer", label:"Bank Transfer", icon:"🏦" },
+    { key:"online",        label:"Online",        icon:"🌐" },
+    { key:"other",         label:"Other",         icon:"💰" },
+  ];
+  const hasBreakdown = breakdown && Object.values(breakdown).some(v => v > 0);
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{ ...card, transition:"all .2s", background:hov?WN.parchment:WN.paper, borderColor:hov?WN.suede:WN.sand, boxShadow:hov?`0 4px 16px rgba(58,39,24,.10)`:`0 1px 4px rgba(58,39,24,.06)`, display:"flex", flexDirection:"column", gap:12 }}>
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between" }}>
+        <div style={{ width:40, height:40, borderRadius:10, background:`${WN.suede}18`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <Banknote size={18} style={{ color:WN.suede }} />
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+          {hasBreakdown && (
+            <button onClick={() => setExpanded(e => !e)}
+              style={{ fontSize:10, fontWeight:700, color:WN.burlap, background:"none", border:"none", cursor:"pointer", padding:0 }}>
+              {expanded ? "▲" : "▼"} breakdown
+            </button>
+          )}
+          <button onClick={onNavigate} style={{ background:"none", border:"none", cursor:"pointer", color:WN.travert, padding:0 }}>
+            <ArrowRight size={14} />
+          </button>
         </div>
       </div>
+      <div>
+        <p style={{ fontSize:26, fontWeight:600, fontFamily:"'Cormorant Garamond',Georgia,serif", color:WN.espresso, lineHeight:1, marginBottom:4 }}>{inr(revenue)}</p>
+        <p style={{ fontSize:13, fontWeight:600, color:WN.charcoal }}>Today's Revenue</p>
+      </div>
+      {expanded && hasBreakdown && (
+        <div style={{ borderTop:`1px solid ${WN.sand}`, paddingTop:12, display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+          {modes.map(m => {
+            const amt = (breakdown||{})[m.key]||0;
+            if (!amt) return null;
+            return (
+              <div key={m.key} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"4px 8px", borderRadius:8, background:WN.parchment, border:`1px solid ${WN.sand}`, fontSize:11, color:WN.espresso }}>
+                <span>{m.icon} <span style={{ fontWeight:600 }}>{m.label}</span></span>
+                <span style={{ fontWeight:700 }}>{inr(amt)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {expanded && !hasBreakdown && (
+        <p style={{ fontSize:11, color:WN.burlap, borderTop:`1px solid ${WN.sand}`, paddingTop:8 }}>No payment records today yet.</p>
+      )}
+    </div>
+  );
+}
 
-      {/* Quick Search with Autocomplete */}
-      <div className="bg-white p-5 rounded-2xl shadow-card border border-ink-100">
-        <div className="max-w-2xl mx-auto flex gap-3 items-center">
-          <GuestSearchInput
-            value={searchTerm}
-            onChange={setSearchTerm}
-            onSelect={(customer) => navigate(`/customers?search=${customer.phone}`)}
-            placeholder="Quick search guest by name or phone..."
-            className="flex-1"
-            inputClassName="!py-3.5 !text-base"
-          />
+// ── Quick action button ───────────────────────────────────────────────
+function QuickBtn({ icon: Icon, label, to, primary = false }) {
+  const navigate = useNavigate();
+  const [hov, setHov] = useState(false);
+  return (
+    <button
+      onClick={() => navigate(to)}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display:"flex", alignItems:"center", gap:10,
+        padding:"12px 16px", borderRadius:12,
+        fontWeight:600, fontSize:13, fontFamily:"'Jost','Plus Jakarta Sans',sans-serif",
+        cursor:"pointer", transition:"all .15s",
+        background: primary ? (hov?WN.walnut:WN.espresso) : (hov?WN.parchment:WN.paper),
+        color:       primary ? WN.canvas : WN.espresso,
+        border:      `1px solid ${primary?WN.espresso:WN.sand}`,
+        boxShadow:   primary&&hov ? `0 4px 12px rgba(35,21,9,.25)` : "none",
+      }}>
+      <Icon size={15} /> {label}
+    </button>
+  );
+}
+
+// ── Main Dashboard ────────────────────────────────────────────────────
+export default function Dashboard() {
+  const navigate  = useNavigate();
+  const { settings }   = useSettings();
+  const { user, roleLabel } = useAuth();
+  const [data,             setData]            = useState(null);
+  const [loading,          setLoading]         = useState(true);
+  const [refreshing,       setRefreshing]      = useState(false);
+  const [error,            setError]           = useState(null);
+  const [dueCheckouts,     setDueCheckouts]    = useState([]);
+  const [upcomingArrivals, setUpcomingArrivals]= useState([]);
+  const [shiftNotes,       setShiftNotes]      = useState(() => localStorage.getItem("shiftNotes") || "");
+  const [notesSaved,       setNotesSaved]      = useState(false);
+
+  const fetchData = useCallback(async (showRefreshing = false) => {
+    if (showRefreshing) setRefreshing(true);
+    setError(null);
+    try {
+      const res = await reportsAPI.dashboard();
+      setData(res.data);
+
+      // Due checkouts today
+      try {
+        const { api } = await import("../services/api");
+        const cRes = await api.get("/checkins?status=active&page_size=100");
+        const today = new Date().toISOString().split("T")[0];
+        const list = Array.isArray(cRes) ? cRes : (cRes?.checkins || cRes?.data || []);
+        setDueCheckouts(list.filter(c => c.expected_checkout?.startsWith(today)));
+      } catch { setDueCheckouts([]); }
+
+      // Upcoming arrivals
+      try {
+        const aRes = await bookingsAPI.upcomingArrivals(7);
+        setUpcomingArrivals(aRes.data || []);
+      } catch { setUpcomingArrivals([]); }
+
+    } catch (e) {
+      const detail = e?.response?.data?.detail || e?.message || "Could not reach backend";
+      setError(detail);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+    const iv = setInterval(fetchData, 120_000);
+    const onFocus = () => fetchData();
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(iv); window.removeEventListener("focus", onFocus); };
+  }, [fetchData]);
+
+  const saveNotes = () => {
+    localStorage.setItem("shiftNotes", shiftNotes);
+    setNotesSaved(true);
+    setTimeout(() => setNotesSaved(false), 2000);
+  };
+
+  const arrivalsByDate = useMemo(() => {
+    const map = new Map();
+    upcomingArrivals.forEach(b => {
+      const k = b.checkin_date;
+      const cur = map.get(k) || { date:k, count:0, rooms:0 };
+      cur.count++;
+      cur.rooms += b.rooms_count || 1;
+      map.set(k, cur);
+    });
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5);
+  }, [upcomingArrivals]);
+
+  // ── Loading ──────────────────────────────────────────────────────────
+  if (loading) return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:280 }}>
+      <div style={{ textAlign:"center" }}>
+        <div style={{ width:44, height:44, borderRadius:"50%", border:`2px solid ${WN.sand}`, borderTopColor:WN.suede, margin:"0 auto 16px", animation:"dashSpin .8s ease-in-out infinite" }}/>
+        <p style={{ fontFamily:"'Cormorant Garamond',Georgia,serif", fontSize:18, fontWeight:500, color:WN.espresso, letterSpacing:".04em" }}>Loading dashboard…</p>
+        <style>{`@keyframes dashSpin{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    </div>
+  );
+
+  // ── Error state ──────────────────────────────────────────────────────
+  if (error && !data) return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:280 }}>
+      <div style={{ textAlign:"center", maxWidth:360 }}>
+        <div style={{ width:56, height:56, borderRadius:"50%", background:`${WN.terra}12`, border:`2px solid ${WN.terra}30`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
+          <WifiOff size={24} style={{ color:WN.terra }} />
+        </div>
+        <p style={{ fontFamily:"'Cormorant Garamond',Georgia,serif", fontSize:20, fontWeight:600, color:WN.espresso, marginBottom:8 }}>
+          Backend not reachable
+        </p>
+        <p style={{ fontSize:12, color:WN.burlap, marginBottom:20, lineHeight:1.6 }}>
+          {error}
+          <br/>
+          Make sure the backend is running on port 8000.
+        </p>
+        <button
+          onClick={() => fetchData(true)}
+          style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"10px 20px", borderRadius:10, background:WN.espresso, color:WN.canvas, border:"none", cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"'Jost',sans-serif" }}>
+          <RefreshCw size={14} /> Retry
+        </button>
+      </div>
+    </div>
+  );
+
+  // Safe data access — all guarded with || {}  or || 0
+  const kpis  = data?.kpis  || {};
+  const totalR = kpis.total_rooms || 1;
+  const occ   = kpis.occupancy_rate ?? 0;
+  const activity     = data?.activity      || [];
+  const dailyCheckins = data?.daily_checkins || [];
+
+  const pieData = [
+    { name:"Available",   value:kpis.available_rooms   || 0, color:WN.sage   },
+    { name:"Occupied",    value:kpis.occupied_rooms    || 0, color:WN.terra  },
+    { name:"Maintenance", value:kpis.maintenance_rooms || 0, color:WN.amber  },
+    { name:"Blocked",     value:kpis.blocked_rooms     || 0, color:WN.burlap },
+  ].filter(d => d.value > 0);
+
+  const todayStr = new Date().toLocaleDateString("en-IN", { weekday:"long", day:"numeric", month:"long" });
+  const hour     = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:24, maxWidth:1280, margin:"0 auto" }}>
+
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+        <div>
+          <p style={{ fontSize:9, fontWeight:700, letterSpacing:".2em", textTransform:"uppercase", color:WN.suede, marginBottom:4 }}>
+            {settings.hotel_name || "Lodge"} · Dashboard
+          </p>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:4 }}>
+            <h1 style={{ fontFamily:"'Cormorant Garamond',Georgia,serif", fontSize:26, fontWeight:600, color:WN.espresso, margin:0 }}>
+              {greeting}, {user?.full_name?.split(" ")[0] || user?.username}
+            </h1>
+            {roleLabel && (
+              <span style={{ fontSize:9, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:WN.suede, background:`${WN.suede}14`, padding:"3px 10px", borderRadius:20, border:`1px solid ${WN.suede}30` }}>
+                {roleLabel}
+              </span>
+            )}
+          </div>
+          <p style={{ fontSize:12, color:WN.burlap }}>{todayStr}</p>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <GuestSearchInput onSelect={c => navigate(`/customers/${c.customer_id}`)} />
           <button
-            onClick={() => navigate(`/customers?search=${searchTerm}`)}
-            className="bg-navy hover:bg-navy-light text-white px-6 py-3.5 rounded-xl text-sm font-semibold transition-all shadow-soft hover:shadow-lifted whitespace-nowrap"
-          >
-            Search
+            onClick={() => fetchData(true)}
+            disabled={refreshing}
+            title="Refresh dashboard"
+            style={{ padding:"9px", borderRadius:10, border:`1px solid ${WN.sand}`, background:WN.paper, color:WN.charcoal, cursor:"pointer", display:"flex", alignItems:"center" }}>
+            <RefreshCw size={14} style={{ animation:refreshing?"dashSpin .7s linear infinite":"none" }} />
           </button>
         </div>
       </div>
 
-      {/* ── ACTION TILES ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <button
-          onClick={() => navigate('/checkins')}
-          className="group relative p-6 bg-white border border-ink-100 rounded-2xl hover:border-gold/40 transition-all flex items-center justify-between shadow-card hover:shadow-lifted hover:-translate-y-0.5 overflow-hidden animate-slide-up stagger-1"
-        >
-          {/* Atmospheric gold halo that fades in on hover */}
-          <div className="absolute -right-12 -bottom-12 w-32 h-32 rounded-full bg-gold/0 group-hover:bg-gold/10 blur-2xl transition-all duration-500 pointer-events-none"/>
-          <div className="relative flex items-center gap-5">
-            <div className="w-14 h-14 bg-navy text-white rounded-xl flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-gold group-hover:to-gold-dark group-hover:scale-105 transition-all duration-300 shadow-soft group-hover:shadow-gold">
-              <DoorOpen size={22} strokeWidth={2}/>
-            </div>
-            <div className="text-left">
-              <p className="font-display text-xl font-bold text-navy">New Check-in</p>
-              <p className="text-sm text-ink-500 mt-0.5">Register a guest arrival</p>
-            </div>
-          </div>
-          <span className="relative text-ink-300 group-hover:text-gold group-hover:translate-x-1 transition-all duration-300 text-2xl font-light">→</span>
-        </button>
+      {/* ── Error banner (if data loaded but stale) ──────────────── */}
+      {error && data && (
+        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:`${WN.amber}12`, border:`1px solid ${WN.amber}40`, borderRadius:10, fontSize:12, color:WN.charcoal }}>
+          <WifiOff size={14} style={{ color:WN.amber, flexShrink:0 }} />
+          <span>Could not refresh: {error}. Showing last known data.</span>
+          <button onClick={() => fetchData(true)} style={{ background:"none", border:"none", cursor:"pointer", color:WN.suede, fontWeight:700, fontSize:11, marginLeft:"auto" }}>Retry</button>
+        </div>
+      )}
 
-        <button
-          onClick={() => navigate('/rooms?filter=available')}
-          className="group relative p-6 bg-white border border-ink-100 rounded-2xl hover:border-gold/40 transition-all flex items-center justify-between shadow-card hover:shadow-lifted hover:-translate-y-0.5 overflow-hidden animate-slide-up stagger-2"
-        >
-          <div className="absolute -right-12 -bottom-12 w-32 h-32 rounded-full bg-gold/0 group-hover:bg-gold/10 blur-2xl transition-all duration-500 pointer-events-none"/>
-          <div className="relative flex items-center gap-5">
-            <div className="w-14 h-14 bg-white border-2 border-navy text-navy rounded-xl flex items-center justify-center group-hover:border-gold group-hover:text-gold group-hover:scale-105 transition-all duration-300 shadow-soft">
-              <BedDouble size={22} strokeWidth={2}/>
-            </div>
-            <div className="text-left">
-              <p className="font-display text-xl font-bold text-navy">Room Availability</p>
-              <p className="text-sm text-ink-500 mt-0.5">Browse vacant rooms & suites</p>
-            </div>
+      {/* ── Overdue alert ───────────────────────────────────────── */}
+      {(kpis.overdue_count || 0) > 0 && (
+        <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", background:`${WN.terra}0D`, border:`1px solid ${WN.terra}40`, borderRadius:12 }}>
+          <AlertTriangle size={18} style={{ color:WN.terra, flexShrink:0 }} />
+          <div style={{ flex:1 }}>
+            <p style={{ fontSize:13, fontWeight:700, color:WN.terra }}>
+              {kpis.overdue_count} overdue checkout{kpis.overdue_count > 1 ? "s" : ""}
+            </p>
+            <p style={{ fontSize:11, color:WN.burlap, marginTop:2 }}>These guests should have checked out already.</p>
           </div>
-          <span className="relative text-ink-300 group-hover:text-gold group-hover:translate-x-1 transition-all duration-300 text-2xl font-light">→</span>
-        </button>
+          <button onClick={() => navigate("/checkins")} style={{ background:"none", border:"none", cursor:"pointer", fontSize:11, fontWeight:700, color:WN.terra, display:"flex", alignItems:"center", gap:4 }}>
+            View <ArrowRight size={11} />
+          </button>
+        </div>
+      )}
+
+      {/* ── 6 KPI cards ─────────────────────────────────────────── */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12 }}>
+        <KpiCard icon={Percent}   label="Occupancy"         value={`${occ}%`}
+          sub={`${kpis.occupied_rooms || 0} / ${totalR} rooms`}
+          color={occ >= 80 ? WN.sage : occ >= 50 ? WN.suede : WN.terra}
+          onClick={() => navigate("/reports")} />
+        <RevenueKpiCard revenue={kpis.today_revenue} breakdown={kpis.today_revenue_breakdown} onNavigate={() => navigate("/reports")} />
+        <KpiCard icon={LogIn}     label="Due Check-outs"    value={dueCheckouts.length}
+          sub="checking out today"
+          color={dueCheckouts.length > 0 ? WN.terra : WN.sage}
+          alert={dueCheckouts.length > 0}
+          onClick={() => navigate("/checkins")} />
+        <KpiCard icon={BedDouble} label="Available Rooms"   value={kpis.available_rooms || 0}
+          sub={`${kpis.maintenance_rooms || 0} in maintenance`}
+          color={WN.sage}
+          onClick={() => navigate("/rooms")} />
+        <KpiCard icon={Calendar}  label="Arrivals (7 days)" value={upcomingArrivals.length}
+          sub={`${arrivalsByDate.length} dates`}
+          color={WN.suede}
+          onClick={() => navigate("/bookings")} />
+        <KpiCard icon={Users}     label="Total Guests"      value={(kpis.total_customers || 0).toLocaleString()}
+          color={WN.charcoal}
+          onClick={() => navigate("/customers")} />
       </div>
 
-      {/* ── KPI CARDS ──────────────────────────────────────────────────
-          Refined cards: staggered pop-in entrance, gold accent rail that
-          brightens on hover, warn-tone red with subtle lantern glow when
-          overdue > 0, revenue card always lit gold. */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Available Rooms', value: kpis.available_rooms ?? 0, icon: DoorOpen,
-            link: '/rooms?filter=available' },
-          { label: 'Occupied Rooms', value: kpis.occupied_rooms ?? 0, icon: Users,
-            link: '/rooms?filter=occupied' },
-          { label: 'Overdue Guests', value: kpis.overdue_count ?? 0, icon: AlertCircle,
-            link: '/checkins?status=overdue',
-            tone: (kpis.overdue_count ?? 0) > 0 ? 'warn' : null },
-          { label: "Today's Revenue",
-            value: `₹${(kpis.today_revenue || 0).toLocaleString('en-IN')}`,
-            icon: DollarSign, accent: true, isRevenue: true },
-        ].map((card, i) => {
-          const Icon = card.icon
-          const isWarn = card.tone === 'warn'
-          return (
-            <div
-              key={i}
-              onClick={() => card.link && navigate(card.link)}
-              style={{ animationDelay: `${i * 75}ms` }}
-              className={`group relative bg-white p-5 rounded-2xl shadow-card border border-ink-100 ${card.link ? 'cursor-pointer hover:shadow-lifted hover:-translate-y-0.5' : ''} transition-all duration-200 overflow-hidden animate-slide-up
-                          ${isWarn ? 'lantern-glow' : ''}`}
-            >
-              {/* Accent rail */}
-              <div className={`absolute top-0 left-0 w-1 h-full ${
-                card.accent ? 'bg-gold' :
-                isWarn ? 'bg-red-400' :
-                'bg-ink-200 group-hover:bg-gold'
-              } transition-colors`}/>
-              {/* Subtle gold sheen on hover for revenue card */}
-              {card.accent && (
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-                  <div className="absolute inset-0 bg-gradient-to-br from-gold/5 via-transparent to-transparent"/>
-                </div>
-              )}
-              <div className="relative flex justify-between items-start mb-4 pl-2">
-                <span className="text-2xs uppercase tracking-eyebrow font-bold text-ink-500">
-                  {card.label}
-                </span>
-                <Icon size={18} className={`transition-all duration-300 ${
-                  card.accent ? 'text-gold group-hover:scale-110' :
-                  isWarn ? 'text-red-500' :
-                  'text-ink-400 group-hover:text-navy group-hover:scale-110'
-                }`}/>
-              </div>
-              {/* Number animates in with count-up easing */}
-              <p
-                style={{ animationDelay: `${(i * 75) + 150}ms` }}
-                className={`font-display font-bold pl-2 animate-count-up ${
-                  card.accent ? 'text-gold-gradient' :
-                  isWarn ? 'text-red-600' :
-                  'text-navy'
-                } ${card.isRevenue ? 'text-2xl md:text-3xl' : 'text-4xl'}`}>
-                {card.value}
+      {/* ── Online booking alert ─────────────────────────────────── */}
+      {(kpis.online_bookings_pending > 0 || kpis.online_arrivals_today > 0) && (
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 16px", background:`${WN.sage}0D`, border:`2px solid ${WN.sage}40`, borderRadius:12 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <div style={{ width:36, height:36, borderRadius:8, background:WN.sage, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>🌐</div>
+            <div>
+              <p style={{ fontSize:13, fontWeight:700, color:WN.espresso }}>
+                {kpis.online_bookings_pending > 0
+                  ? `${kpis.online_bookings_pending} online booking${kpis.online_bookings_pending !== 1 ? "s" : ""} pending check-in`
+                  : `${kpis.online_arrivals_today} online guest${kpis.online_arrivals_today !== 1 ? "s" : ""} arriving today`}
               </p>
+              <p style={{ fontSize:11, color:WN.burlap, marginTop:2 }}>Booked via Rusto marketplace</p>
             </div>
-          )
-        })}
-      </div>
+          </div>
+          <button onClick={() => navigate("/rusto-listing")} style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, fontWeight:700, color:WN.sage, background:WN.paper, padding:"6px 12px", borderRadius:8, border:`1px solid ${WN.sage}40`, cursor:"pointer", flexShrink:0 }}>
+            View <ArrowRight size={10} />
+          </button>
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Room Breakdown with Progress Bars */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-slate-900 text-xl font-display">Room Breakdown</h3>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">By Category</span>
-          </div>
-          <div className="space-y-6">
-            {[...(data?.room_breakdown || [])]
-              .sort((a, b) => b.available - a.available)
-              .map((cat, i) => {
-                const total = cat.total || 1;
-                const vacantPercent = (cat.available / total) * 100;
-                return (
-                  <div key={i} className="cursor-pointer group" onClick={() => navigate(`/rooms?type=${cat.room_type}`)}>
-                    <div className="flex justify-between items-center mb-2">
-                      <div>
-                        <p className="font-semibold text-slate-900 group-hover:text-amber-600 transition-colors">{roomTypeLabels[cat.room_type] || cat.room_type}</p>
-                        <p className="text-xs text-slate-500">Total: {cat.total}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-slate-900">{cat.available} Vacant</p>
-                        <p className="text-xs text-slate-500">{cat.occupied} Occupied</p>
-                      </div>
-                    </div>
-                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-slate-900 group-hover:bg-amber-500 transition-all duration-500" 
-                        style={{ width: `${vacantPercent}%` }}
-                      ></div>
-                    </div>
+      {/* ── Main grid: room status + arrivals ───────────────────── */}
+      <div style={{ display:"grid", gridTemplateColumns:"minmax(260px,1fr) 2fr", gap:20 }}>
+
+        {/* Room status pie */}
+        <div style={card}>
+          <h2 style={{ fontFamily:"'Cormorant Garamond',Georgia,serif", fontSize:16, fontWeight:600, color:WN.espresso, marginBottom:16, display:"flex", alignItems:"center", gap:8 }}>
+            <BedDouble size={15} style={{ color:WN.suede }} /> Room Status
+          </h2>
+          {pieData.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={72} dataKey="value" paddingAngle={2}>
+                    {pieData.map((entry, i) => <Cell key={i} fill={entry.color} strokeWidth={0} />)}
+                  </Pie>
+                  <Tooltip formatter={(v, n) => [v + " rooms", n]}
+                    contentStyle={{ background:WN.paper, border:`1px solid ${WN.sand}`, borderRadius:10, fontSize:12, color:WN.espresso }} />
+                  <Legend iconType="circle" iconSize={8}
+                    formatter={v => <span style={{ color:WN.charcoal, fontSize:11, fontWeight:600 }}>{v}</span>} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginTop:8 }}>
+                {[
+                  { label:"Available",   value:kpis.available_rooms   || 0, color:WN.sage },
+                  { label:"Occupied",    value:kpis.occupied_rooms    || 0, color:WN.terra },
+                  { label:"Maintenance", value:kpis.maintenance_rooms || 0, color:WN.amber },
+                  { label:"Blocked",     value:kpis.blocked_rooms     || 0, color:WN.burlap },
+                ].map(s => (
+                  <div key={s.label} style={{ display:"flex", alignItems:"center", gap:8, fontSize:11 }}>
+                    <span style={{ width:10, height:10, borderRadius:"50%", background:s.color, flexShrink:0 }} />
+                    <span style={{ color:WN.charcoal, flex:1 }}>{s.label}</span>
+                    <span style={{ fontWeight:700, color:WN.espresso }}>{s.value}</span>
                   </div>
-                )
-              })}
-          </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign:"center", padding:"40px 0", color:WN.burlap }}>
+              <BedDouble size={28} style={{ margin:"0 auto 8px", opacity:.4 }} />
+              <p style={{ fontSize:12 }}>No room data yet</p>
+            </div>
+          )}
         </div>
 
-        {/* Today's Check-outs */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-slate-900 text-xl font-display">Today's Departures</h3>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{dueCheckouts.length} Scheduled</span>
+        {/* Upcoming arrivals */}
+        <div style={card}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+            <h2 style={{ fontFamily:"'Cormorant Garamond',Georgia,serif", fontSize:16, fontWeight:600, color:WN.espresso, display:"flex", alignItems:"center", gap:8, margin:0 }}>
+              <Calendar size={15} style={{ color:WN.suede }} /> Upcoming Arrivals
+            </h2>
+            <button onClick={() => navigate("/bookings")} style={{ background:"none", border:"none", cursor:"pointer", fontSize:11, fontWeight:700, color:WN.suede, display:"flex", alignItems:"center", gap:4 }}>
+              All bookings <ArrowRight size={11} />
+            </button>
           </div>
-          {dueCheckouts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <p className="text-slate-400 text-sm font-medium">No departures scheduled for today.</p>
+          {arrivalsByDate.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"40px 0", color:WN.burlap }}>
+              <Calendar size={28} style={{ margin:"0 auto 8px", opacity:.4 }} />
+              <p style={{ fontSize:13 }}>No upcoming arrivals in next 7 days</p>
+              <button onClick={() => navigate("/bookings")} style={{ marginTop:12, fontSize:11, color:WN.suede, background:"none", border:`1px solid ${WN.sand}`, borderRadius:8, padding:"6px 14px", cursor:"pointer" }}>
+                Add a booking
+              </button>
             </div>
           ) : (
-            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-              {dueCheckouts.map((ch, i) => (
-                <div key={i} className="flex justify-between items-center p-4 border border-slate-100 rounded-xl hover:border-slate-200 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-slate-100 text-slate-900 rounded-lg flex items-center justify-center font-bold text-lg border border-slate-200">
-                      {ch.room_number}
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {arrivalsByDate.map(row => {
+                const d = new Date(row.date + "T12:00:00");
+                const isToday = row.date === new Date().toISOString().split("T")[0];
+                return (
+                  <div key={row.date} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 12px", borderRadius:10, background:isToday?`${WN.suede}0D`:WN.parchment, border:`1px solid ${isToday?WN.suede:WN.travert}` }}>
+                    <div style={{ width:48, textAlign:"center", borderRadius:8, padding:"6px 4px", flexShrink:0, background:isToday?WN.suede:WN.paper, border:isToday?"none":`1px solid ${WN.sand}`, color:isToday?WN.canvas:WN.espresso }}>
+                      <p style={{ fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:".06em" }}>
+                        {d.toLocaleDateString("en-IN", { weekday:"short" })}
+                      </p>
+                      <p style={{ fontSize:20, fontWeight:700, lineHeight:1 }}>{d.getDate()}</p>
                     </div>
-                    <div>
-                      <p className="font-bold text-slate-900">{ch.customer?.first_name} {ch.customer?.last_name}</p>
-                      <p className="text-xs text-slate-500 font-medium">{ch.customer?.phone}</p>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <p style={{ fontSize:13, fontWeight:700, color:WN.espresso }}>
+                        {row.count} arrival{row.count > 1 ? "s" : ""}
+                        {isToday && <span style={{ marginLeft:8, fontSize:9, fontWeight:700, letterSpacing:".1em", textTransform:"uppercase", color:WN.suede }}>TODAY</span>}
+                      </p>
+                      <p style={{ fontSize:11, color:WN.burlap }}>{row.rooms} room{row.rooms > 1 ? "s" : ""}</p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
-                      {new Date(ch.expected_checkout).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                    <button 
-                      onClick={() => navigate(`/rooms?room=${ch.room_id}`)}
-                      className="text-xs text-slate-500 hover:text-slate-900 font-medium mt-1 underline"
-                    >
-                      View Suite
+                    <button onClick={() => navigate(`/bookings?from=${row.date}&to=${row.date}`)}
+                      style={{ background:"none", border:"none", cursor:"pointer", fontSize:11, color:WN.burlap, display:"flex", alignItems:"center", gap:4 }}>
+                      View <ArrowRight size={10} />
                     </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Revenue trend ────────────────────────────────────────── */}
+      {dailyCheckins.length > 0 && (
+        <div style={card}>
+          <h2 style={{ fontFamily:"'Cormorant Garamond',Georgia,serif", fontSize:16, fontWeight:600, color:WN.espresso, marginBottom:16, display:"flex", alignItems:"center", gap:8 }}>
+            <TrendingUp size={15} style={{ color:WN.suede }} /> Check-in Trend (last 30 days)
+          </h2>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={dailyCheckins} margin={{ top:4, right:4, bottom:4, left:0 }}>
+              <XAxis dataKey="day" tick={{ fontSize:10, fill:WN.burlap }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize:10, fill:WN.burlap }} tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip contentStyle={{ background:WN.paper, border:`1px solid ${WN.sand}`, borderRadius:10, fontSize:12, color:WN.espresso }} labelStyle={{ color:WN.espresso, fontWeight:700 }} />
+              <Bar dataKey="count" name="Check-ins" fill={WN.suede} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* ── Bottom grid: Activity + Quick Actions + Notes ──────────── */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:20 }}>
+
+        {/* Activity feed */}
+        <div style={card}>
+          <h2 style={{ fontFamily:"'Cormorant Garamond',Georgia,serif", fontSize:16, fontWeight:600, color:WN.espresso, marginBottom:16, display:"flex", alignItems:"center", gap:8 }}>
+            <Clock size={15} style={{ color:WN.suede }} /> Recent Activity
+          </h2>
+          {activity.length === 0 ? (
+            <p style={{ fontSize:12, color:WN.burlap, textAlign:"center", padding:"32px 0" }}>No activity today</p>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              {activity.slice(0, 8).map((ev, i) => (
+                <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:10 }}>
+                  <span style={{ fontSize:14, flexShrink:0, marginTop:1 }}>{ev.icon}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <p style={{ fontSize:12, color:WN.espresso, lineHeight:1.4 }}>{ev.message}</p>
+                    {ev.time && (
+                      <p style={{ fontSize:10, color:WN.burlap, marginTop:2 }}>
+                        {new Date(ev.time).toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit" })}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
-      </div>
 
-      {/* Advance Bookings — Date-wise */}
-      <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-slate-900 text-white rounded-lg flex items-center justify-center">
-              <Calendar size={18} />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900 text-xl font-display">Advance Bookings</h3>
-              <p className="text-xs text-slate-500 font-medium">Next 7 days · confirmed & pending reservations</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold text-slate-900 font-display leading-none">{totalAdvanceBookings}</p>
-            <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mt-1">
-              {totalAdvanceRooms} room{totalAdvanceRooms === 1 ? '' : 's'}
-            </p>
+        {/* Quick actions */}
+        <div style={card}>
+          <h2 style={{ fontFamily:"'Cormorant Garamond',Georgia,serif", fontSize:16, fontWeight:600, color:WN.espresso, marginBottom:16, display:"flex", alignItems:"center", gap:8 }}>
+            Quick Actions
+          </h2>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            <QuickBtn icon={LogIn}      label="New Check-in"  to="/checkins"   primary />
+            <QuickBtn icon={LogOut}     label="Check Out"     to="/checkins" />
+            <QuickBtn icon={Calendar}   label="Add Booking"   to="/bookings" />
+            <QuickBtn icon={BedDouble}  label="Room Status"   to="/rooms" />
+            <QuickBtn icon={LayoutGrid} label="Tape Chart"    to="/tape-chart" />
+            <QuickBtn icon={Users}      label="Customers"     to="/customers" />
           </div>
         </div>
 
-        {advanceByDate.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-center">
-            <p className="text-slate-400 text-sm font-medium">No advance bookings in the next 7 days.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-            {advanceByDate.map((d) => {
-              // Parse "YYYY-MM-DD" as a local date so we don't shift by a day
-              // when the browser is east/west of UTC.
-              const [yyyy, mm, dd] = d.date.split('-').map(Number)
-              const dt = new Date(yyyy, mm - 1, dd)
-              const todayStr = new Date().toISOString().split('T')[0]
-              const isToday = d.date === todayStr
-              return (
-                <button
-                  key={d.date}
-                  onClick={() => navigate(`/bookings?date=${d.date}`)}
-                  className={`text-left p-4 rounded-xl border transition-all hover:shadow-md ${
-                    isToday
-                      ? 'border-amber-400 bg-amber-50 hover:border-amber-500'
-                      : 'border-slate-200 bg-white hover:border-slate-900'
-                  }`}
-                >
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    {dt.toLocaleDateString('en-IN', { weekday: 'short' })}
-                  </p>
-                  <p className="text-lg font-bold text-slate-900 font-display leading-tight">
-                    {dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                  </p>
-                  <div className="mt-3 flex items-baseline gap-1">
-                    <span className="text-3xl font-bold text-slate-900 font-display leading-none">{d.bookings}</span>
-                    <span className="text-xs text-slate-500 font-medium">booking{d.bookings === 1 ? '' : 's'}</span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {d.rooms} room{d.rooms === 1 ? '' : 's'} · {d.guests} guest{d.guests === 1 ? '' : 's'}
-                  </p>
-                  {isToday && (
-                    <p className="text-[10px] font-bold text-amber-700 mt-2 uppercase tracking-wider">Today</p>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Shift Notes */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-slate-900 text-xl font-display">Concierge Notes</h3>
-            <button 
-              onClick={handleSaveNotes}
-              className="px-5 py-2 bg-slate-900 text-white text-xs font-semibold rounded-lg hover:bg-slate-800 transition-colors uppercase tracking-wider"
-            >
-              Save Notes
-            </button>
-          </div>
+        {/* Shift notes */}
+        <div style={{ ...card, display:"flex", flexDirection:"column" }}>
+          <h2 style={{ fontFamily:"'Cormorant Garamond',Georgia,serif", fontSize:16, fontWeight:600, color:WN.espresso, marginBottom:6, display:"flex", alignItems:"center", gap:8 }}>
+            <NotebookPen size={15} style={{ color:WN.suede }} /> Shift Notes
+          </h2>
+          <p style={{ fontSize:10, color:WN.burlap, marginBottom:10 }}>Handover notes for the next shift.</p>
           <textarea
             value={shiftNotes}
-            onChange={(e) => setShiftNotes(e.target.value)}
-            placeholder="Type notes for the next shift... (e.g., Suite 102 requires VIP setup)"
-            className="w-full h-40 p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm placeholder-slate-400"
+            onChange={e => setShiftNotes(e.target.value)}
+            placeholder="Guest requests, pending tasks, reminders…"
+            rows={4}
+            style={{ flex:1, resize:"none", fontSize:12, color:WN.espresso, background:WN.parchment, border:`1px solid ${WN.sand}`, borderRadius:10, padding:"10px 12px", fontFamily:"'Jost','Plus Jakarta Sans',sans-serif", minHeight:90, outline:"none" }}
+            onFocus={e => { e.target.style.borderColor = WN.suede; e.target.style.boxShadow = `0 0 0 3px ${WN.suede}18`; }}
+            onBlur={e  => { e.target.style.borderColor = WN.sand;  e.target.style.boxShadow = "none"; }}
           />
+          <button
+            onClick={saveNotes}
+            style={{ marginTop:10, display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"8px 16px", borderRadius:10, fontSize:12, fontWeight:600, fontFamily:"'Jost',sans-serif", cursor:"pointer", transition:"all .15s", background:notesSaved?`${WN.sage}14`:WN.espresso, color:notesSaved?WN.sage:WN.canvas, border:notesSaved?`1px solid ${WN.sage}40`:"none" }}>
+            {notesSaved ? <CheckCircle2 size={13} /> : <Save size={13} />}
+            {notesSaved ? "Saved!" : "Save Notes"}
+          </button>
         </div>
-
-        {/* Recent Activity — uses the new richer audit-log feed.
-            Polls every 60s; covers checkins, housekeeping, maintenance,
-            expenses, loyalty, feedback, shifts, and more. */}
-        <ActivityFeed limit={20} />
       </div>
     </div>
-  )
+  );
 }

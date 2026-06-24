@@ -130,7 +130,7 @@ def update_promo(promo_id: int, body: PromoUpdate, request: Request,
                  PromoCode.lodge_id == lodge_id).first())
     if not p:
         raise HTTPException(status_code=404, detail="Promo not found")
-    fields = body.dict(exclude_unset=True)
+    fields = body.model_dump(exclude_unset=True)
     for k, v in fields.items():
         if k in ("discount_value", "max_discount_amount", "amount_min") and v is not None:
             setattr(p, k, Decimal(str(v)))
@@ -235,6 +235,35 @@ def validate(body: ValidateRequest,
     return validate_and_compute_discount(db, lodge_id, body.code, body.subtotal)
 
 
+
+@router.post("/validate-public")
+def validate_public(body: ValidateRequest,
+                    lodge_code: str = "",
+                    db: Session = Depends(get_db)):
+    """Public promo validate — used by the customer checkout page.
+    lodge_code identifies which lodge the promo belongs to.
+    """
+    # Resolve lodge_id from lodge_code
+    from ..models import Lodge
+    lodge = None
+    if lodge_code:
+        lodge = db.query(Lodge).filter(
+            Lodge.code == lodge_code.lower(),
+            Lodge.is_active == True
+        ).first()
+    if not lodge:
+        # Try all lodges — find one that has this promo code
+        from ..models import PromoCode as PC
+        promo = db.query(PC).filter(
+            PC.code == body.code.upper().strip(),
+            PC.is_active == True
+        ).first()
+        if promo:
+            lodge = db.query(Lodge).filter(Lodge.lodge_id == promo.lodge_id).first()
+    if not lodge:
+        raise HTTPException(status_code=404, detail="Promo code not found")
+    return validate_and_compute_discount(db, lodge.lodge_id, body.code, body.subtotal)
+
 def redeem(db: Session, *, lodge_id: int, code: str, subtotal: float,
             checkin_id: Optional[int] = None,
             invoice_id: Optional[int] = None,
@@ -255,3 +284,52 @@ def redeem(db: Session, *, lodge_id: int, code: str, subtotal: float,
         code_snapshot=p.code,
     ))
     return info
+
+
+def apply_promo_to_booking(db, lodge_id: int, code: str, subtotal: float) -> dict:
+    """Validate and return discount info for a promo code.
+    Does NOT update the promo usage count — that happens on verify_payment success.
+    Returns dict with discount_amount, discount_pct, or None.
+    """
+    from ..models import PromoCode, PromoDiscountType
+    from datetime import date
+    today = date.today()
+    p = db.query(PromoCode).filter(
+        PromoCode.lodge_id == lodge_id,
+        PromoCode.code == code,
+        PromoCode.is_active == True,
+    ).first()
+    if not p:
+        return None  # not found — caller ignores silently
+
+    # Date bounds check
+    if p.valid_from and p.valid_from > today:
+        return None
+    if p.valid_to and p.valid_to < today:
+        return None
+
+    # Min order check
+    if p.amount_min and subtotal < float(p.amount_min):
+        return None
+
+    # Usage cap
+    if p.max_uses is not None and (p.times_used or 0) >= p.max_uses:
+        return None
+
+    dtype = getattr(p.discount_type, "value", p.discount_type)
+    if dtype == "percent" or dtype == PromoDiscountType.percent:
+        discount_amount = round(subtotal * float(p.discount_value) / 100, 2)
+        if p.max_discount_amount:
+            discount_amount = min(discount_amount, float(p.max_discount_amount))
+        discount_pct = float(p.discount_value)
+    else:
+        discount_amount = float(p.discount_value)
+        discount_pct = round(100 * discount_amount / subtotal, 1) if subtotal else 0
+
+    return {
+        "code":            code,
+        "discount_amount": round(discount_amount, 2),
+        "discount_pct":    discount_pct,
+        "promo_id":        p.promo_id,
+    }
+

@@ -63,8 +63,8 @@ export default function Agencies() {
   if (!isAdmin) {
     return (
       <div className="card text-center py-12 animate-fade-in">
-        <Shield className="mx-auto text-gray-400 mb-3" size={32} />
-        <p className="text-gray-500">Admin access required for partner management.</p>
+        <Shield className="mx-auto text-ink-400 mb-3" size={32} />
+        <p className="text-ink-500">Admin access required for partner management.</p>
       </div>
     )
   }
@@ -75,12 +75,12 @@ export default function Agencies() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-display font-bold text-navy">Agency Partners</h1>
-          <p className="text-xs sm:text-sm text-gray-500">
+          <p className="text-xs sm:text-sm text-ink-500">
             OTAs and travel agencies that integrate with our booking API.
           </p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <button onClick={load} className="p-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">
+          <button onClick={load} className="p-2.5 border border-ink-200 rounded-xl text-ink-600 hover:bg-ink-50 transition-colors">
             <RefreshCw size={16} />
           </button>
           <button onClick={() => setShowCreate(true)} className="flex-1 sm:flex-none btn-primary flex items-center justify-center gap-2 text-sm py-2.5 sm:py-2">
@@ -96,7 +96,7 @@ export default function Agencies() {
         </div>
       ) : agencies.length === 0 ? (
         <div className="card text-center py-12">
-          <p className="text-gray-500 mb-4">No agency partners yet.</p>
+          <p className="text-ink-500 mb-4">No agency partners yet.</p>
           <button onClick={() => setShowCreate(true)} className="btn-primary">
             Create your first partner
           </button>
@@ -108,38 +108,38 @@ export default function Agencies() {
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
                   <h3 className="font-display font-bold text-navy truncate">{a.name}</h3>
-                  <p className="text-xs text-gray-500 font-mono">{a.code}</p>
+                  <p className="text-xs text-ink-500 font-mono">{a.code}</p>
                 </div>
                 <span className={`text-xs px-2 py-1 rounded-full font-semibold ${STATUS_COLORS[a.status] || ''}`}>
                   {a.status}
                 </span>
               </div>
 
-              <div className="space-y-1.5 text-sm text-gray-600 mb-3">
+              <div className="space-y-1.5 text-sm text-ink-600 mb-3">
                 <div className="flex items-center gap-2">
-                  <Key size={12} className="text-gray-400" />
+                  <Key size={12} className="text-ink-400" />
                   <code className="text-[11px] truncate flex-1">{a.api_key}</code>
                   <button title="Copy api_key"
                           onClick={() => { navigator.clipboard.writeText(a.api_key); toast.info('API key copied') }}
-                          className="text-gray-400 hover:text-navy"><Copy size={12} /></button>
+                          className="text-ink-400 hover:text-navy"><Copy size={12} /></button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Webhook size={12} className="text-gray-400" />
+                  <Webhook size={12} className="text-ink-400" />
                   <span className="text-[11px] truncate">
-                    {a.webhook_url || <span className="text-gray-400">no webhook configured</span>}
+                    {a.webhook_url || <span className="text-ink-400">no webhook configured</span>}
                   </span>
                 </div>
-                <div className="flex items-center gap-3 text-[11px] text-gray-500">
+                <div className="flex items-center gap-3 text-[11px] text-ink-500">
                   <span>Commission: <strong className="text-navy">{a.commission_pct}%</strong></span>
                   <span>Markup: <strong className="text-navy">{a.rate_markup_pct}%</strong></span>
                 </div>
-                <div className="flex items-center gap-3 text-[11px] text-gray-500">
+                <div className="flex items-center gap-3 text-[11px] text-ink-500">
                   <span>Bookings: <strong className="text-navy">{a.total_bookings}</strong></span>
                   <span>Revenue: <strong className="text-navy">₹{(a.total_revenue || 0).toLocaleString('en-IN')}</strong></span>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+              <div className="flex flex-wrap gap-2 pt-3 border-t border-ink-100">
                 <button onClick={() => setDetail(a)} className="text-xs text-navy hover:underline flex items-center gap-1">
                   <Activity size={12} /> Details
                 </button>
@@ -199,7 +199,7 @@ function CreateModal({ onSubmit, onClose }) {
       <div className="modal-box" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-xl font-display font-bold text-navy">New Agency Partner</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-600"><X size={20} /></button>
         </div>
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -318,9 +318,9 @@ function CredentialsModal({ data, onClose }) {
                        onCopy={() => copy(data.webhook_secret, 'Webhook Secret')} sensitive />
           )}
 
-          <div className="bg-gray-50 p-4 rounded-lg text-xs">
+          <div className="bg-ink-50 p-4 rounded-lg text-xs">
             <p className="font-semibold text-navy mb-2">Quick start for partner:</p>
-            <pre className="font-mono text-[11px] text-gray-700 whitespace-pre-wrap">
+            <pre className="font-mono text-[11px] text-ink-700 whitespace-pre-wrap">
 {`curl ${window.location.origin}/api/partner/v1/me \\
   -H "X-API-Key: ${data.api_key}" \\
   -H "X-API-Secret: ${data.api_secret || '<the secret you just copied>'}"
@@ -342,15 +342,15 @@ function CredField({ label, value, onCopy, sensitive = false }) {
     <div>
       <label className="label">{label}</label>
       <div className="flex gap-2 items-center">
-        <code className="flex-1 font-mono text-xs bg-gray-100 px-3 py-2 rounded-lg break-all">
+        <code className="flex-1 font-mono text-xs bg-ink-100 px-3 py-2 rounded-lg break-all">
           {shown ? value : '••••••••••••••••••••••••••••'}
         </code>
         {sensitive && (
-          <button onClick={() => setShown(!shown)} className="text-gray-500 hover:text-navy">
+          <button onClick={() => setShown(!shown)} className="text-ink-500 hover:text-navy">
             {shown ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         )}
-        <button onClick={onCopy} className="text-gray-500 hover:text-navy"><Copy size={16} /></button>
+        <button onClick={onCopy} className="text-ink-500 hover:text-navy"><Copy size={16} /></button>
       </div>
     </div>
   )
@@ -384,9 +384,9 @@ function DetailModal({ agencyId, agency, onClose }) {
         <div className="flex items-center justify-between p-6 border-b">
           <div>
             <h2 className="text-xl font-display font-bold text-navy">{agency.name}</h2>
-            <p className="text-xs text-gray-500 font-mono">{agency.code}</p>
+            <p className="text-xs text-ink-500 font-mono">{agency.code}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-600"><X size={20} /></button>
         </div>
 
         <div className="border-b flex">
@@ -396,7 +396,7 @@ function DetailModal({ agencyId, agency, onClose }) {
             { id: 'bookings', label: 'Bookings' },
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-                    className={`px-4 py-3 text-sm font-medium ${tab === t.id ? 'border-b-2 border-gold text-navy' : 'text-gray-500'}`}>
+                    className={`px-4 py-3 text-sm font-medium ${tab === t.id ? 'border-b-2 border-gold text-navy' : 'text-ink-500'}`}>
               {t.label}
             </button>
           ))}
@@ -425,8 +425,8 @@ function DetailModal({ agencyId, agency, onClose }) {
           )}
 
           {tab === 'calls' && (
-            callsLoading ? <p className="text-gray-400 text-sm">Loading...</p>
-            : calls.length === 0 ? <p className="text-gray-400 text-sm">No API calls yet.</p>
+            callsLoading ? <p className="text-ink-400 text-sm">Loading...</p>
+            : calls.length === 0 ? <p className="text-ink-400 text-sm">No API calls yet.</p>
             : <table className="data-table text-xs">
                 <thead><tr><th>Time</th><th>Method</th><th>Path</th><th>Status</th><th>ms</th></tr></thead>
                 <tbody>
@@ -448,7 +448,7 @@ function DetailModal({ agencyId, agency, onClose }) {
           )}
 
           {tab === 'bookings' && (
-            bookings.length === 0 ? <p className="text-gray-400 text-sm">No bookings yet.</p>
+            bookings.length === 0 ? <p className="text-ink-400 text-sm">No bookings yet.</p>
             : <table className="data-table text-xs">
                 <thead><tr><th>Ref</th><th>Guest</th><th>Dates</th><th>Total</th><th>Status</th></tr></thead>
                 <tbody>
@@ -473,7 +473,7 @@ function DetailModal({ agencyId, agency, onClose }) {
 function KV({ label, value, mono = false }) {
   return (
     <div className="flex">
-      <div className="w-40 text-gray-500">{label}</div>
+      <div className="w-40 text-ink-500">{label}</div>
       <div className={`flex-1 text-navy ${mono ? 'font-mono text-xs' : ''}`}>{value || '—'}</div>
     </div>
   )

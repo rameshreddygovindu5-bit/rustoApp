@@ -484,7 +484,7 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
 
           {/* ── Phone search (always at top — quickest path) ─────────── */}
           <div className="relative">
-            <label className="label">Phone Number * <span className="text-gray-400 font-normal">(autocomplete searches existing guests)</span></label>
+            <label className="label">Phone Number * <span className="text-ink-400 font-normal">(autocomplete searches existing guests)</span></label>
             <div className="relative">
               <input
                 ref={phoneRef} autoFocus type="tel" maxLength={10}
@@ -498,10 +498,10 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
             {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
 
             {suggestions.length > 0 && (
-              <div className="absolute z-30 w-full bg-white border border-gray-200 rounded-lg shadow-xl mt-1 overflow-hidden max-h-72 overflow-y-auto">
+              <div className="absolute z-30 w-full bg-white border border-ink-200 rounded-lg shadow-xl mt-1 overflow-hidden max-h-72 overflow-y-auto">
                 {suggestions.map(s => (
                   <button key={s.customer_id} type="button"
-                    className={`w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-gray-50 last:border-0 ${s.blacklisted ? 'bg-red-50/50' : ''}`}
+                    className={`w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-ink-100 last:border-0 ${s.blacklisted ? 'bg-red-50/50' : ''}`}
                     onClick={() => handleSelectCustomer(s)}>
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-navy text-sm flex-1">{s.full_name}</p>
@@ -516,7 +516,7 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
                         </span>
                       )}
                     </div>
-                    <p className="text-gray-500 text-xs mt-0.5">{s.phone} · {s.total_visits} visit{s.total_visits !== 1 ? 's' : ''}</p>
+                    <p className="text-ink-500 text-xs mt-0.5">{s.phone} · {s.total_visits} visit{s.total_visits !== 1 ? 's' : ''}</p>
                   </button>
                 ))}
               </div>
@@ -541,7 +541,7 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
                     </span>
                   )}
                 </div>
-                <p className="text-gray-600 text-xs mt-0.5">
+                <p className="text-ink-600 text-xs mt-0.5">
                   {returningGuest.phone} · {returningGuest.total_visits} previous visit{returningGuest.total_visits !== 1 ? 's' : ''}
                   {returningGuest.email ? ` · ${returningGuest.email}` : ''}
                 </p>
@@ -642,11 +642,11 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
             <div>
               <label className="label">
                 ID Proof Image *
-                <span className="text-gray-400 font-normal"> (JPG/PNG/PDF, max 5MB)</span>
+                <span className="text-ink-400 font-normal"> (JPG/PNG/PDF, max 5MB)</span>
               </label>
-              <label className={`flex items-center gap-3 border-2 border-dashed rounded-lg p-4 cursor-pointer hover:border-navy transition-colors ${errors.id_proof ? 'border-red-400 bg-red-50/30' : 'border-gray-300'}`}>
-                <Upload size={18} className="text-gray-400" />
-                <span className="text-sm text-gray-600 truncate">{idFile ? idFile.name : 'Click to upload ID proof'}</span>
+              <label className={`flex items-center gap-3 border-2 border-dashed rounded-lg p-4 cursor-pointer hover:border-navy transition-colors ${errors.id_proof ? 'border-red-400 bg-red-50/30' : 'border-ink-300'}`}>
+                <Upload size={18} className="text-ink-400" />
+                <span className="text-sm text-ink-600 truncate">{idFile ? idFile.name : 'Click to upload ID proof'}</span>
                 <input type="file" className="hidden" accept=".jpg,.jpeg,.png,.pdf"
                   onChange={e => setIdFile(e.target.files[0])} />
               </label>
@@ -671,7 +671,7 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
           )}
 
           {/* ── Rooms section (R3 multi-room + R1 per-room rent) ──────── */}
-          <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+          <div className="bg-ink-50 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="font-semibold text-navy text-sm">🛏 Rooms</h4>
               <button type="button" onClick={addRoomRow}
@@ -685,7 +685,7 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
 
             {selectedRooms.length === 0 && (
               <button type="button" onClick={addRoomRow}
-                className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-navy hover:text-navy">
+                className="w-full py-3 border-2 border-dashed border-ink-300 rounded-lg text-sm text-ink-500 hover:border-navy hover:text-navy">
                 + Pick a room
               </button>
             )}
@@ -696,9 +696,9 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
               const userTariff = parseFloat(rr.tariff_per_night)
               const isOverridden = picked && !Number.isNaN(userTariff) && userTariff !== liveDefault
               return (
-                <div key={idx} className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
+                <div key={idx} className="bg-white border border-ink-200 rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-ink-400">
                       Room {idx + 1}
                     </span>
                     {selectedRooms.length > 1 && (
@@ -712,7 +712,7 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
 
                   <select
                     disabled={!!room && idx === 0}
-                    className={`input-field ${errors[`room_${idx}`] ? 'border-red-400' : ''} ${(!!room && idx === 0) ? 'bg-gray-100' : ''}`}
+                    className={`input-field ${errors[`room_${idx}`] ? 'border-red-400' : ''} ${(!!room && idx === 0) ? 'bg-ink-100' : ''}`}
                     value={rr.room_id}
                     onChange={e => updateRoomRow(idx, { room_id: e.target.value })}>
                     <option value="">Select a room…</option>
@@ -726,7 +726,7 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[10px] font-bold uppercase text-gray-500">Rent / night (₹) *</label>
+                      <label className="text-[10px] font-bold uppercase text-ink-500">Rent / night (₹) *</label>
                       <input type="number" min={0} step={1}
                         className={`input-field ${errors[`tariff_${idx}`] ? 'border-red-400' : ''}`}
                         value={rr.tariff_per_night}
@@ -740,7 +740,7 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
                       )}
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold uppercase text-gray-500">Deposit (₹) *</label>
+                      <label className="text-[10px] font-bold uppercase text-ink-500">Deposit (₹) *</label>
                       <input type="number" min={0} step={1}
                         className={`input-field ${errors[`deposit_${idx}`] ? 'border-red-400' : ''}`}
                         value={rr.deposit_amount}
@@ -753,7 +753,7 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
             })}
 
             {selectedRooms.length > 0 && computedNights > 0 && (
-              <p className="text-[10px] text-gray-500 pt-1 border-t border-gray-200">
+              <p className="text-[10px] text-ink-500 pt-1 border-t border-ink-200">
                 Estimated room charges: <strong>₹{totalEstimate.toLocaleString('en-IN')}</strong>
                 {' · '}Total deposit: <strong>₹{totalDeposit.toLocaleString('en-IN')}</strong>
               </p>
@@ -801,7 +801,7 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
                   Checkout: {formatDateTime(form.expected_checkout)}
                 </p>
               )}
-              <p className="text-[10px] text-gray-400 mt-0.5">Tariff is calculated on a 24-hour basis.</p>
+              <p className="text-[10px] text-ink-400 mt-0.5">Tariff is calculated on a 24-hour basis.</p>
             </div>
           </div>
 
@@ -830,25 +830,25 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
             <button type="button" onClick={attemptClose} className="btn-outline flex-1">Cancel</button>
             <button type="submit" className="btn-primary flex-1">Review Details ➔</button>
           </div>
-          <p className="text-[10px] text-gray-400 text-center -mt-2">
-            Tip: Press <kbd className="px-1 py-0.5 bg-gray-100 border rounded">Esc</kbd> or click outside to close.
+          <p className="text-[10px] text-ink-400 text-center -mt-2">
+            Tip: Press <kbd className="px-1 py-0.5 bg-ink-100 border rounded">Esc</kbd> or click outside to close.
           </p>
         </form>
         ) : (
         // ── Preview / Review screen ─────────────────────────────────────
         <div className="p-6 space-y-6 max-h-[68vh] overflow-y-auto custom-scrollbar">
-          <div className="bg-gray-50 rounded-xl p-5 border border-gray-100 space-y-4">
+          <div className="bg-ink-50 rounded-xl p-5 border border-ink-100 space-y-4">
             <div>
-              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Guest</p>
+              <p className="text-xs text-ink-500 font-semibold uppercase tracking-wider mb-1">Guest</p>
               <p className="font-bold text-navy text-lg">{form.first_name} {form.last_name}</p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-ink-600">
                 {form.phone}{form.email ? ` · ${form.email}` : ''}
                 {' · '}{form.id_type.toUpperCase()} {form.id_number}
               </p>
             </div>
 
-            <div className="pt-3 border-t border-gray-200">
-              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-2">
+            <div className="pt-3 border-t border-ink-200">
+              <p className="text-xs text-ink-500 font-semibold uppercase tracking-wider mb-2">
                 Rooms ({selectedRooms.length})
               </p>
               <div className="space-y-1.5">
@@ -861,12 +861,12 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
                     <div key={i} className="flex items-center justify-between text-sm">
                       <span className="font-semibold text-navy">
                         Room {r?.room_number || rr.room_id}
-                        <span className="text-gray-400 font-normal ml-1">({r?.room_type?.replace('_',' ')})</span>
+                        <span className="text-ink-400 font-normal ml-1">({r?.room_type?.replace('_',' ')})</span>
                       </span>
-                      <span className="text-gray-700">
+                      <span className="text-ink-700">
                         ₹{rr.tariff_per_night}/night
                         {isOverridden && <span className="text-amber-700 text-[10px] ml-1">(was ₹{liveDef})</span>}
-                        <span className="text-gray-400"> · ₹{rr.deposit_amount} dep</span>
+                        <span className="text-ink-400"> · ₹{rr.deposit_amount} dep</span>
                       </span>
                     </div>
                   )
@@ -874,35 +874,35 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-200">
+            <div className="grid grid-cols-2 gap-4 pt-3 border-t border-ink-200">
               <div>
-                <p className="text-xs text-gray-500">Check-in</p>
+                <p className="text-xs text-ink-500">Check-in</p>
                 <p className="text-sm font-semibold">{formatDateTime(form.checkin_datetime)}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Expected Checkout</p>
+                <p className="text-xs text-ink-500">Expected Checkout</p>
                 <p className="text-sm font-semibold">{formatDateTime(form.expected_checkout)}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Guests</p>
+                <p className="text-xs text-ink-500">Guests</p>
                 <p className="text-sm font-semibold">{form.members_count} · {computedNights} night{computedNights !== 1 ? 's' : ''}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Total Deposit</p>
+                <p className="text-xs text-ink-500">Total Deposit</p>
                 <p className="text-sm font-semibold text-green-700">
-                  ₹{totalDeposit.toLocaleString('en-IN')} <span className="text-gray-400 font-normal">({form.payment_mode})</span>
+                  ₹{totalDeposit.toLocaleString('en-IN')} <span className="text-ink-400 font-normal">({form.payment_mode})</span>
                 </p>
               </div>
               <div className="col-span-2">
-                <p className="text-xs text-gray-500">Estimated room charges</p>
+                <p className="text-xs text-ink-500">Estimated room charges</p>
                 <p className="text-sm font-semibold">₹{totalEstimate.toLocaleString('en-IN')}</p>
               </div>
               {linkedBooking && linkedBooking.advance_amount > 0 && (
                 <div className="col-span-2">
-                  <p className="text-xs text-gray-500">Advance already paid (credited at checkout)</p>
+                  <p className="text-xs text-ink-500">Advance already paid (credited at checkout)</p>
                   <p className="text-sm font-semibold text-green-700">
                     − ₹{Number(linkedBooking.advance_amount).toLocaleString('en-IN')}
-                    <span className="text-gray-400 font-normal"> ({linkedBooking.advance_payment_mode})</span>
+                    <span className="text-ink-400 font-normal"> ({linkedBooking.advance_payment_mode})</span>
                   </p>
                 </div>
               )}
@@ -937,7 +937,7 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
           onClick={(e) => e.target === e.currentTarget && setShowCloseConfirm(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-slide-up">
             <h3 className="font-display text-lg font-bold text-navy">Discard check-in?</h3>
-            <p className="text-sm text-gray-600 mt-2">
+            <p className="text-sm text-ink-600 mt-2">
               You have entered guest details that will be lost. Close anyway?
             </p>
             <div className="flex gap-3 mt-5">

@@ -188,7 +188,7 @@ def update_item(item_id: int, body: ItemUpdate, request: Request,
                     InventoryItem.lodge_id == lodge_id).first())
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    fields = body.dict(exclude_unset=True)
+    fields = body.model_dump(exclude_unset=True)
     # current_stock is NOT editable here — use a movement.
     if "name" in fields:
         item.name = fields["name"].strip()[:160]

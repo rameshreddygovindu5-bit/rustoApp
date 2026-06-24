@@ -1,24 +1,168 @@
-name: Deploy to EC2
+name: CI/CD — Test, Build & Deploy
 
 on:
   push:
-    # Trigger on either branch name in case the default differs across forks
+    branches: [main, master]
+  pull_request:
     branches: [main, master]
   workflow_dispatch:
 
 concurrency:
-  group: production-deploy
+  group: production-deploy-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Build & deploy to EC2
+  # ══════════════════════════════════════════════════════════════════
+  # JOB 1: Run all tests (blocks deploy if any fail)
+  # ══════════════════════════════════════════════════════════════════
+  test:
+    name: Run Test Suite
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: lms
+          POSTGRES_PASSWORD: lms_password
+          POSTGRES_DB: rusto_lms_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Run full test suite
+        working-directory: tests
+        env:
+          DATABASE_URL: sqlite:///lodge_lms_test.db
+        run: |
+          python -m pytest . \
+            --tb=short \
+            --no-header \
+            -q \
+            --timeout=180 \
+            -x
+        # -x: stop on first failure so CI output is readable
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: tests/.pytest_cache/
+          retention-days: 7
+
+  # ══════════════════════════════════════════════════════════════════
+  # JOB 2: Build Docker images (parallel, cached)
+  # ══════════════════════════════════════════════════════════════════
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name != 'pull_request'
+
+    strategy:
+      matrix:
+        include:
+          - image: backend
+            context: backend
+            portal: ""
+          - image: frontend-pms
+            context: frontend
+            portal: pms
+          - image: frontend-customer
+            context: frontend
+            portal: customer
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend
+        if: matrix.image == 'backend'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/backend:latest
+            ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to:   type=gha,scope=backend,mode=max
+
+      - name: Build and push PMS frontend
+        if: matrix.image == 'frontend-pms'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          build-args: |
+            PORTAL=pms
+            VITE_API_URL=/api
+          tags: |
+            ghcr.io/${{ github.repository }}/frontend-pms:latest
+            ghcr.io/${{ github.repository }}/frontend-pms:${{ github.sha }}
+          cache-from: type=gha,scope=frontend-pms
+          cache-to:   type=gha,scope=frontend-pms,mode=max
+
+      - name: Build and push Customer frontend
+        if: matrix.image == 'frontend-customer'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          build-args: |
+            PORTAL=customer
+            VITE_API_URL=/api
+          tags: |
+            ghcr.io/${{ github.repository }}/frontend-customer:latest
+            ghcr.io/${{ github.repository }}/frontend-customer:${{ github.sha }}
+          cache-from: type=gha,scope=frontend-customer
+          cache-to:   type=gha,scope=frontend-customer,mode=max
+
+  # ══════════════════════════════════════════════════════════════════
+  # JOB 3: Deploy to EC2
+  # ══════════════════════════════════════════════════════════════════
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request'
+    environment: production
 
     env:
       EC2_HOST: ${{ secrets.EC2_HOST }}
       EC2_USER: ${{ secrets.EC2_USER }}
-      APP_DIR: /opt/rusto-lms
+      APP_DIR:  /opt/rusto-lms
 
     steps:
       - name: Checkout
@@ -28,22 +172,14 @@ jobs:
         env:
           SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
-          if [ -z "${EC2_HOST}" ]; then
-            echo "✗ FATAL: EC2_HOST secret is empty or not set in GitHub Repository Secrets (Settings -> Secrets -> Actions)."
-            exit 1
-          fi
-          if [ -z "${SSH_KEY}" ]; then
-            echo "✗ FATAL: EC2_SSH_KEY secret is empty or not set in GitHub Repository Secrets (Settings -> Secrets -> Actions)."
-            exit 1
-          fi
+          [ -z "${EC2_HOST}" ] && { echo "✗ EC2_HOST secret missing"; exit 1; }
+          [ -z "${SSH_KEY}" ]  && { echo "✗ EC2_SSH_KEY secret missing"; exit 1; }
           mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          echo "${SSH_KEY}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${EC2_HOST}" >> ~/.ssh/known_hosts 2>/dev/null
 
-
-      # ─── Sync code to EC2 ────────────────────────────────────────────
-      - name: Fix permissions on EC2
+      - name: Prepare EC2 directory
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
               "${EC2_USER}@${EC2_HOST}" \
@@ -51,140 +187,115 @@ jobs:
 
       - name: Sync code to EC2
         run: |
-          # Exclude noise; keep .env.production (server-side only) safe
           rsync -avz --delete \
             --exclude='.git/' \
             --exclude='node_modules/' \
             --exclude='__pycache__/' \
             --exclude='*.pyc' \
+            --exclude='*.db' \
+            --exclude='*.sqlite' \
             --exclude='backend/uploads/' \
             --exclude='backend/logs/' \
             --exclude='backend/backups/' \
-            --exclude='.env' \
-            --exclude='.env.local' \
-            --exclude='.env.production' \
-            --exclude='*.db' \
-            --exclude='*.sqlite' \
+            --exclude='.env*' \
             --exclude='*.pem' \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             ./ "${EC2_USER}@${EC2_HOST}:${APP_DIR}/"
 
-      - name: Ensure runtime directories exist on EC2
+      - name: Deploy on EC2
+        env:
+          SHA: ${{ github.sha }}
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-              "${EC2_USER}@${EC2_HOST}" \
-              "mkdir -p ${APP_DIR}/nginx/conf.d ${APP_DIR}/nginx/certs"
+              "${EC2_USER}@${EC2_HOST}" bash << 'REMOTE'
+            set -euo pipefail
+            cd /opt/rusto-lms
 
-      # ─── Bring up the new stack ─────────────────────────────────────
-      - name: Restart application on EC2
-        run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-              "${EC2_USER}@${EC2_HOST}" "
-            set -e
-            cd ${APP_DIR}
-
-            # Sanity-check the production env file BEFORE touching anything
-            if [ ! -f .env.production ]; then
-              echo '✗ FATAL: .env.production missing on EC2.'
-              echo '   Run ec2-bootstrap.sh once, or copy .env.production.example.'
+            # Verify production env exists
+            [ -f .env.production ] || {
+              echo "✗ .env.production missing — run ec2-bootstrap.sh first"
               exit 1
-            fi
+            }
 
-            # Stop host nginx if it is running (we use a containerized one)
+            # Stop host nginx if running
             sudo systemctl stop nginx 2>/dev/null || true
             sudo systemctl disable nginx 2>/dev/null || true
 
-            # Take the old stack down BEFORE pruning so volumes are released
+            # Bring old stack down
             docker compose -f docker-compose.prod.yml --env-file .env.production down --remove-orphans || true
 
-            # Aggressive cleanup — extracting the new backend image needs
-            # several GB of free space; -af removes *all* unused images
-            # (not just dangling) and the full buildkit cache. Named
-            # volumes (lms_pgdata, etc.) are NOT touched by default.
-            echo '--- Disk before prune ---'
-            df -h /
-            docker system prune -af
+            # Free disk space
+            echo "=== Disk before prune ===" && df -h /
+            docker system prune -af --volumes=false
             docker builder prune -af
-            # Clean apt caches and truncate system logs to maximize host space
             sudo apt-get clean
             sudo journalctl --vacuum-size=50M || true
-            echo '--- Disk after prune ---'
-            df -h /
+            echo "=== Disk after prune ===" && df -h /
 
-            # Refuse to build if there isn't enough headroom to *extract*
-            # the resulting backend image. ~1.2 GB for the new image plus
-            # buildkit scratch space, so require 2.0 GB free as a sane
-            # minimum. Failing here is way better than dying after a 100s
-            # pip install with 'no space left on device'.
-            FREE_KB=\$(df -P / | awk 'NR==2{print \$4}')
-            FREE_MB=\$((FREE_KB / 1024))
-            echo \"Free space on /: \${FREE_MB} MB\"
-            if [ \"\$FREE_MB\" -lt 2000 ]; then
-              echo \"✗ Only \${FREE_MB} MB free on /. Need at least 2000 MB to safely build + extract the backend image.\"
-              echo \"   Grow the EBS root volume to 30 GB and run:  sudo growpart /dev/xvda 1 && sudo resize2fs /dev/xvda1\"
+            # Check free space (need 2 GB)
+            FREE_KB=$(df -P / | awk 'NR==2{print $4}')
+            FREE_MB=$((FREE_KB / 1024))
+            echo "Free: ${FREE_MB} MB"
+            [ "$FREE_MB" -ge 2000 ] || {
+              echo "✗ Only ${FREE_MB} MB free. Need 2000 MB."
+              echo "  Grow EBS root to 30 GB: sudo growpart /dev/xvda 1 && sudo resize2fs /dev/xvda1"
               exit 1
-            fi
+            }
 
-            # Build & start
+            # Load env and deploy
             set -a; . ./.env.production; set +a
-            docker compose -f docker-compose.prod.yml --env-file .env.production build --pull
-            docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+            docker compose -f docker-compose.prod.yml --env-file .env.production \
+              build --pull --parallel
+            docker compose -f docker-compose.prod.yml --env-file .env.production \
+              up -d --remove-orphans
 
-            # Wait for DB then run idempotent migrations
-            echo 'Waiting 15s for DB to be ready...'
-            sleep 15
-            echo '--- Running DB migrations ---'
+            # Wait for DB then migrate
+            echo "Waiting 20s for DB..."
+            sleep 20
             docker compose -f docker-compose.prod.yml exec -T db \
-              psql -U lms -d rusto_lms -f /migrate.sql || echo 'Migration note: non-fatal'
+              psql -U "${POSTGRES_USER:-lms}" -d "${POSTGRES_DB:-rusto_lms}" \
+              -f /migrate.sql || echo "Migration: non-fatal"
 
-            echo '--- Container status ---'
+            echo "=== Container status ==="
             docker compose -f docker-compose.prod.yml --env-file .env.production ps
-          "
+          REMOTE
 
-      # ─── Health check ────────────────────────────────────────────────
-      - name: Wait for backend to become healthy (internal)
+      - name: Wait for backend healthy
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-              "${EC2_USER}@${EC2_HOST}" "
-            cd ${APP_DIR}
-            for i in \$(seq 1 18); do
-              status=\$(docker inspect --format='{{.State.Health.Status}}' rusto_lms_backend 2>/dev/null || echo 'unknown')
-              if [ \"\$status\" = 'healthy' ]; then
-                echo \"✓ Backend healthy after \$((i*5))s\"
-                exit 0
-              fi
-              echo \"attempt \$i/18: backend status = \$status, waiting 5s ...\"
+              "${EC2_USER}@${EC2_HOST}" bash << 'REMOTE'
+            for i in $(seq 1 24); do
+              STATUS=$(docker inspect --format='{{.State.Health.Status}}' rusto_backend 2>/dev/null || echo unknown)
+              [ "$STATUS" = "healthy" ] && { echo "✓ Backend healthy after $((i*5))s"; exit 0; }
+              echo "attempt $i/24: status=$STATUS, waiting 5s..."
               sleep 5
             done
-            echo '✗ Backend never reported healthy.'
-            echo '--- Backend logs ---'
-            docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 backend || true
-            echo '--- DB logs ---'
-            docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=80 db || true
+            echo "✗ Backend never became healthy"
+            docker compose -f /opt/rusto-lms/docker-compose.prod.yml \
+              --env-file /opt/rusto-lms/.env.production logs --tail=100 backend || true
             exit 1
-          "
+          REMOTE
 
       - name: External health check
         run: |
-          echo "Probing http://${EC2_HOST}/api/health ..."
           for i in $(seq 1 15); do
-            if curl -fsS --max-time 5 "http://${EC2_HOST}/api/health" > /tmp/health.json; then
-              echo '--- /api/health response ---'
-              cat /tmp/health.json
-              echo
-              echo "✓ Deployed successfully"
+            if curl -fsS --max-time 5 "http://${EC2_HOST}/health" > /tmp/health.json; then
+              echo "=== Health response ===" && cat /tmp/health.json
+              echo "" && echo "✓ Deployed successfully at http://${EC2_HOST}"
               exit 0
             fi
-            echo "attempt $i/15: not ready yet, waiting 6s ..."
+            echo "attempt $i/15: not ready, waiting 6s..."
             sleep 6
           done
-          echo "✗ External health check failed after 90s."
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-              "${EC2_USER}@${EC2_HOST}" "
-            cd ${APP_DIR}
-            echo '--- nginx logs ---'
-            docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=80 nginx || true
-            echo '--- backend logs ---'
-            docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 backend || true
-          "
+          echo "✗ Health check failed after 90s"
           exit 1
+
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "🚀 Deployed commit ${{ github.sha }} to http://${EC2_HOST}"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed for commit ${{ github.sha }}"

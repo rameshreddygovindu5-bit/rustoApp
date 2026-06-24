@@ -6,12 +6,19 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime, date
+from datetime import datetime, date, timezone
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from ..database import get_db
 from ..models import (Booking, BookingStatus, BookingSource, Customer,
                       Room, RoomType, RoomStatus, Checkin, CheckinStatus)
 from ..auth import get_current_user, require_admin, resolve_lodge_scope
+from ..permissions import require_permission
 from ..services.audit_service import log_audit
 import logging
 
@@ -57,7 +64,7 @@ def _to_dict(b: Booking) -> dict:
     }
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(require_permission("bookings.read"))])
 def list_bookings(
     status: Optional[str] = None,
     source: Optional[str] = None,
@@ -97,7 +104,7 @@ def list_bookings(
     return {"total": total, "page": page, "data": [_to_dict(b) for b in rows]}
 
 
-@router.get("/upcoming-arrivals")
+@router.get("/upcoming-arrivals", dependencies=[Depends(require_permission("bookings.read"))])
 def upcoming_arrivals(days: int = 7, db: Session = Depends(get_db),
                       current_user=Depends(get_current_user),
                       lodge_id: int = Depends(resolve_lodge_scope)):
@@ -114,7 +121,7 @@ def upcoming_arrivals(days: int = 7, db: Session = Depends(get_db),
     return [_to_dict(b) for b in rows]
 
 
-@router.get("/{booking_id}")
+@router.get("/{booking_id}", dependencies=[Depends(require_permission("bookings.read"))])
 def get_booking(booking_id: int, db: Session = Depends(get_db),
                 current_user=Depends(get_current_user),
                 lodge_id: int = Depends(resolve_lodge_scope)):
@@ -144,7 +151,7 @@ class StaffBookingCreate(BaseModel):
     payment_status: str = "unpaid"
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, dependencies=[Depends(require_permission("bookings.write"))])
 def staff_create_booking(body: StaffBookingCreate, request: Request,
                          db: Session = Depends(get_db),
                          current_user=Depends(get_current_user),
@@ -179,7 +186,7 @@ def staff_create_booking(body: StaffBookingCreate, request: Request,
     from ..models import Lodge
     lodge = db.query(Lodge).filter(Lodge.lodge_id == lodge_id).first()
     code_prefix = (lodge.code[:3].upper() if lodge and lodge.code else "UDM")
-    today = datetime.utcnow()
+    today = _utcnow()
     prefix = f"{code_prefix}-{today.strftime('%Y%m')}-"
     last = (db.query(Booking)
             .filter(Booking.lodge_id == lodge_id,
@@ -245,7 +252,7 @@ def staff_create_booking(body: StaffBookingCreate, request: Request,
     return _to_dict(b)
 
 
-@router.put("/{booking_id}/cancel")
+@router.put("/{booking_id}/cancel", dependencies=[Depends(require_permission("bookings.delete"))])
 def cancel_booking(booking_id: int, body: dict, request: Request,
                    db: Session = Depends(get_db),
                    current_user=Depends(get_current_user),
@@ -261,7 +268,7 @@ def cancel_booking(booking_id: int, body: dict, request: Request,
         raise HTTPException(status_code=400,
                             detail=f"Cannot cancel a booking in status: {b.status.value}")
     b.status = BookingStatus.cancelled
-    b.cancelled_at = datetime.utcnow()
+    b.cancelled_at = _utcnow()
     b.cancellation_reason = body.get("reason", "Cancelled by staff")
     db.commit()
 
@@ -302,7 +309,7 @@ class BookingUpdate(BaseModel):
     special_requests: Optional[str] = None
 
 
-@router.put("/{booking_id}")
+@router.put("/{booking_id}", dependencies=[Depends(require_permission("bookings.write"))])
 def update_booking(booking_id: int, body: BookingUpdate, request: Request,
                    db: Session = Depends(get_db),
                    current_user=Depends(get_current_user),
@@ -372,7 +379,7 @@ def update_booking(booking_id: int, body: BookingUpdate, request: Request,
     return _to_dict(b)
 
 
-@router.get("/{booking_id}/checkin-prefill")
+@router.get("/{booking_id}/checkin-prefill", dependencies=[Depends(require_permission("bookings.read"))])
 def booking_checkin_prefill(booking_id: int, db: Session = Depends(get_db),
                             current_user=Depends(get_current_user),
                             lodge_id: int = Depends(resolve_lodge_scope)):
@@ -421,7 +428,7 @@ def booking_checkin_prefill(booking_id: int, db: Session = Depends(get_db),
     }
 
 
-@router.put("/{booking_id}/mark-checked-in")
+@router.put("/{booking_id}/mark-checked-in", dependencies=[Depends(require_permission("checkins.write"))])
 def mark_booking_checked_in(booking_id: int, body: dict, request: Request,
                             db: Session = Depends(get_db),
                             current_user=Depends(get_current_user),

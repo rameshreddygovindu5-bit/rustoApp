@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Globe, Image, MapPin, Plus, Trash2, Sparkles, Save,
+import { Globe, Image, MapPin, Plus, Trash2, Save,
          CheckCircle2, AlertCircle, X, ExternalLink, Eye, EyeOff,
-         RefreshCw, Loader2, ArrowUp, ArrowDown } from "lucide-react";
+         RefreshCw, Loader2, ArrowUp, ArrowDown, Check, XCircle, QrCode } from "lucide-react";
 import { toast } from "react-toastify";
 import { rustoListingAPI } from "../services/api";
 
@@ -65,7 +65,17 @@ export default function RustoListingAdmin() {
       toast.error("Failed to load listing");
     } finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // Live polling: refresh incoming bookings every 30s
+    const pollId = setInterval(async () => {
+      try {
+        const b = await rustoListingAPI.incomingBookings();
+        setBookings(b.data || []);
+      } catch { /* silent refresh */ }
+    }, 30_000);
+    return () => clearInterval(pollId);
+  }, []);
 
   const saveListing = async (extra = {}) => {
     setSaving(true);
@@ -147,7 +157,7 @@ export default function RustoListingAdmin() {
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="flex items-start gap-3">
             <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
-              listing.is_published ? "bg-green-500 text-white" : "bg-amber-500 text-white"
+              listing.is_published ? "bg-green-700 text-white" : "bg-amber-700 text-white"
             }`}>
               {listing.is_published ? <Eye size={20}/> : <EyeOff size={20}/>}
             </div>
@@ -182,6 +192,18 @@ export default function RustoListingAdmin() {
       </div>
 
       {/* Public details form */}
+            {/* Settings auto-sync notice */}
+      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 flex items-start gap-3">
+        <span className="text-lg shrink-0 mt-0.5">⚙️</span>
+        <div>
+          <p className="text-sm font-semibold text-blue-900">Your booking page adapts automatically from Settings</p>
+          <p className="text-xs text-blue-700 mt-0.5 leading-relaxed">
+            Property type, brand colors, logo, description, facilities (pool, spa, gym, restaurant…), policies, social links, and nearby attractions — all configured in <strong>Settings → Property Profile</strong> and shown to guests automatically.
+          </p>
+          <a href="/settings" className="text-xs font-bold text-blue-800 hover:underline mt-1 inline-block">Open Settings →</a>
+        </div>
+      </div>
+
       <div className="card animate-slide-up">
         <h2 className="font-display text-lg font-bold text-navy mb-4 flex items-center gap-2">
           <MapPin size={18} className="text-gold"/> Public details
@@ -400,45 +422,240 @@ export default function RustoListingAdmin() {
       <PhotosPanel listing={listing} onChanged={load}/>
 
       {/* Incoming bookings */}
-      <div className="card animate-slide-up">
-        <h2 className="font-display text-lg font-bold text-navy mb-4 flex items-center gap-2">
-          <ExternalLink size={18} className="text-gold"/> Incoming bookings ({bookings.length})
+      <IncomingBookingsPanel bookings={bookings} onReload={load} />
+    </div>
+  );
+}
+
+/* ── Incoming Bookings Panel ────────────────────────────────────── */
+const STATUS_BADGE = {
+  payment_pending: { cls: "bg-amber-100 text-amber-800",  label: "Awaiting Payment" },
+  confirmed:       { cls: "bg-emerald-100 text-emerald-800", label: "Confirmed" },
+  checked_in:      { cls: "bg-blue-100 text-blue-800",    label: "Checked In" },
+  checked_out:     { cls: "bg-ink-100 text-ink-600",      label: "Checked Out" },
+  cancelled:       { cls: "bg-red-100 text-red-700",      label: "Cancelled" },
+  payment_failed:  { cls: "bg-red-100 text-red-700",      label: "Payment Failed" },
+};
+
+function IncomingBookingsPanel({ bookings, onReload }) {
+  const [actionBusy, setActionBusy] = useState(null); // booking_id being actioned
+  const [qrBookingId, setQrBookingId] = useState(null);
+  const [qrToken, setQrToken]     = useState(null);
+  const [qrRoom, setQrRoom]       = useState("");
+  const [qrBusy, setQrBusy]       = useState(false);
+  const [filterStatus, setFilterStatus] = useState("all");
+
+  const filtered = filterStatus === "all"
+    ? bookings
+    : bookings.filter(b => b.status === filterStatus);
+
+  const confirm = async (b) => {
+    if (!window.confirm(`Confirm booking ${b.booking_ref}?`)) return;
+    setActionBusy(b.booking_id);
+    try {
+      await rustoListingAPI.confirmBooking(b.booking_id, {});
+      toast.success(`${b.booking_ref} confirmed`);
+      onReload();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Confirm failed");
+    } finally { setActionBusy(null); }
+  };
+
+  const reject = async (b) => {
+    if (!window.confirm(`Reject booking ${b.booking_ref}? This cannot be undone.`)) return;
+    setActionBusy(b.booking_id);
+    try {
+      await rustoListingAPI.rejectBooking(b.booking_id, {});
+      toast.success(`${b.booking_ref} rejected`);
+      onReload();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Reject failed");
+    } finally { setActionBusy(null); }
+  };
+
+  const generateQr = async () => {
+    if (!qrBookingId) return;
+    setQrBusy(true);
+    try {
+      const r = await rustoListingAPI.generateCheckinToken(qrBookingId, { room_number: qrRoom || null });
+      setQrToken(r.data);
+      toast.success("Self check-in QR generated");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "QR generation failed");
+    } finally { setQrBusy(false); }
+  };
+
+  const statuses = ["all", "payment_pending", "confirmed", "checked_in", "checked_out", "cancelled"];
+
+  return (
+    <div className="card animate-slide-up">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <h2 className="font-display text-lg font-bold text-navy flex items-center gap-2">
+          <ExternalLink size={18} className="text-gold"/>
+          Incoming Bookings
+          <span className="text-sm font-normal text-ink-500">({bookings.length})</span>
         </h2>
-        {bookings.length === 0 ? (
-          <p className="text-sm text-ink-500 text-center py-6">No customer bookings yet.</p>
-        ) : (
-          <div className="data-table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Ref</th><th>Guest</th><th>Dates</th><th>Room</th><th>Total</th><th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bookings.map(b => (
-                  <tr key={b.booking_id}>
-                    <td className="font-mono text-xs">{b.booking_ref}</td>
-                    <td>
-                      <div className="font-medium">{b.contact_name}</div>
-                      <div className="text-xs text-ink-500">{b.contact_phone}</div>
-                    </td>
-                    <td className="text-xs">{b.checkin_date} → {b.checkout_date}<br/>
-                      <span className="text-ink-500">{b.nights}n · {b.adults}A</span>
-                    </td>
-                    <td>{b.room_type} × {b.rooms_count}</td>
-                    <td className="font-bold">₹{b.total_amount.toLocaleString("en-IN")}</td>
-                    <td>
-                      <span className="badge bg-ink-100 text-ink-700 ring-1 ring-inset ring-ink-200">
-                        {b.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* Status filter pills */}
+        <div className="flex gap-1.5 flex-wrap">
+          {statuses.map(s => (
+            <button key={s}
+              onClick={() => setFilterStatus(s)}
+              className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all
+                ${filterStatus === s
+                  ? "bg-navy text-white"
+                  : "bg-ink-100 text-ink-600 hover:bg-ink-200"}`}>
+              {s === "all" ? "All" : (STATUS_BADGE[s]?.label || s)}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-sm text-ink-500 text-center py-8">No bookings match this filter.</p>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(b => {
+            const badge = STATUS_BADGE[b.status] || { cls: "bg-ink-100 text-ink-600", label: b.status };
+            const busy  = actionBusy === b.booking_id;
+            return (
+              <div key={b.booking_id}
+                   className="border border-ink-200 rounded-xl p-3 hover:border-gold/40
+                              transition-all hover:shadow-sm">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  {/* Left: booking info */}
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs font-bold text-navy">{b.booking_ref}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${badge.cls}`}>
+                        {badge.label}
+                      </span>
+                      {b.instant_confirm === false && b.status === "payment_pending" && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
+                          Manual Confirm Required
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-semibold text-navy text-sm">{b.contact_name}</p>
+                    <p className="text-xs text-ink-500">{b.contact_phone}
+                      {b.contact_email && ` · ${b.contact_email}`}
+                    </p>
+                  </div>
+                  {/* Right: dates + amount */}
+                  <div className="text-right shrink-0">
+                    <p className="font-bold text-navy">₹{Number(b.total_amount).toLocaleString("en-IN")}</p>
+                    <p className="text-xs text-ink-500">{b.checkin_date} → {b.checkout_date}</p>
+                    <p className="text-xs text-ink-500">{b.nights}n · {b.room_type} × {b.rooms_count}</p>
+                  </div>
+                </div>
+
+                {/* Special requests */}
+                {b.special_requests && (
+                  <p className="mt-2 text-xs text-ink-600 bg-amber-50 border border-amber-100
+                                 rounded-lg px-2.5 py-1.5 italic">
+                    "{b.special_requests}"
+                  </p>
+                )}
+
+                {/* Actions row */}
+                <div className="flex items-center gap-2 mt-3 pt-2 border-t border-ink-100 flex-wrap">
+                  {/* Confirm / Reject — only for payment_pending */}
+                  {b.status === "payment_pending" && (
+                    <>
+                      <button onClick={() => confirm(b)} disabled={busy}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg
+                                         bg-emerald-600 text-white text-xs font-semibold
+                                         hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+                        {busy ? <Loader2 size={12} className="animate-spin"/> : <Check size={12}/>}
+                        Confirm
+                      </button>
+                      <button onClick={() => reject(b)} disabled={busy}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg
+                                         bg-red-600 text-white text-xs font-semibold
+                                         hover:bg-red-700 disabled:opacity-50 transition-colors">
+                        {busy ? <Loader2 size={12} className="animate-spin"/> : <XCircle size={12}/>}
+                        Reject
+                      </button>
+                    </>
+                  )}
+
+                  {/* Generate QR self check-in — only for confirmed */}
+                  {b.status === "confirmed" && (
+                    <button onClick={() => { setQrBookingId(b.booking_id); setQrToken(null); setQrRoom(""); }}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg
+                                       bg-navy text-white text-xs font-semibold
+                                       hover:bg-navy/80 transition-colors">
+                      <QrCode size={12}/> Self Check-In QR
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* QR Self Check-In Modal */}
+      {qrBookingId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+             onClick={e => { if (e.target === e.currentTarget) { setQrBookingId(null); setQrToken(null); }}}>
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-navy flex items-center gap-2">
+                <QrCode size={18} className="text-gold"/> Self Check-In QR
+              </h3>
+              <button onClick={() => { setQrBookingId(null); setQrToken(null); }}
+                      className="p-1 rounded-lg hover:bg-ink-100 text-ink-400">
+                <X size={16}/>
+              </button>
+            </div>
+
+            {!qrToken ? (
+              <div className="space-y-3">
+                <p className="text-sm text-ink-600">
+                  Generate a QR code for booking <span className="font-mono font-bold">
+                    {bookings.find(b => b.booking_id === qrBookingId)?.booking_ref}
+                  </span>. The guest scans it to skip the front desk.
+                </p>
+                <label className="block">
+                  <span className="label">Assign Room Number (optional)</span>
+                  <input value={qrRoom} onChange={e => setQrRoom(e.target.value)}
+                         placeholder="e.g. 204" className="input-field"/>
+                </label>
+                <button onClick={generateQr} disabled={qrBusy}
+                        className="btn-gold w-full flex items-center justify-center gap-2">
+                  {qrBusy ? <Loader2 size={14} className="animate-spin"/> : <QrCode size={14}/>}
+                  Generate QR Code
+                </button>
+              </div>
+            ) : (
+              <div className="text-center space-y-3">
+                {/* QR visual placeholder — in production use a QR library */}
+                <div className="w-48 h-48 mx-auto bg-ink-50 border-2 border-ink-200 rounded-xl
+                                flex flex-col items-center justify-center gap-2">
+                  <QrCode size={64} className="text-navy"/>
+                  <p className="text-xs font-mono text-ink-500 break-all px-2 text-center">
+                    {qrToken.token.slice(0, 16)}…
+                  </p>
+                </div>
+                {qrToken.room_number && (
+                  <p className="text-sm font-semibold text-navy">Room: {qrToken.room_number}</p>
+                )}
+                <p className="text-xs text-ink-500">
+                  Valid: {new Date(qrToken.valid_from).toLocaleString()} –{" "}
+                  {new Date(qrToken.valid_until).toLocaleString()}
+                </p>
+                <div className="text-xs text-ink-500 bg-ink-50 rounded-lg p-2 font-mono break-all">
+                  {qrToken.qr_data}
+                </div>
+                <p className="text-xs text-ink-400">
+                  Share this with the guest via WhatsApp or email.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

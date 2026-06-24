@@ -52,6 +52,13 @@ _ADDITIVE_COLUMNS = {
         ("totp_enabled",         "BOOLEAN DEFAULT 0"),
         # v3.2 — per-user permission grants (JSON array). NULL = legacy defaults.
         ("permissions",          "TEXT"),
+        # v10.0 — staff OTP login for premises-lock security.
+        ("login_otp",            "VARCHAR(6)"),
+        ("login_otp_expires",    "DATETIME"),
+        ("login_otp_attempts",   "INTEGER DEFAULT 0"),
+        ("require_login_otp",    "BOOLEAN DEFAULT 0"),
+        ("last_otp_login_ip",    "VARCHAR(45)"),
+        ("static_login_pin",    "VARCHAR(16)"),
     ],
     # v3.1 — marketplace fields on Lodge (Rusto customer-facing).
     # is_published gates whether the lodge appears in public search.
@@ -93,6 +100,18 @@ _ADDITIVE_COLUMNS = {
     ],
     # v7.1 — extended lodge registration: room-type breakdown + plan.
     "lodge_registration_requests": [
+        ("property_category", "VARCHAR(40)"),
+        ("enabled_modules",   "TEXT"),
+        # v11 payment tracking
+        ("payment_status",   "VARCHAR(20) DEFAULT 'pending'"),
+        ("payment_method",   "VARCHAR(40)"),
+        ("payment_ref",      "VARCHAR(120)"),
+        ("payment_amount",   "NUMERIC(12,2)"),
+        ("payment_date",     "DATETIME"),
+        ("payment_notes",    "TEXT"),
+        ("follow_up_at",     "DATETIME"),
+        ("follow_up_count",  "INTEGER DEFAULT 0"),
+        ("assigned_to",      "VARCHAR(80)"),
         ("rooms_ac",         "INTEGER DEFAULT 0"),
         ("rooms_non_ac",     "INTEGER DEFAULT 0"),
         ("rooms_deluxe",     "INTEGER DEFAULT 0"),
@@ -117,6 +136,86 @@ _ADDITIVE_COLUMNS = {
         ("email_sent_at", "DATETIME"),
     ],
 }
+
+# New table DDLs for v9.1+ tables that Base.metadata.create_all handles,
+# but we also create explicitly for environments where create_all may not run.
+_NEW_TABLE_DDLS = [
+    """CREATE TABLE IF NOT EXISTS rusto_memberships (
+        membership_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_id INTEGER NOT NULL REFERENCES rusto_customers(customer_id),
+        tier VARCHAR(20) NOT NULL DEFAULT 'explorer',
+        rusto_points INTEGER NOT NULL DEFAULT 0,
+        lifetime_points INTEGER NOT NULL DEFAULT 0,
+        lifetime_spent_inr NUMERIC(14,2) NOT NULL DEFAULT 0,
+        total_stays INTEGER NOT NULL DEFAULT 0,
+        referral_code VARCHAR(20) UNIQUE,
+        referred_by_code VARCHAR(20),
+        referral_credits INTEGER NOT NULL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ix_rusto_mem_customer ON rusto_memberships(customer_id)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ix_rusto_mem_referral ON rusto_memberships(referral_code)",
+    """CREATE TABLE IF NOT EXISTS rusto_points_ledger (
+        ledger_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        membership_id INTEGER NOT NULL REFERENCES rusto_memberships(membership_id),
+        customer_id INTEGER NOT NULL REFERENCES rusto_customers(customer_id),
+        points INTEGER NOT NULL,
+        txn_type VARCHAR(20) NOT NULL,
+        booking_id INTEGER REFERENCES rusto_customer_bookings(booking_id),
+        description VARCHAR(200),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_rusto_ledger_member ON rusto_points_ledger(membership_id)",
+    """CREATE TABLE IF NOT EXISTS rusto_room_photos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        lodge_id INTEGER NOT NULL REFERENCES lodges(lodge_id),
+        room_type VARCHAR(40) NOT NULL,
+        url VARCHAR(500) NOT NULL,
+        caption VARCHAR(200),
+        sort_order INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_room_photo_lodge_type ON rusto_room_photos(lodge_id, room_type)",
+    """CREATE TABLE IF NOT EXISTS global_api_keys (
+        key_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        partner_name VARCHAR(120) NOT NULL,
+        partner_code VARCHAR(40) NOT NULL,
+        contact_email VARCHAR(160),
+        contact_person VARCHAR(120),
+        api_key VARCHAR(64) UNIQUE NOT NULL,
+        api_secret_hash VARCHAR(255) NOT NULL,
+        webhook_url VARCHAR(300),
+        webhook_secret VARCHAR(64),
+        allowed_lodge_ids TEXT,
+        rate_limit_per_minute INTEGER DEFAULT 100,
+        daily_booking_limit INTEGER DEFAULT 0,
+        rate_markup_pct NUMERIC(5,2) DEFAULT 0,
+        commission_pct NUMERIC(5,2) DEFAULT 10,
+        status VARCHAR(20) DEFAULT 'active',
+        total_calls INTEGER DEFAULT 0,
+        last_used_at DATETIME,
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ix_global_api_key ON global_api_keys(api_key)",
+    """CREATE TABLE IF NOT EXISTS global_api_calls (
+        call_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_id INTEGER NOT NULL REFERENCES global_api_keys(key_id),
+        method VARCHAR(10),
+        path VARCHAR(200),
+        status_code INTEGER,
+        response_ms INTEGER,
+        ip_address VARCHAR(45),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""",
+    # meal_plan column for rusto_customer_bookings
+    "ALTER TABLE rusto_customer_bookings ADD COLUMN IF NOT EXISTS meal_plan VARCHAR(20)",
+    "ALTER TABLE rusto_customer_bookings ADD COLUMN meal_plan VARCHAR(20)",
+    "ALTER TABLE rusto_customer_bookings ADD COLUMN promo_code VARCHAR(40)",
+    "ALTER TABLE rusto_customer_bookings ADD COLUMN promo_discount NUMERIC(10,2) DEFAULT 0",
+]
 
 
 def _add_column_if_missing(engine, table, col, ddl_type):
@@ -163,7 +262,7 @@ def _ensure_default_lodge(engine):
         # change to the Lodge model.
         try:
             conn.execute(text(
-                "INSERT INTO lodges (lodge_id, code, name, is_active, is_published) "
+                "INSERT OR IGNORE INTO lodges (lodge_id, code, name, is_active, is_published) "
                 "VALUES (1, 'rusto', :n, true, false)"
             ), {"n": display_name})
         except Exception:
@@ -301,6 +400,20 @@ def _rebuild_settings_table_if_needed(engine):
         ))
 
 
+def _create_new_tables(engine):
+    """Create new tables and indexes that may not yet exist. Idempotent."""
+    if "_NEW_TABLE_DDLS" not in dir():
+        return
+    from sqlalchemy import text as _text
+    for ddl in _NEW_TABLE_DDLS:
+        try:
+            with engine.begin() as conn:
+                conn.execute(_text(ddl))
+        except Exception as e:
+            import logging as _log
+            _log.getLogger(__name__).debug("DDL skip: %s", e)
+
+
 def run_additive_migrations(engine):
     """Add any missing columns declared in _ADDITIVE_COLUMNS. Then make sure
     every tenant-scoped table has its lodge_id column and the default lodge
@@ -343,6 +456,7 @@ def run_additive_migrations(engine):
         # usable end-to-end out of the box (otherwise nobody can call
         # `POST /api/lodges` to create new lodges).
         _seed_super_admin(engine)
+    _seed_demo_customer(engine)
 
     # 4) Re-apply additive columns. The per-lodge uniqueness rebuild in
     # step 3b reconstructs `users`, `customers`, `rooms`, and `agencies`
@@ -440,27 +554,41 @@ def _seed_lodge_admin_users(engine):
 
 
 def _seed_super_admin(engine):
-    """Seed a cross-tenant super_admin user the first time the multi-tenant
-    system comes up. Without this nobody can actually create new lodges via
-    the API. Username `superadmin`, default password `superadmin123`.
+    """Seed a cross-tenant super_admin and app_owner user the first time the
+    multi-tenant system comes up.
 
-    Idempotent: only inserts if no super_admin currently exists. If one's
-    already present (manual SQL, prior boot, etc.) this is a no-op."""
+    Idempotent — only inserts if missing."""
     from .auth import get_password_hash
     with engine.begin() as conn:
-        existing = conn.execute(text(
+        # super_admin
+        existing_sa = conn.execute(text(
             "SELECT user_id FROM users WHERE role = 'super_admin'"
         )).first()
-        if existing:
-            return
-        # lodge_id is NULL for a super_admin — they're cross-tenant.
-        conn.execute(text(
-            "INSERT INTO users (lodge_id, username, password_hash, full_name, "
-            "role, is_active, failed_attempts) "
-            "VALUES (NULL, 'superadmin', :pw, 'Super Administrator', "
-            "'super_admin', true, 0)"
-        ), {"pw": get_password_hash("superadmin123")})
-        logger.info("Multi-tenant: seeded user 'superadmin' (password: superadmin123) — change this password immediately")
+        if not existing_sa:
+            conn.execute(text(
+                "INSERT INTO users (lodge_id, username, password_hash, full_name, "
+                "role, is_active, failed_attempts) "
+                "VALUES (NULL, 'superadmin', :pw, 'Super Administrator', "
+                "'super_admin', true, 0)"
+            ), {"pw": get_password_hash("superadmin123")})
+            logger.info("Seeded: superadmin (superadmin123) — change immediately")
+
+        # app_owner (Tygonix application owner)
+        existing_ao = conn.execute(text(
+            "SELECT user_id FROM users WHERE username = 'appowner'"
+        )).first()
+        if not existing_ao:
+            try:
+                conn.execute(text(
+                    "INSERT INTO users (lodge_id, username, password_hash, full_name, "
+                    "role, is_active, failed_attempts) "
+                    "VALUES (NULL, 'appowner', :pw, 'Application Owner (Tygonix)', "
+                    "'app_owner', true, 0)"
+                ), {"pw": get_password_hash("AppOwner@2024")})
+                logger.info("Seeded: appowner (AppOwner@2024) — Tygonix internal use")
+            except Exception as e:
+                # Role might not exist in legacy DB; silently skip
+                logger.debug("app_owner seed skipped: %s", e)
 
 
 # ─── Per-lodge uniqueness migration (drops legacy global UNIQUEs) ─────────
@@ -706,3 +834,27 @@ def _apply_per_lodge_uniqueness_postgres(engine):
                 ))
             except Exception as e:
                 logger.debug("Create %s on %s skipped: %s", ix_name, table, e)
+
+
+def _seed_demo_customer(engine):
+    """Seed a demo Rusto customer for testing the marketplace.
+    Phone: 9000000000 / Password: Demo@1234
+    Idempotent.
+    """
+    from .routers.rusto_customer_auth import hash_customer_password
+    from datetime import date
+
+    with engine.begin() as conn:
+        existing = conn.execute(
+            text("SELECT customer_id FROM rusto_customers WHERE phone = '9000000000' LIMIT 1")
+        ).first()
+        if existing:
+            return
+
+        pw = hash_customer_password("Demo@1234")
+        conn.execute(text(
+            "INSERT INTO rusto_customers (full_name, phone, email, password_hash, "
+            "is_active, accepts_marketing, created_at) "
+            "VALUES ('Demo Customer', '9000000000', 'demo@rusto.in', :pw, true, false, CURRENT_TIMESTAMP)"
+        ), {"pw": pw})
+        logger.info("Seeded demo Rusto customer: phone=9000000000 password=Demo@1234")

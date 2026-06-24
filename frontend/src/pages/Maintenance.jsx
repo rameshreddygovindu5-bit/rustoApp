@@ -7,7 +7,7 @@ const PRIORITY_META = {
   urgent: { label: 'Urgent', color: 'bg-red-100 text-red-700 border-red-300' },
   high: { label: 'High', color: 'bg-orange-100 text-orange-700 border-orange-300' },
   medium: { label: 'Medium', color: 'bg-amber-100 text-amber-700 border-amber-300' },
-  low: { label: 'Low', color: 'bg-gray-100 text-gray-600 border-gray-300' },
+  low: { label: 'Low', color: 'bg-ink-100 text-ink-600 border-ink-300' },
 }
 
 const STATUS_META = {
@@ -15,7 +15,7 @@ const STATUS_META = {
   in_progress: { label: 'In Progress', icon: Clock, color: 'text-blue-600' },
   awaiting_parts: { label: 'Awaiting Parts', icon: PauseCircle, color: 'text-purple-600' },
   resolved: { label: 'Resolved', icon: CheckCircle2, color: 'text-green-600' },
-  cancelled: { label: 'Cancelled', icon: XCircle, color: 'text-gray-400' },
+  cancelled: { label: 'Cancelled', icon: XCircle, color: 'text-ink-400' },
 }
 
 const CATEGORIES = [
@@ -71,12 +71,12 @@ export default function Maintenance() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold text-navy">Maintenance</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-ink-500 text-sm mt-1">
             Building & equipment work-orders. Distinct from housekeeping cleaning rotation.
           </p>
         </div>
         <button onClick={() => setShowCreate(true)}
-                className="bg-gold hover:bg-gold/90 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium shadow-sm">
+                className="bg-gold hover:bg-gold/90 text-navy-dark px-4 py-2 rounded-lg flex items-center gap-2 font-medium shadow-sm">
           <Plus size={16}/> New Ticket
         </button>
       </div>
@@ -88,10 +88,10 @@ export default function Maintenance() {
             const Icon = m.icon
             const n = stats.by_status?.[k] ?? 0
             return (
-              <div key={k} className="bg-white rounded-xl shadow-sm p-3 flex items-center gap-3">
+              <div key={k} className="bg-white rounded-2xl shadow-card border border-ink-100 p-3 flex items-center gap-3">
                 <Icon size={20} className={m.color}/>
                 <div>
-                  <div className="text-[11px] uppercase tracking-wide text-gray-500">{m.label}</div>
+                  <div className="text-[11px] uppercase tracking-wide text-ink-500">{m.label}</div>
                   <div className="text-xl font-bold text-navy">{n}</div>
                 </div>
               </div>
@@ -101,11 +101,11 @@ export default function Maintenance() {
       )}
 
       {/* Filter tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-gray-200">
+      <div className="flex flex-wrap gap-2 border-b border-ink-200">
         {[['open', 'Open & Active'], ['resolved', 'Resolved'], ['cancelled', 'Cancelled'], ['all', 'All']].map(([k, l]) => (
           <button key={k} onClick={() => setFilter(k)}
                   className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                    filter === k ? 'border-gold text-gold' : 'border-transparent text-gray-500 hover:text-navy'
+                    filter === k ? 'border-gold text-gold' : 'border-transparent text-ink-500 hover:text-navy'
                   }`}>
             {l}
           </button>
@@ -113,11 +113,11 @@ export default function Maintenance() {
       </div>
 
       {loading ? (
-        <div className="text-gray-400 text-center py-12">Loading…</div>
+        <div className="text-ink-400 text-center py-12">Loading…</div>
       ) : tickets.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <Wrench size={40} className="mx-auto text-gray-300 mb-3"/>
-          <p className="text-gray-500">No tickets in this view.</p>
+          <Wrench size={40} className="mx-auto text-ink-300 mb-3"/>
+          <p className="text-ink-500">No tickets in this view.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -125,14 +125,14 @@ export default function Maintenance() {
             const Status = STATUS_META[t.status] || STATUS_META.open
             const StatusIcon = Status.icon
             return (
-              <div key={t.ticket_id} className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+              <div key={t.ticket_id} className="bg-white rounded-2xl shadow-card border border-ink-100 p-4">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h3 className="font-bold text-navy flex-1">{t.title}</h3>
                   <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${PRIORITY_META[t.priority]?.color}`}>
                     {PRIORITY_META[t.priority]?.label}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                <div className="flex items-center gap-2 text-xs text-ink-500 mb-2">
                   <StatusIcon size={12} className={Status.color}/>
                   <span>{Status.label}</span>
                   <span>·</span>
@@ -140,13 +140,13 @@ export default function Maintenance() {
                   {t.room_number && (<><span>·</span><span>Room {t.room_number}</span></>)}
                   {t.location && (<><span>·</span><span>{t.location}</span></>)}
                 </div>
-                {t.description && <p className="text-sm text-gray-600 mb-2">{t.description}</p>}
+                {t.description && <p className="text-sm text-ink-600 mb-2">{t.description}</p>}
                 {t.blocks_room_availability && t.room_number && (
                   <p className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded p-1.5 mb-2">
                     🚫 Room blocked until resolved
                   </p>
                 )}
-                <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center justify-between text-xs text-ink-500">
                   <span>
                     {t.assignee_name && <>👤 {t.assignee_name}</>}
                     {t.vendor_name && <span className="ml-2">🔧 {t.vendor_name}</span>}
@@ -161,10 +161,10 @@ export default function Maintenance() {
                 </div>
                 {/* Quick actions */}
                 {!['resolved', 'cancelled'].includes(t.status) && (
-                  <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2 flex-wrap">
+                  <div className="mt-3 pt-3 border-t border-ink-100 flex gap-2 flex-wrap">
                     {t.status === 'open' && (
                       <button onClick={() => handleQuickStatus(t, 'in_progress')}
-                              className="px-2.5 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs">
+                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs">
                         Start work
                       </button>
                     )}
@@ -175,11 +175,11 @@ export default function Maintenance() {
                       </button>
                     )}
                     <button onClick={() => setEditing(t)}
-                            className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs">
+                            className="px-2.5 py-1 bg-ink-100 hover:bg-ink-200 text-ink-700 rounded text-xs">
                       Edit / Resolve
                     </button>
                     <button onClick={() => handleQuickStatus(t, 'cancelled')}
-                            className="px-2.5 py-1 text-gray-500 hover:text-red-600 text-xs ml-auto">
+                            className="px-2.5 py-1 text-ink-500 hover:text-red-600 text-xs ml-auto">
                       Cancel
                     </button>
                   </div>
@@ -276,49 +276,49 @@ function TicketModal({ ticket = null, onClose, onSaved }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
       <form onSubmit={submit} className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-slide-up">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-ink-100">
           <h2 className="font-display font-bold text-navy text-lg">
             {isEdit ? 'Edit Ticket' : 'New Maintenance Ticket'}
           </h2>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button type="button" onClick={onClose} className="text-ink-400 hover:text-ink-600">
             <X size={20}/>
           </button>
         </div>
         <div className="p-5 space-y-3">
           {!isEdit && (
             <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Title *</label>
+              <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Title *</label>
               <input type="text" value={form.title}
                      onChange={e => setForm(s => ({ ...s, title: e.target.value }))}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                     className="input-field"
                      placeholder="e.g. AC compressor not cooling" />
             </div>
           )}
           {!isEdit && (
             <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Description</label>
+              <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Description</label>
               <textarea value={form.description}
                         onChange={e => setForm(s => ({ ...s, description: e.target.value }))}
                         rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                        className="input-field" />
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">
             {!isEdit && (
               <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Category</label>
+                <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Category</label>
                 <select value={form.category}
                         onChange={e => setForm(s => ({ ...s, category: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        className="input-field">
                   {CATEGORIES.map(c => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
                 </select>
               </div>
             )}
             <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Priority</label>
+              <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Priority</label>
               <select value={form.priority}
                       onChange={e => setForm(s => ({ ...s, priority: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                      className="input-field">
                 <option value="urgent">Urgent</option>
                 <option value="high">High</option>
                 <option value="medium">Medium</option>
@@ -327,10 +327,10 @@ function TicketModal({ ticket = null, onClose, onSaved }) {
             </div>
             {isEdit && (
               <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Status</label>
+                <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Status</label>
                 <select value={form.status}
                         onChange={e => setForm(s => ({ ...s, status: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        className="input-field">
                   <option value="open">Open</option>
                   <option value="in_progress">In Progress</option>
                   <option value="awaiting_parts">Awaiting Parts</option>
@@ -343,29 +343,29 @@ function TicketModal({ ticket = null, onClose, onSaved }) {
           {!isEdit && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Room</label>
+                <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Room</label>
                 <select value={form.room_id}
                         onChange={e => setForm(s => ({ ...s, room_id: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        className="input-field">
                   <option value="">— common area —</option>
                   {rooms.map(r => <option key={r.room_id} value={r.room_id}>Room {r.room_number}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Location</label>
+                <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Location</label>
                 <input type="text" value={form.location}
                        onChange={e => setForm(s => ({ ...s, location: e.target.value }))}
-                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                       className="input-field"
                        placeholder="e.g. lobby, rooftop" />
               </div>
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Assignee</label>
+              <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Assignee</label>
               <select value={form.assigned_to}
                       onChange={e => setForm(s => ({ ...s, assigned_to: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                      className="input-field">
                 <option value="">Unassigned</option>
                 {users.filter(u => u.is_active).map(u => (
                   <option key={u.user_id} value={u.user_id}>{u.full_name}</option>
@@ -373,26 +373,26 @@ function TicketModal({ ticket = null, onClose, onSaved }) {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Vendor</label>
+              <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Vendor</label>
               <input type="text" value={form.vendor_name}
                      onChange={e => setForm(s => ({ ...s, vendor_name: e.target.value }))}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                     className="input-field"
                      placeholder="optional" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Estimated Cost (₹)</label>
+              <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Estimated Cost (₹)</label>
               <input type="number" min="0" step="0.01" value={form.estimated_cost}
                      onChange={e => setForm(s => ({ ...s, estimated_cost: e.target.value }))}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                     className="input-field" />
             </div>
             {isEdit && (
               <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Actual Cost (₹)</label>
+                <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Actual Cost (₹)</label>
                 <input type="number" min="0" step="0.01" value={form.actual_cost}
                        onChange={e => setForm(s => ({ ...s, actual_cost: e.target.value }))}
-                       className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                       className="input-field" />
               </div>
             )}
           </div>
@@ -403,20 +403,20 @@ function TicketModal({ ticket = null, onClose, onSaved }) {
           </label>
           {isEdit && (
             <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Resolution Notes</label>
+              <label className="block text-xs font-semibold text-ink-600 uppercase tracking-wide mb-1">Resolution Notes</label>
               <textarea value={form.resolution_notes}
                         onChange={e => setForm(s => ({ ...s, resolution_notes: e.target.value }))}
                         rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        className="input-field"
                         placeholder="What was actually done to resolve it..." />
             </div>
           )}
         </div>
-        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+        <div className="px-5 py-4 border-t border-ink-100 flex justify-end gap-2">
           <button type="button" onClick={onClose}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                  className="px-4 py-2 text-ink-600 hover:bg-ink-100 rounded-lg">Cancel</button>
           <button type="submit" disabled={saving}
-                  className="px-4 py-2 bg-gold text-white rounded-lg hover:bg-gold/90 disabled:opacity-50">
+                  className="px-4 py-2 bg-gold text-navy-dark rounded-lg hover:bg-gold/90 disabled:opacity-50">
             {saving ? 'Saving…' : (isEdit ? 'Save' : 'Create Ticket')}
           </button>
         </div>

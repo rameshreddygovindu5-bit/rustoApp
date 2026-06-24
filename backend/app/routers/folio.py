@@ -17,6 +17,7 @@ from decimal import Decimal
 from ..database import get_db
 from ..models import FolioCharge, FolioChargeCategory, Checkin, CheckinStatus
 from ..auth import get_current_user, resolve_lodge_scope
+from ..permissions import require_permission
 from ..services.audit_service import log_audit
 
 router = APIRouter(prefix="/api/folio", tags=["folio"])
@@ -50,7 +51,7 @@ def _ensure_active_checkin(db: Session, checkin_id: int, lodge_id: int) -> Check
     return ch
 
 
-@router.get("/checkin/{checkin_id}")
+@router.get("/checkin/{checkin_id}", dependencies=[Depends(require_permission("billing.read"))])
 def list_for_checkin(checkin_id: int,
                      db: Session = Depends(get_db),
                      current_user=Depends(get_current_user),
@@ -76,7 +77,7 @@ class ChargeCreate(BaseModel):
     unit_price: float
 
 
-@router.post("/checkin/{checkin_id}")
+@router.post("/checkin/{checkin_id}", dependencies=[Depends(require_permission("billing.write"))])
 def add_charge(checkin_id: int, body: ChargeCreate, request: Request,
                db: Session = Depends(get_db),
                current_user=Depends(get_current_user),
@@ -124,7 +125,7 @@ class VoidRequest(BaseModel):
     reason: str
 
 
-@router.patch("/{charge_id}/void")
+@router.patch("/{charge_id}/void", dependencies=[Depends(require_permission("billing.delete"))])
 def void_charge(charge_id: int, body: VoidRequest, request: Request,
                 db: Session = Depends(get_db),
                 current_user=Depends(get_current_user),

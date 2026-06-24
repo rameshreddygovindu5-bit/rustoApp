@@ -18,8 +18,14 @@ Endpoints:
   GET /api/platform/analytics/disputes
 """
 import logging
-from datetime import date, timedelta
+from datetime import date, timedelta, timezone
 from typing import Optional
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, and_, case, distinct
@@ -27,8 +33,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import (Lodge, CustomerBooking, CustomerBookingStatus,
-                       Payment, PaymentStatus, RustoCustomer,
-                       Review, ReviewStatus, UserRole)
+                       RustoCustomer, Review, ReviewStatus)
 from ..auth import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -36,7 +41,7 @@ router = APIRouter(prefix="/api/platform/analytics", tags=["platform-analytics"]
 
 
 def _require_super_admin(user=Depends(get_current_user)):
-    if user.role != UserRole.super_admin:
+    if user.role != "super_admin":
         raise HTTPException(403, "Super-admin only")
     return user
 
@@ -94,7 +99,7 @@ def platform_overview(
     total_reviews = db.query(func.count(Review.review_id)).filter(
         Review.created_at >= start,
         Review.status == ReviewStatus.published.value).scalar() or 0
-    avg_rating = db.query(func.avg(Review.overall_rating)).filter(
+    avg_rating = db.query(func.avg(Review.rating)).filter(
         Review.status == ReviewStatus.published.value).scalar()
 
     return {
@@ -180,7 +185,7 @@ def lodge_leaderboard(
             ]), CustomerBooking.total_amount),
             else_=0
         )).label("gmv"),
-        func.avg(Review.overall_rating).label("avg_rating"),
+        func.avg(Review.rating).label("avg_rating"),
     ).outerjoin(CustomerBooking, CustomerBooking.lodge_id == Lodge.lodge_id)
      .outerjoin(Review, and_(
          Review.lodge_id == Lodge.lodge_id,
@@ -287,3 +292,211 @@ def onboarding_health(
         })
 
     return {"unpublished_lodges": result, "total": len(result)}
+
+
+# ── v11.1 — Extended platform analytics ─────────────────────────────
+
+@router.get("/registrations")
+def registration_funnel(
+    db: Session = Depends(get_db),
+    user=Depends(_require_super_admin),
+):
+    """Registration pipeline health for the super-admin command centre."""
+    from ..models import LodgeRegistrationRequest, RegistrationStatus
+
+    total    = db.query(func.count(LodgeRegistrationRequest.request_id)).scalar() or 0
+    pending  = db.query(func.count(LodgeRegistrationRequest.request_id)).filter(
+        LodgeRegistrationRequest.status == RegistrationStatus.pending.value).scalar() or 0
+    approved = db.query(func.count(LodgeRegistrationRequest.request_id)).filter(
+        LodgeRegistrationRequest.status == RegistrationStatus.approved.value).scalar() or 0
+    rejected = db.query(func.count(LodgeRegistrationRequest.request_id)).filter(
+        LodgeRegistrationRequest.status == RegistrationStatus.rejected.value).scalar() or 0
+
+    # Payment breakdown (pending-status regs only)
+    from sqlalchemy import case
+    pay_rows = db.query(
+        LodgeRegistrationRequest.payment_status,
+        func.count(LodgeRegistrationRequest.request_id).label("cnt"),
+    ).filter(
+        LodgeRegistrationRequest.status == RegistrationStatus.pending.value
+    ).group_by(LodgeRegistrationRequest.payment_status).all()
+    pay_breakdown = {(r.payment_status or "pending"): r.cnt for r in pay_rows}
+
+    # Recent 10 registrations
+    recent = db.query(LodgeRegistrationRequest).order_by(
+        LodgeRegistrationRequest.created_at.desc()
+    ).limit(10).all()
+
+    return {
+        "funnel": {
+            "total": total, "pending": pending,
+            "approved": approved, "rejected": rejected,
+            "approval_rate_pct": round(100 * approved / total, 1) if total else 0,
+        },
+        "payment_breakdown": pay_breakdown,
+        "recent": [
+            {
+                "request_id":      r.request_id,
+                "lodge_name":      r.lodge_name,
+                "owner_name":      r.owner_full_name,
+                "city":            r.city,
+                "property_category": r.property_category,
+                "plan":            r.selected_plan,
+                "payment_status":  r.payment_status or "pending",
+                "status":          r.status,
+                "created_at":      r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in recent
+        ],
+    }
+
+
+@router.get("/system-health")
+def system_health(
+    db: Session = Depends(get_db),
+    user=Depends(_require_super_admin),
+):
+    """Platform system health snapshot."""
+    import os
+    from ..models import Alert, AlertStatus, SupportTicket
+    from datetime import datetime, timedelta
+
+    now = _utcnow()
+    since_24h = now - timedelta(hours=24)
+    since_7d  = now - timedelta(days=7)
+
+    # Failed email/SMS alerts in last 24h
+    failed_alerts = db.query(func.count(Alert.alert_id)).filter(
+        Alert.status == AlertStatus.failed.value,
+        Alert.created_at >= since_24h,
+    ).scalar() or 0
+
+    sent_alerts = db.query(func.count(Alert.alert_id)).filter(
+        Alert.status == AlertStatus.sent.value,
+        Alert.created_at >= since_24h,
+    ).scalar() or 0
+
+    # Open support tickets
+    try:
+        open_tickets = db.query(func.count(SupportTicket.ticket_id)).filter(
+            SupportTicket.status == "open"
+        ).scalar() or 0
+        urgent_tickets = db.query(func.count(SupportTicket.ticket_id)).filter(
+            SupportTicket.status == "open",
+            SupportTicket.priority == "urgent",
+        ).scalar() or 0
+    except Exception:
+        open_tickets = 0
+        urgent_tickets = 0
+
+    # DB file size (SQLite only)
+    db_size_mb = None
+    db_path = os.getenv("DATABASE_URL", "")
+    if "sqlite" in db_path:
+        path = db_path.replace("sqlite:///", "").replace("sqlite://", "")
+        if os.path.exists(path):
+            db_size_mb = round(os.path.getsize(path) / (1024 * 1024), 2)
+
+    # Stale lodges — active but no checkin in 7 days
+    from ..models import Checkin, CheckinStatus
+    all_active_lodges = db.query(func.count(Lodge.lodge_id)).filter(
+        Lodge.is_active == True).scalar() or 0
+    lodges_with_recent_activity = db.query(
+        func.count(distinct(Checkin.lodge_id))
+    ).filter(Checkin.created_at >= since_7d).scalar() or 0
+
+    return {
+        "alerts_24h": {
+            "sent": sent_alerts,
+            "failed": failed_alerts,
+            "delivery_rate_pct": round(100 * sent_alerts / (sent_alerts + failed_alerts), 1)
+                                 if (sent_alerts + failed_alerts) > 0 else 100,
+        },
+        "support": {
+            "open_tickets": open_tickets,
+            "urgent_tickets": urgent_tickets,
+        },
+        "lodges": {
+            "active": all_active_lodges,
+            "with_activity_7d": lodges_with_recent_activity,
+            "stale": all_active_lodges - lodges_with_recent_activity,
+        },
+        "database": {
+            "size_mb": db_size_mb,
+        },
+        "timestamp": now.isoformat(),
+    }
+
+
+@router.get("/notifications")
+def platform_notifications(
+    db: Session = Depends(get_db),
+    user=Depends(_require_super_admin),
+):
+    """Recent platform-level events requiring super-admin attention."""
+    from ..models import LodgeRegistrationRequest, RegistrationStatus
+    from datetime import datetime, timedelta
+
+    now   = _utcnow()
+    since = now - timedelta(days=7)
+    items = []
+
+    # New pending registrations (last 7 days)
+    new_regs = db.query(LodgeRegistrationRequest).filter(
+        LodgeRegistrationRequest.created_at >= since,
+        LodgeRegistrationRequest.status == RegistrationStatus.pending.value,
+    ).order_by(LodgeRegistrationRequest.created_at.desc()).all()
+    for r in new_regs:
+        items.append({
+            "type":      "new_registration",
+            "priority":  "high",
+            "title":     f"New registration: {r.lodge_name}",
+            "body":      f"{r.owner_full_name} · {r.city} · {r.selected_plan or 'No plan'}",
+            "action_url": "/registrations",
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "meta": {"payment_status": r.payment_status or "pending",
+                     "request_id": r.request_id},
+        })
+
+    # Payment confirmed but not yet approved
+    paid_not_approved = db.query(LodgeRegistrationRequest).filter(
+        LodgeRegistrationRequest.status == RegistrationStatus.pending.value,
+        LodgeRegistrationRequest.payment_status.in_(["paid", "offline_collected"]),
+    ).all()
+    for r in paid_not_approved:
+        items.append({
+            "type":      "payment_confirmed",
+            "priority":  "urgent",
+            "title":     f"Payment received — ready to approve: {r.lodge_name}",
+            "body":      f"₹{float(r.payment_amount or 0):,.0f} via {r.payment_method or 'unknown'} · Ref: {r.payment_ref or '—'}",
+            "action_url": "/registrations",
+            "created_at": r.payment_date.isoformat() if r.payment_date else now.isoformat(),
+            "meta": {"request_id": r.request_id, "amount": float(r.payment_amount or 0)},
+        })
+
+    # Follow-ups overdue
+    from sqlalchemy import and_
+    overdue = db.query(LodgeRegistrationRequest).filter(
+        LodgeRegistrationRequest.status == RegistrationStatus.pending.value,
+        LodgeRegistrationRequest.follow_up_at <= now,
+        LodgeRegistrationRequest.payment_status.in_(["pending", "failed"]),
+    ).all()
+    for r in overdue:
+        items.append({
+            "type":      "followup_overdue",
+            "priority":  "normal",
+            "title":     f"Overdue follow-up: {r.lodge_name}",
+            "body":      f"Scheduled for {r.follow_up_at.strftime('%d %b') if r.follow_up_at else '?'} · Assigned: {r.assigned_to or 'unassigned'}",
+            "action_url": "/registrations",
+            "created_at": now.isoformat(),
+            "meta": {"request_id": r.request_id},
+        })
+
+    # Sort: urgent first, then by created_at desc
+    priority_order = {"urgent": 0, "high": 1, "normal": 2}
+    items.sort(key=lambda x: (priority_order.get(x["priority"], 9),
+                               x.get("created_at","") or ""), reverse=False)
+    items.sort(key=lambda x: priority_order.get(x["priority"], 9))
+
+    return {"notifications": items, "total": len(items),
+            "urgent_count": sum(1 for i in items if i["priority"] == "urgent")}

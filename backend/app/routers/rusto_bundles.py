@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field
 
 from ..database import get_db
 from ..models import LocalBundle, Lodge
-from ..auth import get_current_user, require_admin, resolve_lodge_scope
+from ..auth import require_admin, resolve_lodge_scope
 
 logger = logging.getLogger(__name__)
 

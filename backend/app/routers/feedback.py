@@ -13,8 +13,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import secrets
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from ..database import get_db
 from ..models import GuestFeedback, Customer, Checkin, CheckinStatus
@@ -152,7 +158,7 @@ def create_request(body: CreateRequestForCheckin, request: Request,
     fb = GuestFeedback(
         lodge_id=lodge_id, customer_id=ch.customer_id, checkin_id=ch.checkin_id,
         submit_token=token,
-        token_expires_at=datetime.utcnow() + timedelta(days=days),
+        token_expires_at=_utcnow() + timedelta(days=days),
         guest_name=(f"{cust.first_name} {cust.last_name}" if cust else None),
     )
     db.add(fb)
@@ -201,7 +207,7 @@ def staff_entry(body: StaffEntry, request: Request,
         location_rating=body.location_rating,
         comment=body.comment,
         would_recommend=body.would_recommend,
-        submitted_at=datetime.utcnow(),
+        submitted_at=_utcnow(),
         submission_source="staff",
     )
     db.add(fb)
@@ -233,7 +239,7 @@ def public_view(submit_token: str, db: Session = Depends(get_db)):
     if fb.submitted_at:
         raise HTTPException(status_code=400,
                             detail="This feedback has already been submitted")
-    if fb.token_expires_at and fb.token_expires_at < datetime.utcnow():
+    if fb.token_expires_at and fb.token_expires_at < _utcnow():
         raise HTTPException(status_code=400, detail="This link has expired")
     # Don't leak lodge name+customer details — just enough to confirm
     # the link is valid and show the guest's own name.
@@ -266,7 +272,7 @@ def public_submit(submit_token: str, body: PublicSubmit, request: Request,
     if fb.submitted_at:
         raise HTTPException(status_code=400,
                             detail="This feedback has already been submitted")
-    if fb.token_expires_at and fb.token_expires_at < datetime.utcnow():
+    if fb.token_expires_at and fb.token_expires_at < _utcnow():
         raise HTTPException(status_code=400, detail="This link has expired")
 
     fb.overall_rating = body.overall_rating
@@ -278,7 +284,7 @@ def public_submit(submit_token: str, body: PublicSubmit, request: Request,
     fb.would_recommend = body.would_recommend
     if body.guest_name and not fb.guest_name:
         fb.guest_name = body.guest_name
-    fb.submitted_at = datetime.utcnow()
+    fb.submitted_at = _utcnow()
     fb.submission_source = "web"
     # Clear the token — prevents replay and prevents the guest from
     # editing their submission later.

@@ -14,8 +14,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from ..database import get_db, SessionLocal
 from ..models import (SmsCampaign, CampaignStatus, CampaignAudienceType,
@@ -53,7 +59,7 @@ def _resolve_audience(db: Session, lodge_id: int, audience_type: str,
         rows = (db.query(Customer.phone)
                 .filter(Customer.lodge_id == lodge_id,
                         Customer.is_active == True,
-                        Customer.is_blacklisted == False).all())
+                        Customer.blacklisted == False).all())
         phones = [r[0] for r in rows if r[0]]
 
     elif audience_type == "vip_only":
@@ -61,7 +67,7 @@ def _resolve_audience(db: Session, lodge_id: int, audience_type: str,
                 .filter(Customer.lodge_id == lodge_id,
                         Customer.is_vip == True,
                         Customer.is_active == True,
-                        Customer.is_blacklisted == False).all())
+                        Customer.blacklisted == False).all())
         phones = [r[0] for r in rows if r[0]]
 
     elif audience_type == "by_tier":
@@ -73,19 +79,19 @@ def _resolve_audience(db: Session, lodge_id: int, audience_type: str,
                 .filter(Customer.lodge_id == lodge_id,
                         LoyaltyAccount.tier == tier,
                         Customer.is_active == True,
-                        Customer.is_blacklisted == False).all())
+                        Customer.blacklisted == False).all())
         phones = [r[0] for r in rows if r[0]]
 
     elif audience_type == "recently_checked_out":
         since_days = int(params.get("since_days", 30))
-        cutoff = datetime.utcnow() - timedelta(days=since_days)
+        cutoff = _utcnow() - timedelta(days=since_days)
         rows = (db.query(Customer.phone)
                 .join(Checkin, Checkin.customer_id == Customer.customer_id)
                 .filter(Customer.lodge_id == lodge_id,
                         Checkin.status == CheckinStatus.checked_out,
                         Checkin.actual_checkout >= cutoff,
                         Customer.is_active == True,
-                        Customer.is_blacklisted == False)
+                        Customer.blacklisted == False)
                 .distinct().all())
         phones = [r[0] for r in rows if r[0]]
 
@@ -212,7 +218,7 @@ def _do_send(campaign_id: int, lodge_id: int):
         c.actual_sent = sent
         c.actual_failed = failed
         c.status = CampaignStatus.completed
-        c.sent_at = datetime.utcnow()
+        c.sent_at = _utcnow()
         db.commit()
     except Exception:
         # Last-ditch: mark cancelled rather than leaving it stuck on 'sending'.

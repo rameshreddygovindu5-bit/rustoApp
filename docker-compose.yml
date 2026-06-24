@@ -1,17 +1,26 @@
 # ════════════════════════════════════════════════════════════════════
-# Local development docker-compose.
-# Uses simple credentials and exposes Postgres on 5432 for tooling.
-# For production, use docker-compose.prod.yml + .env.production.
+# Rusto LMS — Local Development
 #
+# Starts THREE portals on separate ports:
+#   http://localhost:3000  — Combined (PMS + Customer) [default]
+#   http://localhost:3001  — PMS portal only
+#   http://localhost:3002  — Customer portal only
+#
+# All portals share the same backend (port 8000).
+#
+# Usage:
 #   docker compose up -d --build
-#   open http://localhost:3000   ← frontend
-#         http://localhost:8000/docs   ← backend Swagger
+#   docker compose logs -f backend
+#
+# Environment: copy .env.example → .env and fill in secrets.
 # ════════════════════════════════════════════════════════════════════
+version: "3.9"
 
 services:
+  # ── Database (PostgreSQL) ────────────────────────────────────────
   db:
     image: postgres:15-alpine
-    container_name: rusto_lms_db_dev
+    container_name: rusto_db_dev
     environment:
       POSTGRES_USER: lms
       POSTGRES_PASSWORD: lms_password
@@ -28,24 +37,33 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # ── Backend (FastAPI) ────────────────────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: rusto_lms_backend_dev
+    container_name: rusto_backend_dev
     depends_on:
       db:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://lms:lms_password@db:5432/rusto_lms
-      JWT_SECRET_KEY: dev-only-change-in-prod-jwt-secret-key
+      JWT_SECRET_KEY: dev-secret-change-in-production
       JWT_ALGORITHM: HS256
       JWT_EXPIRE_HOURS: "8"
-      CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://localhost
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5173"
       DEFAULT_ADMIN_USERNAME: admin
       DEFAULT_ADMIN_PASSWORD: Admin@1234
+      # Optional: set these to enable integrations
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      MSG91_AUTH_KEY: ${MSG91_AUTH_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       TZ: Asia/Kolkata
-      PYTHONUNBUFFERED: "1"
     volumes:
       - uploads_data:/app/uploads
       - logs_data:/app/logs
@@ -59,18 +77,52 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # ── Combined Frontend (PMS + Customer) ──────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
+        PORTAL: combined
         VITE_API_URL: /api
-    container_name: rusto_lms_frontend_dev
+    container_name: rusto_frontend_dev
     depends_on:
       backend:
         condition: service_healthy
     ports:
       - "3000:80"
+    restart: unless-stopped
+
+  # ── PMS-only Frontend ────────────────────────────────────────────
+  frontend_pms:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        PORTAL: pms
+        VITE_API_URL: /api
+    container_name: rusto_frontend_pms_dev
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3001:80"
+    restart: unless-stopped
+
+  # ── Customer-only Frontend ───────────────────────────────────────
+  frontend_customer:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        PORTAL: customer
+        VITE_API_URL: /api
+    container_name: rusto_frontend_customer_dev
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3002:80"
     restart: unless-stopped
 
 volumes:

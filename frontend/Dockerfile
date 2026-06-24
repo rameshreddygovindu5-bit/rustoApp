@@ -1,33 +1,62 @@
-FROM node:18-alpine AS build
+# ════════════════════════════════════════════════════════════════════
+# Frontend Dockerfile — supports both PMS and Customer portal builds
+#
+# Build args:
+#   PORTAL   = pms | customer | combined (default: combined)
+#   VITE_API_URL = /api  (default)
+#
+# Examples:
+#   PMS portal:      docker build --build-arg PORTAL=pms -t rusto-pms .
+#   Customer portal: docker build --build-arg PORTAL=customer -t rusto-customer .
+#   Combined:        docker build -t rusto-combined .
+# ════════════════════════════════════════════════════════════════════
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Build-time configuration (Vite bakes env vars into the bundle)
+# Build arguments
+ARG PORTAL=combined
 ARG VITE_API_URL=/api
+ARG VITE_API_BASE=
+
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_API_BASE=$VITE_API_BASE
 
-# Copy package files first for better layer caching
+# Cache dependencies separately
 COPY package*.json ./
+RUN npm ci --prefer-offline
 
-# Use clean install for reproducible builds; falls back to install if no lockfile
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
-
-# Copy source code
+# Copy all source
 COPY . .
 
-# Build the application
-RUN npm run build
+# Choose the correct build target based on PORTAL arg
+RUN if [ "$PORTAL" = "pms" ]; then \
+      echo "Building PMS portal..." && npm run build:pms; \
+    elif [ "$PORTAL" = "customer" ]; then \
+      echo "Building Customer portal..." && npm run build:customer; \
+    else \
+      echo "Building combined portal..." && npm run build; \
+    fi
 
+# Resolve output directory
+RUN if [ "$PORTAL" = "pms" ]; then \
+      cp -r dist-pms dist-final; \
+    elif [ "$PORTAL" = "customer" ]; then \
+      cp -r dist-customer dist-final; \
+    else \
+      cp -r dist dist-final; \
+    fi
 
 # ── Production stage ─────────────────────────────────────────────────
-FROM nginx:alpine
+FROM nginx:1.25-alpine
 
 # Copy built assets
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY --from=build /app/dist-final /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
-# Default nginx CMD already runs as `nginx -g "daemon off;"`
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD wget -qO- http://localhost/ || exit 1

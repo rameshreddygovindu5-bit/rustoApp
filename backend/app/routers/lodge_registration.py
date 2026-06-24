@@ -22,8 +22,14 @@ import re
 import secrets
 import string
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -76,6 +82,9 @@ class LodgeRegistrationBody(BaseModel):
     selected_plan: Optional[str] = Field(default=None, max_length=20)
     billing_cycle: Optional[str] = Field(default="monthly", max_length=10)
     notes: Optional[str] = Field(default=None, max_length=2000)
+    # v10 — property type + enabled modules from onboarding wizard
+    property_category: Optional[str] = Field(default=None, max_length=40)
+    enabled_modules:   Optional[str] = Field(default=None, max_length=2000)
 
     @field_validator("proposed_code")
     @classmethod
@@ -116,6 +125,18 @@ def _request_to_dict(r: LodgeRegistrationRequest, db: Optional[Session] = None) 
         "billing_cycle":    getattr(r, "billing_cycle", None) or "monthly",
         "quoted_price_inr": float(r.quoted_price_inr) if getattr(r, "quoted_price_inr", None) else None,
         "notes": r.notes,
+        "property_category": r.property_category,
+        "enabled_modules":   r.enabled_modules,
+        # v11 payment
+        "payment_status":  r.payment_status or "pending",
+        "payment_method":  r.payment_method,
+        "payment_ref":     r.payment_ref,
+        "payment_amount":  float(r.payment_amount) if r.payment_amount else None,
+        "payment_date":    r.payment_date.isoformat() if r.payment_date else None,
+        "payment_notes":   r.payment_notes,
+        "follow_up_at":    r.follow_up_at.isoformat() if r.follow_up_at else None,
+        "follow_up_count": r.follow_up_count or 0,
+        "assigned_to":     r.assigned_to,
         "status": r.status,
         "rejection_reason": r.rejection_reason,
         "reviewed_at": r.reviewed_at.isoformat() if r.reviewed_at else None,
@@ -204,6 +225,8 @@ def submit_registration(body: LodgeRegistrationBody, request: Request,
         billing_cycle=billing_cycle,
         quoted_price_inr=quoted_price,
         notes=(body.notes or "").strip() or None,
+        property_category=body.property_category or None,
+        enabled_modules=body.enabled_modules or None,
         status=RegistrationStatus.pending.value,
         submitter_ip=submitter_ip,
     )
@@ -279,7 +302,9 @@ def _generate_password(length: int = 12) -> str:
 
 def _seed_lodge_defaults(db: Session, lodge_id: int, lodge_name: str,
                           owner_phone: str, owner_email: str,
-                          address: str):
+                          address: str,
+                          property_category: str = "lodge",
+                          enabled_modules: str = None):
     """Insert the standard per-lodge settings (hotel_name, contact info,
     GST defaults, etc.) so the new lodge's Settings page is populated
     out-of-the-box rather than blank."""
@@ -297,6 +322,21 @@ def _seed_lodge_defaults(db: Session, lodge_id: int, lodge_name: str,
         ("checkin_time", "12:00", "policy", "Standard check-in time"),
         ("checkout_time", "11:00", "policy", "Standard check-out time"),
     ]
+    # Add property type and module configuration
+    extra_defaults = []
+    if property_category:
+        extra_defaults.append(("property_category", property_category, "hotel", "Property type"))
+        extra_defaults.append(("has_pool", "false", "hotel", "Swimming pool"))
+        extra_defaults.append(("has_restaurant", "false", "hotel", "Restaurant on-site"))
+        extra_defaults.append(("has_gym", "false", "hotel", "Fitness center"))
+        extra_defaults.append(("has_spa", "false", "hotel", "Spa and wellness"))
+        extra_defaults.append(("has_conference_hall", "false", "hotel", "Conference hall"))
+        extra_defaults.append(("has_parking", "false", "hotel", "Parking available"))
+        extra_defaults.append(("has_24hr_reception", "false", "hotel", "24h reception"))
+        extra_defaults.append(("has_wifi", "true", "hotel", "WiFi available"))
+    if enabled_modules:
+        extra_defaults.append(("enabled_modules", enabled_modules, "system", "Enabled feature modules"))
+    defaults.extend(extra_defaults)
     for key, value, group, desc in defaults:
         if db.query(Setting).filter(Setting.lodge_id == lodge_id,
                                      Setting.setting_key == key).first():
@@ -377,7 +417,7 @@ def approve_registration(request_id: int, request: Request,
     # 3. Update the registration request itself (FKs and status).
     r.status = RegistrationStatus.approved.value
     r.reviewed_by = current_user.user_id
-    r.reviewed_at = datetime.utcnow()
+    r.reviewed_at = _utcnow()
     r.created_lodge_id = lodge.lodge_id
     r.created_admin_user_id = admin_user.user_id
     db.commit()
@@ -386,7 +426,9 @@ def approve_registration(request_id: int, request: Request,
     # 4. Seed defaults (settings + email templates) — non-fatal if these fail.
     try:
         _seed_lodge_defaults(db, lodge.lodge_id, r.lodge_name,
-                              r.owner_phone, r.owner_email, full_address)
+                              r.owner_phone, r.owner_email, full_address,
+                              property_category=r.property_category or "lodge",
+                              enabled_modules=r.enabled_modules)
     except Exception as e:
         logger.warning("Default settings seed failed for lodge %s: %s",
                        lodge.lodge_id, e)
@@ -591,7 +633,7 @@ def reject_registration(request_id: int, body: RejectBody, request: Request,
     r.status = RegistrationStatus.rejected.value
     r.rejection_reason = body.reason.strip()
     r.reviewed_by = current_user.user_id
-    r.reviewed_at = datetime.utcnow()
+    r.reviewed_at = _utcnow()
     db.commit(); db.refresh(r)
 
     try:
@@ -603,3 +645,334 @@ def reject_registration(request_id: int, body: RejectBody, request: Request,
                   ip_address=request.client.host if request and request.client else None)
     except Exception: pass
     return _request_to_dict(r, db)
+
+
+# ── v11 — Payment management & follow-up endpoints ──────────────────
+
+class PaymentUpdateBody(BaseModel):
+    payment_status: str = Field(..., description="pending/paid/failed/waived/offline_collected")
+    payment_method: Optional[str] = None          # upi/phonepe/googlepay/razorpay/offline/waived
+    payment_ref:    Optional[str] = None           # UTR or transaction ID
+    payment_amount: Optional[float] = None
+    payment_date:   Optional[str]  = None          # ISO date string
+    payment_notes:  Optional[str]  = None
+    follow_up_at:   Optional[str]  = None          # ISO datetime for next follow-up
+    assigned_to:    Optional[str]  = None
+
+
+@admin_router.patch("/{request_id}/payment")
+def update_payment(request_id: int, body: PaymentUpdateBody,
+                    request: Request,
+                    db: Session = Depends(get_db),
+                    current_user=Depends(require_super_admin)):
+    """Record or update payment details for a registration.
+
+    Used by the RUSTO team after collecting payment offline (call, UPI, etc.).
+    Can also be used to mark a payment as waived or failed with follow-up notes.
+    """
+    r = db.query(LodgeRegistrationRequest).filter(
+        LodgeRegistrationRequest.request_id == request_id
+    ).first()
+    if not r:
+        raise HTTPException(404, "Registration not found")
+
+    r.payment_status = body.payment_status
+    if body.payment_method is not None:
+        r.payment_method = body.payment_method
+    if body.payment_ref is not None:
+        r.payment_ref = body.payment_ref
+    if body.payment_amount is not None:
+        r.payment_amount = body.payment_amount
+    if body.payment_date:
+        from dateutil.parser import parse as _parse_dt
+        try:
+            r.payment_date = _parse_dt(body.payment_date)
+        except Exception:
+            pass
+    if body.payment_notes is not None:
+        # Append to existing notes with timestamp
+        ts = _utcnow().strftime("%d %b %Y %H:%M UTC")
+        actor = current_user.full_name or current_user.username
+        new_note = f"[{ts} — {actor}] {body.payment_notes}"
+        r.payment_notes = (r.payment_notes + "\n" + new_note) if r.payment_notes else new_note
+    if body.follow_up_at:
+        from dateutil.parser import parse as _parse_dt2
+        try:
+            r.follow_up_at = _parse_dt2(body.follow_up_at)
+            r.follow_up_count = (r.follow_up_count or 0) + 1
+        except Exception:
+            pass
+    if body.assigned_to is not None:
+        r.assigned_to = body.assigned_to
+
+    db.commit()
+    db.refresh(r)
+
+    try:
+        log_audit(db, "lodge_registration.payment_updated",
+                  actor_user_id=current_user.user_id,
+                  actor_username=current_user.username,
+                  entity_type="lodge_registration", entity_id=request_id,
+                  lodge_id=None,
+                  details={"payment_status": r.payment_status, "method": r.payment_method},
+                  ip_address=request.client.host if request and request.client else None)
+    except Exception:
+        pass
+
+    return _request_to_dict(r, db)
+
+
+@admin_router.post("/{request_id}/resend-credentials")
+def resend_credentials(request_id: int,
+                        db: Session = Depends(get_db),
+                        current_user=Depends(require_super_admin)):
+    """Re-generate a new password and re-send the welcome email.
+
+    Used when:
+    - The original email was lost/never received
+    - RUSTO team collected offline payment and now needs to activate the lodge
+    - Lodge owner forgot their password before first login
+    """
+    r = db.query(LodgeRegistrationRequest).filter(
+        LodgeRegistrationRequest.request_id == request_id,
+        LodgeRegistrationRequest.status == RegistrationStatus.approved.value,
+    ).first()
+    if not r:
+        raise HTTPException(400, "Registration must be approved before re-sending credentials")
+
+    admin_user = db.query(User).filter(User.user_id == r.created_admin_user_id).first()
+    lodge      = db.query(Lodge).filter(Lodge.lodge_id == r.created_lodge_id).first()
+    if not admin_user or not lodge:
+        raise HTTPException(500, "Associated lodge/user not found")
+
+    # Generate and apply new password
+    new_password = _generate_password()
+    admin_user.password_hash = get_password_hash(new_password)
+    db.commit()
+
+    # Re-send email
+    email_sent = False
+    try:
+        email_sent = _send_credentials_email(
+            db, lodge=lodge, owner_name=r.owner_full_name,
+            owner_email=r.owner_email, username=admin_user.username,
+            password=new_password, plan_key=r.selected_plan,
+        )
+    except Exception as e:
+        logger.warning("Resend credentials email failed: %s", e)
+
+    return {
+        "admin_username":   admin_user.username,
+        "admin_password":   new_password,
+        "email_sent":       email_sent,
+        "owner_email":      r.owner_email,
+        "lodge_code":       lodge.code,
+        "lodge_id":         lodge.lodge_id,
+        "message": ("New password generated and emailed to the lodge owner."
+                    if email_sent else
+                    "New password generated. Email delivery failed — share manually via a secure channel."),
+    }
+
+
+@admin_router.get("/follow-ups")
+def list_follow_ups(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_super_admin)
+):
+    """List all pending registrations with payment issues that need follow-up."""
+    rows = db.query(LodgeRegistrationRequest).filter(
+        LodgeRegistrationRequest.status == RegistrationStatus.pending.value,
+        LodgeRegistrationRequest.payment_status.in_(["pending", "failed"])
+    ).order_by(
+        LodgeRegistrationRequest.follow_up_at.asc().nullslast(),
+        LodgeRegistrationRequest.created_at.asc()
+    ).all()
+    return {"follow_ups": [_request_to_dict(r) for r in rows], "total": len(rows)}
+
+
+@admin_router.get("/stats/payments")
+def payment_stats(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_super_admin)
+):
+    """Aggregate payment status counts across all registrations."""
+    from sqlalchemy import func, case
+
+    rows = db.query(
+        LodgeRegistrationRequest.payment_status,
+        func.count(LodgeRegistrationRequest.request_id).label("count"),
+        func.sum(LodgeRegistrationRequest.payment_amount).label("total_amount"),
+    ).group_by(LodgeRegistrationRequest.payment_status).all()
+
+    stats = {}
+    for row in rows:
+        stats[row.payment_status or "pending"] = {
+            "count": row.count,
+            "total_amount": float(row.total_amount) if row.total_amount else 0,
+        }
+
+    # Overall KPIs
+    total_regs = db.query(func.count(LodgeRegistrationRequest.request_id)).scalar() or 0
+    approved   = db.query(func.count(LodgeRegistrationRequest.request_id)).filter(
+        LodgeRegistrationRequest.status == RegistrationStatus.approved.value).scalar() or 0
+    pending_payment = db.query(func.count(LodgeRegistrationRequest.request_id)).filter(
+        LodgeRegistrationRequest.status == RegistrationStatus.pending.value,
+        LodgeRegistrationRequest.payment_status.in_(["pending", "failed"])
+    ).scalar() or 0
+
+    return {
+        "by_payment_status": stats,
+        "total_registrations": total_regs,
+        "approved": approved,
+        "awaiting_payment_followup": pending_payment,
+    }
+
+
+# ── v11.1 — Registration payment link (Razorpay) ────────────────────
+
+@public_router.post("/{request_id}/create-payment-link")
+def create_registration_payment_link(
+    request_id: int,
+    db: Session = Depends(get_db),
+):
+    """Create a Razorpay payment link for the registration fee.
+
+    Called from the final step of the onboarding wizard so the applicant
+    can pay via UPI / PhonePe / GPay without leaving the page.
+    Returns a short_url the frontend opens in a new tab / Razorpay checkout.
+    Falls back to a 'pending' state if Razorpay is not configured.
+    """
+    r = db.query(LodgeRegistrationRequest).filter(
+        LodgeRegistrationRequest.request_id == request_id,
+        LodgeRegistrationRequest.status == RegistrationStatus.pending.value,
+    ).first()
+    if not r:
+        raise HTTPException(404, "Registration not found or already processed")
+
+    if r.payment_status == "paid":
+        return {"already_paid": True, "message": "Payment already recorded"}
+
+    amount = float(r.quoted_price_inr or 0)
+    if amount <= 0:
+        return {"no_payment_required": True,
+                "message": "No payment amount set — super-admin will review"}
+
+    # Try to create Razorpay payment link
+    try:
+        import razorpay, os
+        client = razorpay.Client(
+            auth=(os.getenv("RAZORPAY_KEY_ID", ""),
+                  os.getenv("RAZORPAY_KEY_SECRET", ""))
+        )
+        data = {
+            "amount": int(amount * 100),  # paise
+            "currency": "INR",
+            "accept_partial": False,
+            "description": f"Rusto platform subscription — {r.lodge_name}",
+            "customer": {
+                "name":  r.owner_full_name,
+                "email": r.owner_email,
+                "contact": r.owner_phone,
+            },
+            "notify": {"sms": True, "email": True},
+            "reminder_enable": True,
+            "notes": {
+                "registration_id": str(request_id),
+                "lodge_name":      r.lodge_name,
+                "plan":            r.selected_plan or "",
+            },
+            "callback_url": f"{os.getenv('APP_BASE_URL','')}/register?payment=success&reg={request_id}",
+            "callback_method": "get",
+        }
+        link = client.payment_link.create(data)
+        short_url = link.get("short_url", "")
+
+        # Save the payment link ref
+        r.payment_ref    = link.get("id", "")
+        r.payment_notes  = (r.payment_notes or "") + f"\n[AUTO] Razorpay payment link created: {short_url}"
+        db.commit()
+
+        return {
+            "payment_link_id": link.get("id"),
+            "short_url": short_url,
+            "amount": amount,
+            "currency": "INR",
+            "lodge_name": r.lodge_name,
+            "plan": r.selected_plan,
+        }
+    except Exception as e:
+        logger.warning("Razorpay payment link creation failed: %s", e)
+        # Graceful fallback — no Razorpay configured
+        return {
+            "no_gateway": True,
+            "message": "Online payment not configured. RUSTO team will contact you to collect payment.",
+            "contact_email": "hello@rusto.in",
+            "amount": amount,
+        }
+
+
+@public_router.post("/webhook/payment-confirmed")
+async def registration_payment_webhook(request: Request, db: Session = Depends(get_db)):
+    """Razorpay webhook: payment.captured → mark registration as paid.
+
+    Razorpay sends this when a payment link is paid. We verify the signature,
+    find the registration from the notes, mark payment_status='paid', and
+    log the event. The super-admin is then notified on their next page load
+    (via the payment_stats endpoint showing awaiting_payment_followup delta).
+    """
+    import hmac, hashlib, os
+
+    body_bytes = await request.body()
+    sig = request.headers.get("x-razorpay-signature", "")
+    secret = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+
+    if secret and sig:
+        expected = hmac.new(secret.encode(), body_bytes, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected, sig):
+            raise HTTPException(400, "Invalid webhook signature")
+
+    try:
+        import json
+        payload = json.loads(body_bytes)
+        event = payload.get("event", "")
+        if event not in ("payment.captured", "payment_link.paid"):
+            return {"ignored": True, "event": event}
+
+        # Extract registration_id from notes
+        entity = (payload.get("payload", {})
+                         .get("payment", {})
+                         .get("entity", {})
+                  or payload.get("payload", {})
+                             .get("payment_link", {})
+                             .get("entity", {}))
+        notes = entity.get("notes", {})
+        reg_id_str = notes.get("registration_id")
+        if not reg_id_str:
+            return {"ignored": True, "reason": "no registration_id in notes"}
+
+        reg = db.query(LodgeRegistrationRequest).filter(
+            LodgeRegistrationRequest.request_id == int(reg_id_str)
+        ).first()
+        if not reg:
+            return {"ignored": True, "reason": "registration not found"}
+
+        amount_paise = entity.get("amount", 0)
+        payment_id   = entity.get("id", "")
+        method       = entity.get("method", "online")
+
+        reg.payment_status = "paid"
+        reg.payment_method = method
+        reg.payment_ref    = payment_id
+        reg.payment_amount = amount_paise / 100
+        reg.payment_date   = _utcnow()
+        reg.payment_notes  = ((reg.payment_notes or "") +
+                               f"\n[AUTO] Payment confirmed via Razorpay. "
+                               f"ID: {payment_id} · ₹{amount_paise//100}")
+        db.commit()
+        logger.info("Registration %s payment confirmed via webhook. ID: %s",
+                    reg_id_str, payment_id)
+        return {"ok": True, "registration_id": reg_id_str}
+
+    except Exception as e:
+        logger.error("Registration payment webhook error: %s", e)
+        raise HTTPException(500, "Webhook processing error")

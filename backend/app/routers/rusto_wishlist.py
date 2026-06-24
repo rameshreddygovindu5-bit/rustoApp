@@ -23,7 +23,7 @@ def _lodge_summary(l: Lodge, db: Session) -> dict:
     photo = db.query(LodgePhoto).filter(
         LodgePhoto.lodge_id == l.lodge_id
     ).order_by(LodgePhoto.sort_order).first()
-    avg = db.query(func.avg(Review.overall_rating)).filter(
+    avg = db.query(func.avg(Review.rating)).filter(
         Review.lodge_id == l.lodge_id,
         Review.status == ReviewStatus.published.value
     ).scalar()

@@ -18,8 +18,14 @@ via the message_id → DB lookup, so the webhook itself doesn't need to
 know about tenants.
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
@@ -224,7 +230,7 @@ def list_messages(
                                 __import__("sqlalchemy").func.count())
                      .filter(WhatsAppMessage.lodge_id == lodge_id,
                              WhatsAppMessage.created_at >=
-                               datetime.utcnow() - timedelta(days=30))
+                               _utcnow() - timedelta(days=30))
                      .group_by(WhatsAppMessage.status).all())
     summary = {s.value: 0 for s in WhatsAppMessageStatus}
     for s, c in summary_rows:

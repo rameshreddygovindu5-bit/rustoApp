@@ -18,9 +18,14 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Callable, Dict, List, Optional, Awaitable
+
+
+def _utcnow():
+    """Return naive UTC datetime — SQLite only accepts naive (no-tzinfo) datetimes."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func, desc, cast, Date as SqlDate
@@ -257,7 +262,7 @@ async def get_dashboard_stats(ctx: ToolContext):
         "upcoming_arrivals_7d": upcoming,
         "revenue_today": float(revenue_today),
         "revenue_month_to_date": float(revenue_mtd),
-        "as_of": datetime.utcnow().isoformat() + "Z",
+        "as_of": _utcnow().isoformat() + "Z",
     }
 
 
@@ -815,7 +820,7 @@ async def create_checkin(ctx: ToolContext, customer_id: int, room_id: int,
         customer_id=customer.customer_id,
         room_id=room.room_id,
         booking_id=linked_booking.booking_id if linked_booking else None,
-        checkin_datetime=datetime.utcnow(),
+        checkin_datetime=_utcnow(),
         expected_checkout=exp_co,
         members_count=members_count,
         deposit_amount=Decimal(str(deposit_amount)),
@@ -915,7 +920,7 @@ async def checkout_guest(ctx: ToolContext, checkin_id: int,
     if not ch:
         raise ToolError(f"No active check-in #{checkin_id}.")
 
-    now = datetime.utcnow()
+    now = _utcnow()
     elapsed = (now - ch.checkin_datetime).total_seconds() / 86400
     nights = max(1, int(elapsed) + (1 if elapsed % 1 > 0 else 0))
     room_charges = nights * float(ch.tariff_per_night or 0)
@@ -966,26 +971,40 @@ async def checkout_guest(ctx: ToolContext, checkin_id: int,
     deposit_paid = float(ch.deposit_amount or 0)
     refunded = float(deposit_refunded) if deposit_refunded is not None else deposit_paid
 
-    invoice = Invoice(
-        lodge_id=ctx.lodge_id,
-        invoice_number=invoice_number,
-        checkin_id=ch.checkin_id,
-        customer_id=ch.customer_id,
-        room_id=ch.room_id,
-        checkin_datetime=ch.checkin_datetime,
-        checkout_datetime=now,
-        nights=nights,
-        tariff_per_night=ch.tariff_per_night,
-        room_charges=Decimal(str(room_charges)),
-        deposit_paid=Decimal(str(deposit_paid)),
-        deposit_refunded=Decimal(str(refunded)),
-        additional_charges=Decimal(str(additional_charges or 0)),
-        discount=Decimal(str(discount_amount or 0)),
-        gst_amount=Decimal(str(gst_amount)),
-        total_amount=Decimal(str(total)),
-        payment_mode=payment_mode,
-    )
-    db.add(invoice)
+    # Idempotent: reuse existing invoice rather than hitting UNIQUE constraint
+    existing_inv = db.query(Invoice).filter(
+        Invoice.checkin_id == ch.checkin_id
+    ).first()
+    if existing_inv:
+        invoice = existing_inv
+        invoice.checkout_datetime = now
+        invoice.nights = nights
+        invoice.room_charges = Decimal(str(room_charges))
+        invoice.gst_amount = Decimal(str(gst_amount))
+        invoice.total_amount = Decimal(str(total))
+        invoice.payment_mode = payment_mode
+        invoice_number = existing_inv.invoice_number
+    else:
+        invoice = Invoice(
+            lodge_id=ctx.lodge_id,
+            invoice_number=invoice_number,
+            checkin_id=ch.checkin_id,
+            customer_id=ch.customer_id,
+            room_id=ch.room_id,
+            checkin_datetime=ch.checkin_datetime,
+            checkout_datetime=now,
+            nights=nights,
+            tariff_per_night=ch.tariff_per_night,
+            room_charges=Decimal(str(room_charges)),
+            deposit_paid=Decimal(str(deposit_paid)),
+            deposit_refunded=Decimal(str(refunded)),
+            additional_charges=Decimal(str(additional_charges or 0)),
+            discount=Decimal(str(discount_amount or 0)),
+            gst_amount=Decimal(str(gst_amount)),
+            total_amount=Decimal(str(total)),
+            payment_mode=payment_mode,
+        )
+        db.add(invoice)
     db.commit()
     db.refresh(invoice)
 
@@ -1087,7 +1106,7 @@ async def create_booking(ctx: ToolContext, guest_name, guest_phone, room_type,
     from ...models import Lodge
     lodge = db.query(Lodge).filter(Lodge.lodge_id == ctx.lodge_id).first()
     code_prefix = (lodge.code[:3].upper() if lodge and lodge.code else "UDM")
-    today = datetime.utcnow()
+    today = _utcnow()
     prefix = f"{code_prefix}-{today.strftime('%Y%m')}-"
     last = (db.query(Booking).filter(
                 Booking.lodge_id == ctx.lodge_id,
@@ -1160,7 +1179,7 @@ async def cancel_booking(ctx: ToolContext, booking_id: int, reason: Optional[str
                     BookingStatus.checked_in, BookingStatus.no_show]:
         raise ToolError(f"Cannot cancel a booking in status: {_enum_val(b.status)}.")
     b.status = BookingStatus.cancelled
-    b.cancelled_at = datetime.utcnow()
+    b.cancelled_at = _utcnow()
     b.cancellation_reason = reason or "Cancelled via agent"
     ctx.db.commit()
     ctx.audit(action="booking.cancelled", entity_type="booking",

@@ -3,9 +3,9 @@ import { useParams, useLocation, useNavigate, Link } from "react-router-dom";
 import { CreditCard, CheckCircle2, AlertCircle, Loader2,
          Shield, MapPin, Users, Sparkles,
          ArrowLeft, Lock, Mail, Phone,
-         ArrowRight, Wallet, FileText } from "lucide-react";
+         ArrowRight, Wallet, FileText , MessageSquare, Tag, X} from "lucide-react";
 import { toast } from "react-toastify";
-import { rustoBookingsAPI } from "../../services/api";
+import { rustoBookingsAPI, promosAPI } from "../../services/api";
 import { useCustomerAuth } from "../../context/CustomerAuthContext";
 
 /**
@@ -44,28 +44,36 @@ export default function RustoCheckout() {
   const initial = loc.state || null;
   const [booking, setBooking] = useState(initial?.booking || null);
   const [razorpay, setRazorpay] = useState(initial?.razorpay || null);
-  const [loading, setLoading] = useState(!initial);
+  // Bundle add-ons passed from lodge detail page
+  const passedBundles = initial?.bundles || [];
+  const passedSelected = initial?.selectedBundles || {};
+  const [selectedBundles] = useState(passedSelected);
+  const [loading, setLoading] = useState(!initial?.booking);
+  // Track if user arrived via direct URL (no state) — show status only
+  const isDirectAccess = !initial?.booking;
   const [paying, setPaying] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoResult, setPromoResult] = useState(null);
+  const [promoLoading, setPromoLoading] = useState(false);
   const [done, setDone] = useState(false);
 
   const [editingContact, setEditingContact] = useState(false);
+  const [specialRequests, setSpecialRequests] = useState(booking?.special_requests || "");
   const [contactForm, setContactForm] = useState({
-    full_name: "",
-    phone: "",
-    email: ""
+    full_name: customer?.full_name || booking?.contact_name || "",
+    phone:     customer?.phone     || booking?.contact_phone || "",
+    email:     customer?.email     || booking?.contact_email || "",
   });
   const [savingContact, setSavingContact] = useState(false);
 
-  // Initialize form when customer changes
+  // Initialize form when customer or booking data arrives
   useEffect(() => {
-    if (customer) {
-      setContactForm({
-        full_name: customer.full_name || "",
-        phone: customer.phone || "",
-        email: customer.email || ""
-      });
-    }
-  }, [customer]);
+    setContactForm({
+      full_name: customer?.full_name || booking?.contact_name || "",
+      phone:     customer?.phone     || booking?.contact_phone || "",
+      email:     customer?.email     || booking?.contact_email || "",
+    });
+  }, [customer, booking]);
 
   const saveContact = async () => {
     if (!contactForm.full_name.trim()) {
@@ -96,7 +104,9 @@ export default function RustoCheckout() {
 
   const handlePay = async () => {
     if (!razorpay) {
-      toast.error("Payment session unavailable. Please re-create the booking.");
+      // Direct URL access without payment session — show helpful message
+      toast.error("Payment session expired. Please re-book from the lodge page.");
+      if (booking?.lodge?.code) nav(`/lodges/${booking.lodge.code}`);
       return;
     }
     setPaying(true);
@@ -120,7 +130,7 @@ export default function RustoCheckout() {
         amount: razorpay.amount, currency: razorpay.currency,
         name: razorpay.name, description: razorpay.description,
         prefill: razorpay.prefill,
-        theme: { color: "#C9A84C" },
+        theme: { color: "var(--gold-DEFAULT, #C9A84C)" },
         handler: async (resp) => {
           try {
             const r = await rustoBookingsAPI.verifyPayment(bookingId, {
@@ -143,6 +153,40 @@ export default function RustoCheckout() {
     }
   };
 
+  const applyPromo = async () => {
+    if (!promoCode.trim()) return;
+    setPromoLoading(true);
+    try {
+      const r = await rustoBookingsAPI.applyPromo(bookingId, {
+        promo_code: promoCode.trim().toUpperCase()
+      });
+      setBooking(r.data.booking);
+      setRazorpay(r.data.razorpay);
+      setPromoResult({
+        code: r.data.booking.promo_code,
+        discount_amount: r.data.booking.promo_discount,
+      });
+      toast.success(`Promo applied! You save ₹${r.data.booking.promo_discount.toLocaleString("en-IN")}`);
+    } catch (e) {
+      setPromoResult(null);
+      toast.error(e.response?.data?.detail || "Invalid promo code — please check and try again");
+    } finally { setPromoLoading(false); }
+  };
+
+  const removePromo = async () => {
+    setPromoLoading(true);
+    try {
+      const r = await rustoBookingsAPI.applyPromo(bookingId, { promo_code: "" });
+      setBooking(r.data.booking);
+      setRazorpay(r.data.razorpay);
+      setPromoResult(null);
+      setPromoCode("");
+      toast.info("Promo code removed");
+    } catch (e) {
+      toast.error("Could not remove promo code");
+    } finally { setPromoLoading(false); }
+  };
+
   if (loading) return (
     <div className="max-w-2xl mx-auto p-12 text-center">
       <Loader2 size={32} className="mx-auto animate-spin text-gold mb-3"/>
@@ -158,7 +202,7 @@ export default function RustoCheckout() {
       </div>
       <h2 className="font-display text-2xl font-bold text-navy mb-2">Booking not found</h2>
       <p className="text-ink-500 mb-6">It may have been cancelled or the link is wrong.</p>
-      <Link to="/account/bookings" className="btn-gold">My bookings</Link>
+      <Link to="/account/bookings" className="btn-cta">My bookings</Link>
     </div>
   );
 
@@ -171,20 +215,20 @@ export default function RustoCheckout() {
   const step = paying ? 2 : 1; // 1 = review, 2 = pay (in progress), 3 = done
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in rusto-page-light" style={{background:"var(--page-bg,#F8FAFC)"}}>
       <button onClick={() => nav(-1)}
-              className="flex items-center gap-1.5 text-sm text-ink-500 hover:text-navy transition-colors mb-6">
+              className="flex items-center gap-1.5 text-sm text-ink-600 hover:text-navy transition-colors mb-6 font-medium">
         <ArrowLeft size={14}/> Back
       </button>
 
       {/* Step indicator */}
       <StepIndicator currentStep={step}/>
 
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
         {/* Left: payment area */}
-        <div className="animate-rise-up">
-          <h1 className="font-display text-3xl font-bold text-navy mb-2">Confirm and pay</h1>
-          <p className="text-ink-500 mb-8">Review the details below and complete your booking with a secure payment.</p>
+        <div className="animate-rise-up checkout-light-col">
+          <h1 className="font-display text-2xl font-bold text-navy mb-1">Confirm your booking</h1>
+          <p className="text-ink-600 mb-8">Review the details below and complete your booking with a secure payment.</p>
 
           {/* Guest details card */}
           <SectionCard 
@@ -201,17 +245,17 @@ export default function RustoCheckout() {
                     });
                     setEditingContact(true);
                   }}
-                  className="text-2xs font-semibold text-[#D4AF37] hover:text-gold uppercase tracking-widest hover:underline"
+                  className="text-xs font-semibold text-orange-600 hover:text-orange-700"
                 >
                   Edit contact
                 </button>
               ) : (
-                <div className="flex gap-2 text-2xs">
-                  <button onClick={() => setEditingContact(false)} className="text-white/60 hover:text-white font-semibold">
+                <div className="flex gap-2 text-xs">
+                  <button onClick={() => setEditingContact(false)} className="text-ink-500 hover:text-ink-700 font-medium">
                     Cancel
                   </button>
-                  <span className="text-white/20">|</span>
-                  <button onClick={saveContact} disabled={savingContact} className="text-[#D4AF37] font-bold hover:text-gold uppercase">
+                  <span className="text-ink-300">|</span>
+                  <button onClick={saveContact} disabled={savingContact} className="text-gold-700 font-bold hover:text-gold-600">
                     {savingContact ? "Saving..." : "Save"}
                   </button>
                 </div>
@@ -227,38 +271,93 @@ export default function RustoCheckout() {
                               Icon={Users}/>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-                  <span className="text-3xs uppercase tracking-widest font-bold text-[#D4AF37] mb-1.5 block">Full Name</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-ink-600 block mb-1">Full Name</label>
                   <input
                     type="text"
                     value={contactForm.full_name}
                     onChange={(e) => setContactForm((f) => ({ ...f, full_name: e.target.value }))}
-                    className="w-full bg-transparent border-none outline-none text-white text-xs font-semibold"
+                    className="w-full border border-ink-300 rounded-xl px-3 py-2.5 text-sm text-ink-800
+                               focus:outline-none focus:ring-2 focus:ring-gold/30 focus:border-transparent bg-white"
                   />
                 </div>
-                <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-                  <span className="text-3xs uppercase tracking-widest font-bold text-[#D4AF37] mb-1.5 block">Phone</span>
+                <div>
+                  <label className="text-xs font-semibold text-ink-600 block mb-1">Phone</label>
                   <input
                     type="text"
                     value={contactForm.phone}
                     onChange={(e) => setContactForm((f) => ({ ...f, phone: e.target.value }))}
-                    className="w-full bg-transparent border-none outline-none text-white text-xs font-semibold font-mono"
+                    className="w-full border border-ink-300 rounded-xl px-3 py-2.5 text-sm text-ink-800 font-mono
+                               focus:outline-none focus:ring-2 focus:ring-gold/30 focus:border-transparent bg-white"
                   />
                 </div>
-                <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-                  <span className="text-3xs uppercase tracking-widest font-bold text-[#D4AF37] mb-1.5 block">Email</span>
+                <div>
+                  <label className="text-xs font-semibold text-ink-600 block mb-1">Email</label>
                   <input
                     type="email"
                     value={contactForm.email}
                     onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))}
-                    className="w-full bg-transparent border-none outline-none text-white text-xs font-semibold"
+                    className="w-full border border-ink-300 rounded-xl px-3 py-2.5 text-sm text-ink-800
+                               focus:outline-none focus:ring-2 focus:ring-gold/30 focus:border-transparent bg-white"
                   />
                 </div>
-                <div className="rounded-xl bg-white/5 border border-white/15 p-3 flex flex-col justify-center">
-                  <span className="text-3xs uppercase tracking-widest font-bold text-white/40 block">Guests</span>
-                  <span className="text-xs font-semibold text-white/60 mt-1">{booking.adults} Adults</span>
+                <div className="flex flex-col justify-center bg-ivory-50 rounded-xl px-3 py-2.5 border border-ivory-200">
+                  <span className="text-xs text-ink-500">Guests</span>
+                  <span className="text-sm font-semibold text-ink-800 mt-0.5">{booking.adults} Adult{booking.adults > 1 ? "s" : ""}</span>
                 </div>
+              </div>
+            )}
+          </SectionCard>
+
+          {/* Special Requests */}
+          <SectionCard title="Special Requests" icon={MessageSquare}>
+            <p className="text-xs text-ink-500 mb-3 leading-relaxed">
+              Optional: let the property know about dietary needs, room preferences, arrival time, or any special occasion.
+            </p>
+            <textarea
+              rows={3}
+              value={specialRequests}
+              onChange={e => setSpecialRequests(e.target.value)}
+              placeholder="e.g. We're celebrating an anniversary, please arrange flowers. Vegetarian meals only. Late check-in at 10pm."
+              className="w-full rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-gold/30"
+                          style={{border:"1px solid var(--border,#E2E8F0)",background:"var(--surface,#FFFFFF)",color:"var(--text-primary,#0F172A)"}}
+              maxLength={500}
+            />
+            <p className="text-2xs text-ink-400 mt-1 text-right">{specialRequests.length}/500</p>
+          </SectionCard>
+
+          {/* Promo Code */}
+          <SectionCard title="Promo Code" icon={Tag}>
+            <div className="flex gap-2">
+              <input
+                value={promoCode}
+                onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                onKeyDown={e => e.key === "Enter" && applyPromo()}
+                placeholder="Enter promo code (e.g. RUSTO10)"
+                className="flex-1 rounded-xl px-4 py-2.5 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-gold/30"
+                           style={{border:"1px solid var(--border,#E2E8F0)",background:"var(--surface,#FFFFFF)",color:"var(--text-primary,#0F172A)"}}
+                maxLength={30}
+              />
+              <button onClick={applyPromo} disabled={promoLoading || !promoCode.trim()}
+                      className="px-4 py-2.5 bg-gold hover:bg-gold/90 text-navy-dark font-bold text-sm rounded-xl
+                                 transition-colors disabled:opacity-50 shrink-0 flex items-center gap-1.5">
+                {promoLoading ? <Loader2 size={14} className="animate-spin"/> : null}
+                Apply
+              </button>
+            </div>
+            {promoResult && (
+              <div className="mt-3 flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm">
+                <CheckCircle2 size={16} className="text-green-600 shrink-0"/>
+                <div>
+                  <span className="font-bold">{promoResult.code}</span> applied —{" "}
+                  <span className="font-bold">₹{promoResult.discount_amount} off</span>
+                  {promoResult.discount_pct > 0 && <span className="text-green-600 text-xs ml-1">({promoResult.discount_pct}%)</span>}
+                </div>
+                <button onClick={removePromo}
+                        className="ml-auto text-green-500 hover:text-green-700">
+                  <X size={14}/>
+                </button>
               </div>
             )}
           </SectionCard>
@@ -298,7 +397,7 @@ export default function RustoCheckout() {
               </div>
             </div>
 
-            <div className="mt-4 p-3 rounded-xl bg-ink-50 flex items-start gap-2.5">
+            <div className="mt-4 p-3 rounded-xl bg-ivory-50 flex items-start gap-2.5">
               <Shield size={16} className="text-green-600 flex-shrink-0 mt-0.5"/>
               <p className="text-xs text-ink-600 leading-relaxed">
                 Your payment is secured with bank-grade 256-bit SSL encryption.
@@ -318,12 +417,11 @@ export default function RustoCheckout() {
           {/* Pay button */}
           <div className="mt-8">
             <button onClick={handlePay} disabled={paying}
-                    className="w-full px-6 py-4 rounded-2xl bg-gradient-to-br from-gold to-gold-dark
-                                text-navy-dark font-bold text-base uppercase tracking-eyebrow
-                                shadow-gold-glow hover:shadow-gold hover:-translate-y-0.5
-                                active:translate-y-0 transition-all duration-200
+                    className="w-full px-6 py-4 rounded-2xl font-bold text-base text-white
+                                transition-all duration-200
                                 disabled:opacity-60 disabled:cursor-wait
-                                flex items-center justify-center gap-3">
+                                flex items-center justify-center gap-3"
+                    style={{background: paying ? '#4b5563' : '#16a34a'}}>
               {paying ? (
                 <>
                   <Loader2 size={18} className="animate-spin"/>
@@ -332,7 +430,7 @@ export default function RustoCheckout() {
               ) : (
                 <>
                   <Lock size={16}/>
-                  Pay ₹{booking.total_amount.toLocaleString("en-IN")} securely
+                  Pay ₹{Math.max(0, booking.total_amount - (promoResult?.discount_amount || 0)).toLocaleString("en-IN")} securely
                   <ArrowRight size={16}/>
                 </>
               )}
@@ -344,8 +442,8 @@ export default function RustoCheckout() {
         </div>
 
         {/* Right: booking summary */}
-        <div className="lg:sticky lg:top-24 lg:self-start animate-rise-scale">
-          <BookingSummary booking={booking}/>
+        <div className="lg:sticky lg:top-24 lg:self-start animate-rise-scale rusto-page-light">
+          <BookingSummary booking={booking} bundles={passedBundles} selectedBundles={selectedBundles} promoResult={promoResult}/>
         </div>
       </div>
     </div>
@@ -372,11 +470,11 @@ function StepIndicator({ currentStep }) {
             </div>
             <div className="mt-2 hidden sm:block">
               <p className={`text-sm font-semibold ${
-                currentStep === s.num ? "text-navy" : "text-ink-500"
+                currentStep === s.num ? "text-white font-bold" : "text-white/60"
               }`}>
                 {s.label}
               </p>
-              <p className="text-2xs text-ink-400 mt-0.5">{s.sublabel}</p>
+              <p className="text-2xs text-white/50 mt-0.5">{s.sublabel}</p>
             </div>
           </div>
           {i < steps.length - 1 && (
@@ -392,10 +490,10 @@ function StepIndicator({ currentStep }) {
 
 function SectionCard({ title, icon: Icon, children, className = "", action }) {
   return (
-    <div className={`card border border-ink-100 ${className}`}>
+    <div className={`bg-white border border-ivory-200 rounded-2xl p-6 mb-4 shadow-sm ${className}`}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-display text-lg font-bold text-navy flex items-center gap-2">
-          <Icon size={16} className="text-gold"/> {title}
+        <h3 className="font-semibold text-ink-800 text-base flex items-center gap-2">
+          <Icon size={16} className="text-gold-600"/> {title}
         </h3>
         {action}
       </div>
@@ -406,23 +504,27 @@ function SectionCard({ title, icon: Icon, children, className = "", action }) {
 
 function DetailField({ label, value, Icon }) {
   return (
-    <div className="rounded-xl bg-ink-50 p-3">
-      <p className="text-2xs uppercase tracking-eyebrow font-bold text-ink-500 flex items-center gap-1">
+    <div className="rounded-xl bg-ivory-50 border border-ivory-100 p-3">
+      <p className="text-2xs uppercase tracking-wider font-bold text-ink-500 flex items-center gap-1">
         <Icon size={10}/> {label}
       </p>
-      <p className="font-semibold text-navy mt-1 text-sm">{value}</p>
+      <p className="font-semibold text-ink-800 mt-1 text-sm">{value}</p>
     </div>
   );
 }
 
-function BookingSummary({ booking }) {
+function BookingSummary({ booking, bundles = [], selectedBundles = {}, promoResult = null }) {
+  const bundleTotal = Object.entries(selectedBundles).reduce((sum, [id, qty]) => {
+    const b = bundles.find(x => x.bundle_id === +id);
+    return sum + (b ? b.price * qty : 0);
+  }, 0);
   const nights = Math.round(
     (new Date(booking.checkout_date) - new Date(booking.checkin_date)) / 86400000
   );
   const subtotal = booking.subtotal || booking.total_amount * 0.88;
   const tax = booking.tax_amount || (booking.total_amount * 0.12);
   return (
-    <div className="card bg-white border border-ink-100 overflow-hidden p-0">
+    <div className="card !bg-white border border-ivory-200 overflow-hidden p-0 text-navy">
       {/* Lodge image header */}
       <div className="relative h-32 bg-gradient-to-br from-navy via-navy-light to-navy-dark
                         overflow-hidden">
@@ -443,19 +545,19 @@ function BookingSummary({ booking }) {
       {/* Body */}
       <div className="p-5">
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="rounded-xl bg-ink-50 p-3">
-            <p className="text-2xs uppercase tracking-eyebrow font-bold text-ink-500">Check in</p>
+          <div className="rounded-xl bg-ivory-50 p-3">
+            <p className="text-2xs uppercase tracking-wider font-bold text-ink-500">Check in</p>
             <p className="font-display text-lg font-bold text-navy mt-1 leading-none">
               {new Date(booking.checkin_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
             </p>
-            <p className="text-2xs text-ink-500 mt-1">After 2:00 PM</p>
+            <p className="text-2xs text-ink-500 mt-1">After {booking.lodge?.checkin_time || booking.checkin_time || "12:00"} PM</p>
           </div>
-          <div className="rounded-xl bg-ink-50 p-3">
-            <p className="text-2xs uppercase tracking-eyebrow font-bold text-ink-500">Check out</p>
+          <div className="rounded-xl bg-ivory-50 p-3">
+            <p className="text-2xs uppercase tracking-wider font-bold text-ink-500">Check out</p>
             <p className="font-display text-lg font-bold text-navy mt-1 leading-none">
               {new Date(booking.checkout_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
             </p>
-            <p className="text-2xs text-ink-500 mt-1">Before 11:00 AM</p>
+            <p className="text-2xs text-ink-500 mt-1">Before {booking.lodge?.checkout_time || booking.checkout_time || "11:00"} AM</p>
           </div>
         </div>
 
@@ -466,15 +568,35 @@ function BookingSummary({ booking }) {
         </div>
 
         {/* Cost */}
-        <div className="space-y-2 pb-4 border-b border-ink-100">
+        <div className="space-y-2 pb-4 border-b border-ivory-100">
           <SummaryRow label="Subtotal" value={`₹${subtotal.toLocaleString("en-IN")}`}/>
+          {/* Bundle add-ons */}
+          {Object.entries(selectedBundles).map(([id, qty]) => {
+            const b = bundles.find(x => x.bundle_id === +id);
+            if (!b) return null;
+            return <SummaryRow key={id} label={`${b.title} ×${qty}`} value={`₹${(b.price*qty).toLocaleString("en-IN")}`}/>;
+          })}
+          {bundleTotal > 0 && <SummaryRow label="Add-ons total" value={`₹${bundleTotal.toLocaleString("en-IN")}`}/>}
           <SummaryRow label="Taxes & fees" value={`₹${tax.toLocaleString("en-IN")}`}/>
+          {promoResult && promoResult.discount_amount > 0 && (
+            <div className="flex items-center justify-between py-1.5 text-sm font-semibold text-green-600">
+              <span>🏷️ Promo: {promoResult.code}</span>
+              <span>−₹{promoResult.discount_amount.toLocaleString("en-IN")}</span>
+            </div>
+          )}
         </div>
         <div className="flex items-baseline justify-between pt-4">
-          <span className="font-display text-lg font-bold text-navy">Total</span>
+          <span className="font-display text-lg font-bold text-navy">
+            {promoResult ? "You Pay" : "Total"}
+          </span>
           <div className="text-right">
+            {promoResult && promoResult.discount_amount > 0 && (
+              <p className="text-sm text-ink-400 line-through">
+                ₹{booking.total_amount.toLocaleString("en-IN")}
+              </p>
+            )}
             <p className="font-display text-2xl font-bold text-navy leading-none">
-              ₹{booking.total_amount.toLocaleString("en-IN")}
+              ₹{Math.max(0, booking.total_amount - (promoResult?.discount_amount || 0)).toLocaleString("en-IN")}
             </p>
             <p className="text-2xs text-ink-500 mt-1">INR · all-inclusive</p>
           </div>
@@ -531,14 +653,50 @@ function ConfirmationScreen({ booking }) {
         </h1>
         <p className="text-base md:text-lg text-ink-600 max-w-md mx-auto leading-relaxed
                         animate-rise-up" style={{ animationDelay: "400ms" }}>
-          Your stay at <strong className="text-navy">{booking.lodge?.name}</strong> is confirmed.
-          We've sent the details to <strong>{booking.email || "your registered contact"}</strong>.
+          Your stay at <strong className="text-navy">{booking.lodge?.name || booking.lodge?.display_name}</strong> is confirmed.
+          We've sent the details to <strong>{booking.contact_email || booking.email || "your registered contact"}</strong>.
         </p>
 
+        {/* Points earned */}
+        {booking.total_amount > 0 && (
+          <div className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-gold/10 border border-gold/30 rounded-full animate-rise-up"
+               style={{ animationDelay: "500ms" }}>
+            <span className="text-lg">⭐</span>
+            <span className="text-sm font-semibold text-gold-800">
+              +{Math.floor(booking.total_amount / 100)} Rusto Points earned!
+            </span>
+          </div>
+        )}
+
+        {/* Welcome / Wi-Fi Digital Card */}
+        <div className="mt-6 bg-gradient-to-br from-navy to-[#0F1B33] border border-white/10 rounded-2xl p-6 text-left max-w-md mx-auto animate-rise-up shadow-lux text-white"
+             style={{ animationDelay: "550ms" }}>
+          <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
+            <span className="text-2xs uppercase tracking-eyebrow font-bold text-amber-glow">Digital Key Card</span>
+            <span className="text-sm">📶</span>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <p className="text-[9px] uppercase tracking-widest text-white/50">Guest Wi-Fi Network</p>
+              <p className="font-mono text-base font-bold text-white mt-0.5">
+                {(booking.lodge?.name || "Rusto").replace(/\s+/g, '')}_Guest
+              </p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase tracking-widest text-white/50">Password (Passcode)</p>
+              <p className="font-mono text-base font-bold text-amber-glow mt-0.5">REST_EVERYWHERE</p>
+            </div>
+            <div className="pt-2 border-t border-white/5 flex items-center justify-between text-2xs text-white/60">
+              <span>🔑 Code: {booking.booking_ref}</span>
+              <span>🕒 Check-in: 12:00 PM</span>
+            </div>
+          </div>
+        </div>
+
         {/* Booking card */}
-        <div className="mt-8 card-lux text-left max-w-md mx-auto animate-rise-up"
-              style={{ animationDelay: "500ms" }}>
-          <div className="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-ink-100">
+        <div className="mt-8 bg-white border border-ivory-200 rounded-2xl p-6 text-left max-w-md mx-auto animate-rise-up shadow-sm"
+              style={{ animationDelay: "600ms" }}>
+          <div className="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-ivory-200">
             <div>
               <p className="text-2xs uppercase tracking-eyebrow font-bold text-ink-500">Check in</p>
               <p className="font-display text-xl font-bold text-navy mt-1">
@@ -563,7 +721,13 @@ function ConfirmationScreen({ booking }) {
 
         <div className="flex flex-wrap gap-3 justify-center mt-8 animate-rise-up"
               style={{ animationDelay: "600ms" }}>
-          <Link to="/account/bookings" className="btn-gold px-6 py-3">
+          <Link to="/membership"
+                className="px-6 py-3 rounded-xl border-2 border-ink-300 text-ink-700 font-semibold hover:bg-ivory-50 flex items-center justify-center gap-1.5">
+              <span>⭐</span> View Membership
+            </Link>
+          <Link to="/account"
+                className="px-6 py-3 rounded-xl font-bold text-white flex items-center gap-2"
+                style={{background:"var(--brand-cta,#1E3A8A)"}}>
             View my bookings
           </Link>
           <Link to="/search"

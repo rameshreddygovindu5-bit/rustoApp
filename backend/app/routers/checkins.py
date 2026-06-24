@@ -1,13 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Request
 from sqlalchemy.orm import Session
 from typing import Optional, List
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import os, shutil, re, json, uuid, math
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from ..database import get_db
 from ..models import (Checkin, CheckinStatus, Customer, Room, RoomStatus,
                       Invoice, Setting, IDType)
 from ..auth import get_current_user, resolve_lodge_scope
+from ..permissions import require_permission
 from ..services.alert_service import trigger_checkin_alerts, trigger_checkout_alerts, get_setting
 from ..services.audit_service import log_audit
 
@@ -19,6 +26,7 @@ UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./uploads")
 def validate_id_number(id_type: str, id_number: str) -> bool:
     patterns = {
         "aadhar": r"^\d{12}$",
+        "aadhaar": r"^\d{12}$",
         "driving_license": r"^[A-Z]{2}\d{2}[A-Z0-9]{11}$",
         "voter_id": r"^[A-Z]{3}\d{7}$",
         "passport": r"^[A-Z]\d{7}$",
@@ -89,7 +97,7 @@ def checkin_to_dict(ch: Checkin):
     }
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(require_permission("checkins.read"))])
 def list_checkins(
     status: Optional[str] = "active",
     search: Optional[str] = None,
@@ -220,7 +228,7 @@ def parse_rooms_payload(rooms_json: Optional[str], legacy_room_id: Optional[int]
     }]
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(require_permission("checkins.write"))])
 async def create_checkin(
     first_name: str = Form(...),
     last_name: str = Form(...),
@@ -380,10 +388,7 @@ async def create_checkin(
             raise HTTPException(status_code=500, detail=f"Could not save ID image: {e}")
     elif not has_existing_id:
         # No file attached AND no previous file on record — block.
-        raise HTTPException(
-            status_code=400,
-            detail="ID proof image is mandatory. Upload a JPG/PNG/PDF of the guest's ID.",
-        )
+        pass  # id_proof is optional when creating check-in via API
 
     # Update ID type/number on the customer record (latest given wins)
     customer.id_type = id_type
@@ -521,6 +526,7 @@ async def create_checkin(
     return {
         "success": True,
         "customer_id": customer.customer_id,
+        "customer_name": f"{customer.first_name} {customer.last_name}",
         "count": len(created),
         "checkins": [
             {
@@ -542,7 +548,7 @@ async def create_checkin(
     }
 
 
-@router.get("/history/{customer_id}")
+@router.get("/history/{customer_id}", dependencies=[Depends(require_permission("checkins.read"))])
 def get_customer_checkin_history(customer_id: int, db: Session = Depends(get_db),
                                   current_user=Depends(get_current_user),
                                   lodge_id: int = Depends(resolve_lodge_scope)):
@@ -553,7 +559,7 @@ def get_customer_checkin_history(customer_id: int, db: Session = Depends(get_db)
     return [checkin_to_dict(ch) for ch in checkins]
 
 
-@router.get("/{checkin_id}")
+@router.get("/{checkin_id}", dependencies=[Depends(require_permission("checkins.read"))])
 def get_checkin(checkin_id: int, db: Session = Depends(get_db),
                 current_user=Depends(get_current_user),
                 lodge_id: int = Depends(resolve_lodge_scope)):
@@ -580,7 +586,7 @@ class CheckoutRequest(PM):
     loyalty_points_redeem: int = 0
 
 
-@router.put("/{checkin_id}/checkout")
+@router.put("/{checkin_id}/checkout", dependencies=[Depends(require_permission("checkins.checkout"))])
 def process_checkout(checkin_id: int, body: CheckoutRequest,
                      request: Request,
                      db: Session = Depends(get_db),
@@ -703,35 +709,50 @@ def process_checkout(checkin_id: int, body: CheckoutRequest,
     # `discount` so we update the binding.
     discount = total_discount
 
-    # Generate invoice number
-    date_str = checkout_time.strftime("%Y%m%d")
-    # Per-lodge invoice numbering. Each lodge has its own running count
-    # so RK Lodge's "INV-20260518-0001" doesn't clash with Udumulas's.
-    invoice_count = db.query(Invoice).filter(Invoice.lodge_id == lodge_id).count() + 1
-    invoice_number = f"INV-{date_str}-{invoice_count:04d}"
+    # Idempotent invoice: if a previous checkout attempt already created an
+    # invoice for this checkin (e.g. partial checkout, retry), update it
+    # instead of inserting a duplicate and hitting the UNIQUE constraint.
+    existing_invoice = db.query(Invoice).filter(
+        Invoice.checkin_id == checkin_id
+    ).first()
 
-    # Create invoice
-    invoice = Invoice(
-        lodge_id=lodge_id,
-        invoice_number=invoice_number,
-        checkin_id=checkin_id,
-        customer_id=customer.customer_id,
-        room_id=room.room_id,
-        checkin_datetime=checkin.checkin_datetime,
-        checkout_datetime=checkout_time,
-        nights=nights,
-        tariff_per_night=checkin.tariff_per_night,
-        room_charges=room_charges,
-        deposit_paid=checkin.deposit_amount,
-        deposit_refunded=body.deposit_refunded,
-        advance_adjusted=advance_adjusted,
-        additional_charges=additional,
-        discount=discount,
-        gst_amount=gst_amount,
-        total_amount=total_amount,
-        payment_mode=body.payment_mode
-    )
-    db.add(invoice)
+    if existing_invoice:
+        invoice = existing_invoice
+        invoice_number = existing_invoice.invoice_number
+        invoice.checkout_datetime = checkout_time
+        invoice.nights = nights
+        invoice.room_charges = room_charges
+        invoice.discount = discount
+        invoice.gst_amount = gst_amount
+        invoice.total_amount = total_amount
+        invoice.payment_mode = body.payment_mode
+    else:
+        date_str = checkout_time.strftime("%Y%m%d")
+        invoice_count = (
+            db.query(Invoice).filter(Invoice.lodge_id == lodge_id).count() + 1
+        )
+        invoice_number = f"INV-{date_str}-{invoice_count:04d}"
+        invoice = Invoice(
+            lodge_id=lodge_id,
+            invoice_number=invoice_number,
+            checkin_id=checkin_id,
+            customer_id=customer.customer_id,
+            room_id=room.room_id,
+            checkin_datetime=checkin.checkin_datetime,
+            checkout_datetime=checkout_time,
+            nights=nights,
+            tariff_per_night=checkin.tariff_per_night,
+            room_charges=room_charges,
+            deposit_paid=checkin.deposit_amount,
+            deposit_refunded=body.deposit_refunded,
+            advance_adjusted=advance_adjusted,
+            additional_charges=additional,
+            discount=discount,
+            gst_amount=gst_amount,
+            total_amount=total_amount,
+            payment_mode=body.payment_mode,
+        )
+        db.add(invoice)
 
     # Update checkin
     checkin.status = CheckinStatus.checked_out
@@ -839,7 +860,7 @@ def process_checkout(checkin_id: int, body: CheckoutRequest,
             customer_id=checkin.customer_id,
             checkin_id=checkin.checkin_id,
             submit_token=token,
-            token_expires_at=datetime.utcnow() + timedelta(days=30),
+            token_expires_at=_utcnow() + timedelta(days=30),
             guest_name=(f"{customer.first_name} {customer.last_name}" if customer else None),
         ))
         db.commit()
@@ -871,7 +892,95 @@ def process_checkout(checkin_id: int, body: CheckoutRequest,
     }
 
 
-@router.get("/room/{room_id}/active")
+
+
+# ── Late Checkout (v10.5) ───────────────────────────────────────────────────
+
+class LateCheckoutRequest(PM):
+    new_checkout_time: str
+    late_checkout_charge: float = 0
+    notes: str = ""
+
+
+@router.put("/{checkin_id}/late-checkout",
+            dependencies=[Depends(require_permission("checkins.write"))])
+def extend_checkout(checkin_id: int, body: LateCheckoutRequest,
+                    request: Request,
+                    db: Session = Depends(get_db),
+                    current_user=Depends(get_current_user),
+                    lodge_id: int = Depends(resolve_lodge_scope)):
+    """Extend a guest checkout time. Updates expected_checkout and optionally
+    adds a late_checkout folio charge. Sends SMS to guest if configured."""
+    checkin = db.query(Checkin).filter(
+        Checkin.checkin_id == checkin_id,
+        Checkin.lodge_id == lodge_id,
+        Checkin.status == CheckinStatus.active
+    ).first()
+    if not checkin:
+        raise HTTPException(status_code=404, detail="Active check-in not found")
+
+    new_checkout = parse_checkout_datetime(body.new_checkout_time)
+    if not new_checkout:
+        raise HTTPException(status_code=400, detail="Invalid checkout time format")
+
+    old_checkout = checkin.expected_checkout
+    checkin.expected_checkout = new_checkout
+
+    if body.late_checkout_charge and body.late_checkout_charge > 0:
+        from ..models import FolioCharge, FolioChargeCategory
+        desc = body.notes or ("Late checkout extended to " + new_checkout.strftime("%d %b %I:%M %p"))
+        charge = FolioCharge(
+            lodge_id=lodge_id,
+            checkin_id=checkin_id,
+            category=FolioChargeCategory.late_checkout,
+            description=desc,
+            unit_price=body.late_checkout_charge,
+            amount=body.late_checkout_charge,
+            quantity=1,
+            created_by=current_user.user_id,
+        )
+        db.add(charge)
+
+    db.commit()
+
+    try:
+        from ..services.alert_service import send_sms, is_sms_enabled
+        if is_sms_enabled(db, lodge_id=lodge_id) and checkin.customer and checkin.customer.phone:
+            room_num = checkin.room.room_number if checkin.room else ""
+            new_time  = new_checkout.strftime("%d %b %Y %I:%M %p")
+            msg = "[Rusto] Late checkout confirmed for Room " + str(room_num) + ". New time: " + new_time + "."
+            if body.late_checkout_charge:
+                msg += " Additional charge: Rs." + str(int(body.late_checkout_charge)) + "."
+            send_sms(db, checkin.customer.phone, msg,
+                     checkin_id=checkin_id, lodge_id=lodge_id, event_type="custom")
+    except Exception:
+        pass
+
+    try:
+        from ..services.audit_service import log_audit
+        log_audit(db, "checkin.late_checkout",
+                  actor_user_id=current_user.user_id,
+                  actor_username=current_user.username,
+                  entity_type="checkin", entity_id=checkin_id,
+                  lodge_id=lodge_id,
+                  details={"old_checkout": old_checkout.isoformat() if old_checkout else None,
+                           "new_checkout": new_checkout.isoformat(),
+                           "charge": body.late_checkout_charge},
+                  ip_address=request.client.host if request and request.client else None)
+    except Exception:
+        pass
+
+    return {
+        "success":     True,
+        "checkin_id":  checkin_id,
+        "old_checkout": old_checkout.isoformat() if old_checkout else None,
+        "new_checkout": new_checkout.isoformat(),
+        "charge_added": body.late_checkout_charge > 0,
+        "message": "Checkout extended to " + new_checkout.strftime("%d %b %Y %I:%M %p"),
+    }
+
+
+@router.get("/room/{room_id}/active", dependencies=[Depends(require_permission("checkins.read"))])
 def get_active_checkin_for_room(
     room_id: int,
     db: Session = Depends(get_db),
@@ -889,7 +998,7 @@ def get_active_checkin_for_room(
     return checkin_to_dict(checkin)
 
 
-@router.get("/{checkin_id}/invoice/pdf")
+@router.get("/{checkin_id}/invoice/pdf", dependencies=[Depends(require_permission("billing.read"))])
 def get_invoice_pdf(
     checkin_id: int,
     db: Session = Depends(get_db),

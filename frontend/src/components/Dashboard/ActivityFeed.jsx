@@ -23,7 +23,7 @@ const ACTION_META = {
   'expense.created':      { icon: Receipt, color: 'text-red-500', label: 'Expense' },
   'promo.created':        { icon: Tag, color: 'text-amber-500', label: 'New promo code' },
   'loyalty.adjusted':     { icon: Award, color: 'text-purple-500', label: 'Loyalty adjusted' },
-  'feedback.staff_entered': { icon: Star, color: 'text-yellow-500', label: 'Feedback recorded' },
+  'feedback.staff_entered': { icon: Star, color: 'text-amber-500', label: 'Feedback recorded' },
   'shift.opened':         { icon: Wallet, color: 'text-green-500', label: 'Shift opened' },
   'shift.closed':         { icon: Wallet, color: 'text-blue-500', label: 'Shift closed' },
   'room.created':         { icon: BedDouble, color: 'text-amber-500', label: 'Room added' },
@@ -103,25 +103,25 @@ export default function ActivityFeed({ limit = 20 }) {
 
   return (
     <div className="bg-white rounded-xl shadow-sm">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+      <div className="px-4 py-3 border-b border-ink-100 flex items-center gap-2">
         <Activity size={16} className="text-gold"/>
         <h3 className="font-semibold text-navy text-sm">Recent Activity</h3>
       </div>
       <div className="max-h-[420px] overflow-y-auto">
         {loading ? (
-          <div className="text-gray-400 text-center py-8 text-sm">Loading…</div>
+          <div className="text-ink-400 text-center py-8 text-sm">Loading…</div>
         ) : rows.length === 0 ? (
-          <div className="text-gray-400 text-center py-8 text-sm">No recent activity.</div>
+          <div className="text-ink-400 text-center py-8 text-sm">No recent activity.</div>
         ) : (
           rows.map(r => {
-            const meta = ACTION_META[r.action] || { icon: Activity, color: 'text-gray-400', label: r.action }
+            const meta = ACTION_META[r.action] || { icon: Activity, color: 'text-ink-400', label: r.action }
             const Icon = meta.icon
             return (
-              <div key={r.id} className="px-4 py-2.5 border-b border-gray-50 last:border-0 flex items-start gap-3 text-sm">
+              <div key={r.id} className="px-4 py-2.5 border-b border-ink-100 last:border-0 flex items-start gap-3 text-sm">
                 <Icon size={14} className={`${meta.color} mt-1 flex-shrink-0`}/>
                 <div className="flex-1 min-w-0">
-                  <div className="text-gray-700 truncate">{describe(r)}</div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
+                  <div className="text-ink-700 truncate">{describe(r)}</div>
+                  <div className="text-[11px] text-ink-400 mt-0.5">
                     {meta.label} · {timeAgo(r.created_at)}
                   </div>
                 </div>

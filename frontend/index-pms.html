@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rusto PMS — Lodge Management</title>
+    <meta name="description" content="Lodge management system for hotel and hospitality staff." />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Warm Neutrals PMS font stack: Cormorant (display) + Jost (body) -->
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Jost:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+      /* ── Warm Neutrals palette ── */
+      :root {
+        --wn-canvas:   #F2EDE4;
+        --wn-paper:    #EAE4D7;
+        --wn-espresso: #3A2718;
+        --wn-suede:    #8C6E54;
+        --wn-sand:     #C9AE8A;
+      }
+      * { margin:0; padding:0; box-sizing:border-box }
+      html, body {
+        height:100%;
+        background: var(--wn-canvas);
+        font-family: 'Jost', 'Plus Jakarta Sans', sans-serif;
+        color: var(--wn-espresso);
+      }
+      #root { height:100% }
+
+      /* ── Preloader ── */
+      #pms-loader {
+        position:fixed; inset:0;
+        background: var(--wn-canvas);
+        display:flex; flex-direction:column; align-items:center; justify-content:center;
+        gap:20px; z-index:9999; transition: opacity .4s ease, visibility .4s ease;
+      }
+
+      /* Linen texture grain overlay */
+      #pms-loader::before {
+        content:'';
+        position:absolute; inset:0;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+        pointer-events:none;
+      }
+
+      #pms-loader .loader-mark {
+        position:relative;
+        width:64px; height:64px;
+        display:flex; align-items:center; justify-content:center;
+      }
+      #pms-loader .loader-mark .ring {
+        position:absolute; inset:0; border-radius:50%;
+        border:2px solid var(--wn-sand);
+        border-top-color: var(--wn-suede);
+        animation: spin .9s cubic-bezier(.6,.1,.4,.9) infinite;
+      }
+      #pms-loader .loader-mark .inner {
+        width:36px; height:36px; border-radius:50%;
+        background: var(--wn-paper);
+        border: 1px solid var(--wn-sand);
+        display:flex; align-items:center; justify-content:center;
+      }
+      #pms-loader .loader-mark .initial {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size:18px; font-weight:500;
+        color: var(--wn-espresso);
+        letter-spacing:0;
+      }
+
+      #pms-loader .brand {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size:26px; font-weight:500;
+        color: var(--wn-espresso);
+        letter-spacing: 0.04em;
+      }
+      #pms-loader .sub {
+        font-family: 'Jost', sans-serif;
+        font-size:9px; font-weight:500;
+        letter-spacing:.35em;
+        text-transform:uppercase;
+        color: var(--wn-suede);
+      }
+      @keyframes spin { to { transform:rotate(360deg) } }
+      .pms-loaded #pms-loader { opacity:0; visibility:hidden; }
+    </style>
+  </head>
+  <body>
+    <div id="pms-loader">
+      <div class="loader-mark">
+        <div class="ring"></div>
+        <div class="inner"><span class="initial">R</span></div>
+      </div>
+      <div class="brand">Rusto PMS</div>
+      <div class="sub">Lodge Management System</div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main-pms.jsx"></script>
+    <script>
+      window.addEventListener('DOMContentLoaded', function() {
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            document.body.classList.add('pms-loaded');
+          });
+        });
+      });
+    </script>
+  </body>
+</html>

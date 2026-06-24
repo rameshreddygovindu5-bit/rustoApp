@@ -30,7 +30,7 @@ export default function Backup() {
         <div className="text-center max-w-sm">
           <ServerCrash size={48} className="mx-auto text-red-400 mb-4"/>
           <h2 className="text-xl font-bold text-navy">Super-admin only</h2>
-          <p className="text-gray-500 mt-2">Only the super administrator can download backups.</p>
+          <p className="text-ink-500 mt-2">Only the super administrator can download backups.</p>
         </div>
       </div>
     )
@@ -56,13 +56,13 @@ export default function Backup() {
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-display font-bold text-navy">Backup & Restore</h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <p className="text-ink-500 text-sm mt-1">
           Database snapshot management. Backups are audit-logged.
         </p>
       </div>
 
       {loading ? (
-        <div className="text-gray-400 text-center py-12">Loading…</div>
+        <div className="text-ink-400 text-center py-12">Loading…</div>
       ) : !info ? (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3">
           <AlertCircle size={20} className="text-red-500 flex-shrink-0"/>
@@ -77,23 +77,23 @@ export default function Backup() {
               </div>
               <div>
                 <h2 className="font-display font-bold text-navy">Database</h2>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">{info.backend}</p>
+                <p className="text-xs text-ink-500 uppercase tracking-wide">{info.backend}</p>
               </div>
             </div>
             {info.downloadable ? (
               <>
                 <div className="grid grid-cols-2 gap-3 text-sm mb-4">
                   <div>
-                    <div className="text-xs text-gray-500 uppercase tracking-wide">Size</div>
+                    <div className="text-xs text-ink-500 uppercase tracking-wide">Size</div>
                     <div className="font-bold text-navy mt-1">{info.size_human}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 uppercase tracking-wide">Path</div>
-                    <div className="font-mono text-xs text-gray-600 mt-1 truncate" title={info.path}>{info.path}</div>
+                    <div className="text-xs text-ink-500 uppercase tracking-wide">Path</div>
+                    <div className="font-mono text-xs text-ink-600 mt-1 truncate" title={info.path}>{info.path}</div>
                   </div>
                 </div>
                 <button onClick={handleDownload} disabled={downloading}
-                        className="w-full px-4 py-3 bg-gold hover:bg-gold/90 text-white rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50">
+                        className="w-full px-4 py-3 bg-gold hover:bg-gold/90 text-navy-dark rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50">
                   <Download size={16}/> {downloading ? 'Preparing…' : 'Download backup'}
                 </button>
               </>
@@ -108,15 +108,15 @@ export default function Backup() {
             <h3 className="font-semibold text-navy mb-2 flex items-center gap-2">
               <FileArchive size={16}/> Restore
             </h3>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-ink-600 mb-3">
               Restoring is intentionally not exposed via the web UI. Replacing a live database while users are connected is high-risk. The recommended workflow is:
             </p>
-            <ol className="text-sm text-gray-600 space-y-1.5 list-decimal list-inside ml-2">
+            <ol className="text-sm text-ink-600 space-y-1.5 list-decimal list-inside ml-2">
               <li>Stop the LMS service on the host</li>
-              <li>Replace the database file with the backup (or run <code className="bg-gray-100 px-1 rounded text-xs">pg_restore</code> for Postgres)</li>
+              <li>Replace the database file with the backup (or run <code className="bg-ink-100 px-1 rounded text-xs">pg_restore</code> for Postgres)</li>
               <li>Restart the service</li>
             </ol>
-            <p className="text-xs text-gray-500 mt-3 italic">
+            <p className="text-xs text-ink-500 mt-3 italic">
               Anyone with shell access can do this; the API doesn't need to.
             </p>
           </div>

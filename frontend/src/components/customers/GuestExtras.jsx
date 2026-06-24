@@ -78,9 +78,9 @@ function PreferencesCard({ customerId }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+    <div className="bg-white rounded-2xl shadow-sm border border-ivory-100 p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-playfair text-lg font-semibold text-navy flex items-center gap-2">
+        <h3 className="font-display text-lg font-semibold text-navy flex items-center gap-2">
           <Tag size={18} className="text-gold"/> Preferences
         </h3>
         {!adding && (
@@ -198,9 +198,9 @@ function DocumentsCard({ customerId }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+    <div className="bg-white rounded-2xl shadow-sm border border-ivory-100 p-6">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <h3 className="font-playfair text-lg font-semibold text-navy flex items-center gap-2">
+        <h3 className="font-display text-lg font-semibold text-navy flex items-center gap-2">
           <FileText size={18} className="text-gold"/> Documents
         </h3>
         <div className="flex items-center gap-2">

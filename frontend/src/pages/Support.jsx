@@ -36,7 +36,7 @@ const FEATURE_CATEGORIES = {
   "front-desk": { label: "Front Desk", color: "bg-green-900/10 text-green-700 border-green-200/50" },
   operations: { label: "Operations", color: "bg-purple-900/10 text-purple-700 border-purple-200/50" },
   "guest-experience": { label: "Guest Experience", color: "bg-pink-900/10 text-pink-700 border-pink-200/50" },
-  marketplace: { label: "Marketplace", color: "bg-yellow-900/10 text-yellow-700 border-yellow-200/50" },
+  marketplace: { label: "Marketplace", color: "bg-amber-900/10 text-amber-700 border-amber-200/50" },
   communications: { label: "Communications", color: "bg-teal-900/10 text-teal-700 border-teal-200/50" },
   AI: { label: "AI Concierge", color: "bg-indigo-900/10 text-indigo-700 border-indigo-200/50" },
   analytics: { label: "Analytics", color: "bg-rose-900/10 text-rose-700 border-rose-200/50" },
@@ -762,7 +762,7 @@ export default function Support() {
                   }`}
                 >
                   <span>{meta.label}</span>
-                  <span className={`px-1.5 py-0.5 rounded-full text-3xs ${
+                  <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${
                     isActive ? "bg-white/20 text-white" : "bg-ink-100 text-ink-500"
                   }`}>
                     {count}
@@ -1272,7 +1272,7 @@ function CreateTicketModal({ onClose, onCreated }) {
                         onClick={() => setForm(f => ({...f, category: c.value}))}
                         className={`p-2 rounded-lg border-2 text-center text-xs transition-all ${
                           form.category === c.value
-                            ? "border-gold bg-gold-50 text-navy font-semibold"
+                            ? "border-gold bg-gold-50 text-navy-dark font-semibold"
                             : "border-ink-200 hover:border-ink-300 text-ink-600"
                         }`}>
                   <div className="text-xl mb-0.5">{c.icon}</div>

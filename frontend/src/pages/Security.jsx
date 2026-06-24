@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Shield, ShieldCheck, ShieldOff, Copy, AlertCircle } from 'lucide-react'
+import { Shield, ShieldCheck, ShieldOff, Copy, AlertCircle, Smartphone, Lock } from 'lucide-react'
 import { toast } from 'react-toastify'
-import { twoFactorAPI } from '../services/api'
+import { twoFactorAPI, settingsAPI, authAPI } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 
 /**
@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext'
  * onto their phone anyway).
  */
 export default function Security() {
-  const { user } = useAuth()
+  const { user, isAdmin, isStaff } = useAuth()
   const [status, setStatus] = useState(null)         // {totp_enabled, totp_enrolled}
   const [loading, setLoading] = useState(true)
   const [enrolling, setEnrolling] = useState(null)   // {secret, provisioning_uri}
@@ -83,13 +83,13 @@ export default function Security() {
     <div className="space-y-6 max-w-2xl animate-fade-in">
       <div>
         <h1 className="text-2xl font-display font-bold text-navy">Security</h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <p className="text-ink-500 text-sm mt-1">
           Two-factor authentication for your account ({user?.username}).
         </p>
       </div>
 
       {loading ? (
-        <div className="text-gray-400 text-center py-12">Loading…</div>
+        <div className="text-ink-400 text-center py-12">Loading…</div>
       ) : enrolling ? (
         // ── ENROLLING ────────────────────────────────────────────────
         <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
@@ -99,27 +99,27 @@ export default function Security() {
             </div>
             <div>
               <h2 className="font-display font-bold text-navy">Set up 2FA</h2>
-              <p className="text-xs text-gray-500">Step 1 of 2 — scan & confirm</p>
+              <p className="text-xs text-ink-500">Step 1 of 2 — scan & confirm</p>
             </div>
           </div>
 
-          <ol className="text-sm text-gray-700 space-y-2 list-decimal list-inside ml-2">
+          <ol className="text-sm text-ink-700 space-y-2 list-decimal list-inside ml-2">
             <li>Install an authenticator app — Google Authenticator, Authy, 1Password, Microsoft Authenticator all work.</li>
             <li>Scan the QR code below (or type the secret manually).</li>
             <li>Enter the 6-digit code your app shows.</li>
           </ol>
 
-          <div className="bg-gray-50 rounded-lg p-4 flex flex-col sm:flex-row gap-4 items-center">
+          <div className="bg-ink-50 rounded-lg p-4 flex flex-col sm:flex-row gap-4 items-center">
             <img src={qrUrl} alt="QR code" className="w-[220px] h-[220px] bg-white p-2 rounded"
                  onError={(e) => { e.target.style.display = 'none' }}/>
             <div className="flex-1">
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Secret (manual entry)</p>
+              <p className="text-xs text-ink-500 uppercase tracking-wide mb-1">Secret (manual entry)</p>
               <div className="flex items-center gap-2">
-                <code className="bg-white border border-gray-300 px-2 py-1.5 rounded text-xs font-mono break-all">
+                <code className="bg-white border border-ink-300 px-2 py-1.5 rounded text-xs font-mono break-all">
                   {enrolling.secret}
                 </code>
                 <button onClick={handleCopySecret}
-                        className="p-1.5 text-gray-500 hover:text-navy" title="Copy">
+                        className="p-1.5 text-ink-500 hover:text-navy" title="Copy">
                   <Copy size={14}/>
                 </button>
               </div>
@@ -130,7 +130,7 @@ export default function Security() {
             </div>
           </div>
 
-          <form onSubmit={handleVerify} className="border-t border-gray-100 pt-4">
+          <form onSubmit={handleVerify} className="border-t border-ink-100 pt-4">
             <label className="block text-sm font-medium text-navy mb-2">
               Verify by entering the current 6-digit code
             </label>
@@ -139,14 +139,14 @@ export default function Security() {
                      autoFocus placeholder="000000"
                      value={verifyCode}
                      onChange={e => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-lg font-mono tracking-[0.4em] text-center"/>
+                     className="flex-1 px-3 py-2 border border-ink-300 rounded-lg text-lg font-mono tracking-[0.4em] text-center"/>
               <button type="submit" disabled={verifying || verifyCode.length !== 6}
-                      className="px-5 py-2 bg-gold hover:bg-gold/90 text-white rounded-lg font-medium disabled:opacity-50">
+                      className="px-5 py-2 bg-gold hover:bg-gold/90 text-navy-dark rounded-lg font-medium disabled:opacity-50">
                 {verifying ? 'Verifying…' : 'Verify & Enable'}
               </button>
             </div>
             <button type="button" onClick={() => { setEnrolling(null); setVerifyCode('') }}
-                    className="text-xs text-gray-500 hover:text-navy mt-3">
+                    className="text-xs text-ink-500 hover:text-navy mt-3">
               Cancel setup
             </button>
           </form>
@@ -160,10 +160,10 @@ export default function Security() {
             </div>
             <div>
               <h2 className="font-display font-bold text-navy">2FA is enabled</h2>
-              <p className="text-sm text-gray-500">Your account is protected by two-factor authentication.</p>
+              <p className="text-sm text-ink-500">Your account is protected by two-factor authentication.</p>
             </div>
           </div>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-ink-600">
             Every login requires the 6-digit code from your authenticator app in addition to your password.
           </p>
           {!showDisable ? (
@@ -180,24 +180,158 @@ export default function Security() {
         // ── NOT ENROLLED ─────────────────────────────────────────────
         <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-              <Shield size={22} className="text-gray-400"/>
+            <div className="w-12 h-12 rounded-full bg-ink-100 flex items-center justify-center">
+              <Shield size={22} className="text-ink-400"/>
             </div>
             <div>
               <h2 className="font-display font-bold text-navy">2FA is not enabled</h2>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-ink-500">
                 Your account uses password-only authentication.
               </p>
             </div>
           </div>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-ink-600">
             Two-factor authentication adds a second step at login: a 6-digit code from your phone's
             authenticator app. Even if someone learns your password, they can't sign in without your phone.
           </p>
           <button onClick={handleSetup}
-                  className="px-5 py-2.5 bg-gold hover:bg-gold/90 text-white rounded-lg font-medium flex items-center gap-2">
+                  className="px-5 py-2.5 bg-gold hover:bg-gold/90 text-navy-dark rounded-lg font-medium flex items-center gap-2">
             <Shield size={14}/> Set up 2FA
           </button>
+        </div>
+      )}
+      {/* ── v10.0: Staff OTP Login (premises lock) ─────────────────── */}
+      {isStaff ? (
+        /* Staff view: shows their OTP status (admin-controlled) */
+        <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center"
+                 style={{ background: user?.require_login_otp ? 'rgba(42,125,95,0.1)' : 'rgba(13,31,45,0.06)' }}>
+              <Lock size={20} color={user?.require_login_otp ? '#1E5C44' : '#0D1F2D'}/>
+            </div>
+            <div>
+              <h2 className="font-display font-bold text-navy">Premises OTP Login</h2>
+              <p className="text-sm text-ink-500">
+                {user?.require_login_otp
+                  ? 'Your login requires a 6-digit OTP from the lodge admin.'
+                  : 'Standard login — no OTP required for your account.'}
+              </p>
+            </div>
+          </div>
+          {user?.require_login_otp ? (
+            <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
+              <ShieldCheck size={15} className="text-green-600 flex-shrink-0 mt-0.5"/>
+              <p className="text-green-700">
+                <strong>Active.</strong> Every time you log in, your lodge admin receives an OTP on
+                their phone. You must enter it to complete login. This ensures only on-premises
+                logins are possible.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-ink-500">
+              Your lodge admin can enable OTP login from the <strong>Users</strong> page.
+              When enabled, each login sends a 6-digit code to the admin's phone.
+            </p>
+          )}
+        </div>
+      ) : isAdmin && (
+        /* Admin view: lodge-wide OTP toggle */
+        <StaffOtpLodgeSetting />
+      )}
+    </div>
+  )
+}
+
+function StaffOtpLodgeSetting() {
+  const { user, isAdmin, isStaff } = useAuth()
+  const [enabled, setEnabled] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving,  setSaving]  = useState(false)
+
+  useEffect(() => {
+    settingsAPI.getAll().then(r => {
+      const s = r.data
+      const val = Array.isArray(s)
+        ? s.find(x => x.key === 'require_staff_otp' || x.setting_key === 'require_staff_otp')
+        : s?.require_staff_otp
+      setEnabled(
+        typeof val === 'object' ? (val?.value || val?.setting_value) === 'true'
+        : String(val) === 'true'
+      )
+    }).catch(() => {}).finally(() => setLoading(false))
+  }, [])
+
+  const toggle = async () => {
+    setSaving(true)
+    const newVal = !enabled
+    try {
+      await settingsAPI.update('require_staff_otp', String(newVal))
+      setEnabled(newVal)
+      toast.success(newVal
+        ? 'OTP login ENABLED lodge-wide. All staff logins now require admin OTP.'
+        : 'OTP login disabled lodge-wide.')
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Failed to update setting')
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center"
+               style={{ background: enabled ? 'rgba(42,125,95,0.1)' : 'rgba(13,31,45,0.06)' }}>
+            <Smartphone size={20} color={enabled ? '#1E5C44' : '#0D1F2D'}/>
+          </div>
+          <div>
+            <h2 className="font-display font-bold text-navy">Staff OTP Login</h2>
+            <p className="text-sm text-ink-500">Premises-lock: require admin approval per staff login</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-bold ${enabled ? 'text-green-600' : 'text-ink-400'}`}>
+            {loading ? '…' : enabled ? 'ENABLED' : 'DISABLED'}
+          </span>
+          <button
+            onClick={toggle}
+            disabled={loading || saving}
+            className={`relative inline-flex h-6 w-11 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+              enabled ? 'bg-green-500' : 'bg-ink-300'
+            }`}>
+            <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transform transition-transform duration-200 m-0.5 ${
+              enabled ? 'translate-x-5' : 'translate-x-0'
+            }`}/>
+          </button>
+        </div>
+      </div>
+
+      {enabled ? (
+        <div className="space-y-3 text-sm">
+          <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-lg p-3">
+            <ShieldCheck size={14} className="text-green-600 mt-0.5 flex-shrink-0"/>
+            <p className="text-green-700">
+              <strong>Active.</strong> Each time any staff member signs in, a 6-digit OTP is sent
+              to the <strong>admin phone</strong> configured in Settings. Staff cannot complete
+              login without this code — preventing access from outside the premises.
+            </p>
+          </div>
+          <p className="text-ink-400 text-xs">
+            You can also enable this per-user from the <a href="/staff" className="text-gold underline font-medium">My Team</a> page.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3 text-sm text-ink-600">
+          <p>
+            When enabled, every staff login triggers an SMS OTP to the lodge admin's phone.
+            The staff member must enter this code to complete sign-in — effectively locking
+            access to on-site, admin-approved logins only.
+          </p>
+          <ul className="list-disc list-inside text-ink-500 space-y-1">
+            <li>OTP valid for 5 minutes only</li>
+            <li>3 wrong attempts lock the login session</li>
+            <li>All OTP events logged in the audit trail</li>
+            <li>Requires admin phone configured in Settings → Notifications</li>
+          </ul>
         </div>
       )}
     </div>
@@ -225,10 +359,10 @@ function DisableForm({ onDone, onCancel }) {
       <input type="password" value={password} autoFocus
              placeholder="Your password"
              onChange={e => setPassword(e.target.value)}
-             className="w-full px-3 py-2 border border-gray-300 rounded-lg"/>
+             className="w-full px-3 py-2 border border-ink-300 rounded-lg"/>
       <div className="flex gap-2">
         <button type="button" onClick={onCancel}
-                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm">Cancel</button>
+                className="px-4 py-2 text-ink-600 hover:bg-ink-100 rounded-lg text-sm">Cancel</button>
         <button type="submit" disabled={loading}
                 className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
           {loading ? '…' : 'Disable 2FA'}

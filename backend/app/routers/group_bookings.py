@@ -134,7 +134,7 @@ def update_group(group_id: int, body: GroupUpdate,
                  GroupBooking.lodge_id == lodge_id).first())
     if not g:
         raise HTTPException(status_code=404, detail="Group not found")
-    fields = body.dict(exclude_unset=True)
+    fields = body.model_dump(exclude_unset=True)
     if "status" in fields and fields["status"] not in ("confirmed", "cancelled", "completed"):
         raise HTTPException(status_code=400, detail="status must be confirmed|cancelled|completed")
     for k, v in fields.items():

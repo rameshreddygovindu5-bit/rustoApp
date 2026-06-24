@@ -1,123 +1,137 @@
 #!/usr/bin/env bash
-# ──────────────────────────────────────────────────────────────────
-#  Rusto — local quickstart
-#
-#  One-command setup for a fresh clone. Runs everything you need to
-#  get the platform on your laptop:
-#    1. Python venv + backend deps (SQLite-only — no Postgres needed)
-#    2. Node deps for the frontend
-#    3. .env file from the example (only if missing)
-#    4. Database migrations + default seed (admin / superadmin users)
-#
-#  After this script finishes:
-#    - Backend:  cd backend && source venv/bin/activate && uvicorn app.main:app --reload
-#    - Frontend: cd frontend && npm run dev
-#    - Open:     http://localhost:3000
-#    - Login:    admin / Admin@1234   (lodge admin)
-#                superadmin / superadmin123  (cross-tenant)
-#
-#  This script is idempotent — safe to re-run. It will skip steps that
-#  are already done.
-# ──────────────────────────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════════════
+# Rusto LMS — Local Quickstart (all 3 portals + backend)
+# Usage:  bash quickstart.sh
+# ════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+CYAN='\033[0;36m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 
-# Pretty print helpers
-GOLD='\033[38;5;221m'; NAVY='\033[38;5;25m'; GREEN='\033[32m'
-RED='\033[31m'; BOLD='\033[1m'; DIM='\033[2m'; RESET='\033[0m'
-say() { printf "${GOLD}▸${RESET} %s\n" "$*"; }
-ok()  { printf "${GREEN}✓${RESET} %s\n" "$*"; }
-warn(){ printf "${RED}!${RESET} %s\n" "$*"; }
+echo ""
+echo -e "${CYAN}════════════════════════════════════════════${NC}"
+echo -e "${CYAN}  Rusto LMS — Full Stack Dev               ${NC}"
+echo -e "${CYAN}════════════════════════════════════════════${NC}"
 
-printf "\n${BOLD}${NAVY}Rusto — Local Quickstart${RESET}\n"
-printf "${DIM}Travel Anywhere. Rest Everywhere.${RESET}\n\n"
+# ── Check prerequisites ──────────────────────────────────────────────
+check_cmd() {
+  command -v "$1" >/dev/null 2>&1 || { echo -e "${RED}✗ $1 not found. $2${NC}"; exit 1; }
+}
+check_cmd python3 "Install Python 3.11+"
+check_cmd node    "Install Node.js 18+ from https://nodejs.org"
+check_cmd npm     "Install Node.js 18+ from https://nodejs.org"
 
-# ── 1. Tool checks ───────────────────────────────────────────────
-say "Checking prerequisites..."
-command -v python3 >/dev/null 2>&1 || { warn "python3 not found. Install Python 3.10+"; exit 1; }
-command -v node >/dev/null 2>&1 || { warn "node not found. Install Node 18+ (https://nodejs.org)"; exit 1; }
-command -v npm >/dev/null 2>&1 || { warn "npm not found"; exit 1; }
-PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-NODE_VER=$(node --version)
-ok "python $PY_VER, node $NODE_VER"
-
-# ── 2. Env file ──────────────────────────────────────────────────
-if [ ! -f .env ]; then
-    say "Creating .env from .env.example (SQLite default — no Postgres needed)"
-    cp .env.example .env
-    ok ".env created"
-else
-    ok ".env already exists, leaving alone"
+# ── Install frontend dependencies ────────────────────────────────────
+cd "$(dirname "$0")/frontend"
+if [ ! -d node_modules ]; then
+  echo -e "${CYAN}Installing frontend dependencies...${NC}"
+  npm install
 fi
+# Ensure concurrently is available
+if ! npm list concurrently >/dev/null 2>&1; then
+  echo -e "${CYAN}Installing concurrently...${NC}"
+  npm install --save-dev concurrently
+fi
+cd ..
 
-# ── 3. Python venv + backend deps ────────────────────────────────
+# ── Install backend dependencies ─────────────────────────────────────
 cd backend
 if [ ! -d venv ]; then
-    say "Creating Python virtual environment..."
-    python3 -m venv venv
+  echo -e "${CYAN}Creating Python venv...${NC}"
+  python3 -m venv venv
 fi
-# shellcheck source=/dev/null
 source venv/bin/activate
-
-# Use the SQLite requirements file (skips psycopg2-binary, which needs
-# libpq-dev system headers to compile on first run).
-say "Installing backend dependencies (SQLite-only — fast path)..."
-pip install --quiet --upgrade pip
-if [ -f requirements_sqlite.txt ]; then
-    pip install --quiet -r requirements_sqlite.txt
-else
-    pip install --quiet -r requirements.txt
-fi
-ok "backend deps installed"
-
-# ── 4. Database init + seed ──────────────────────────────────────
-# auto_migrate runs Base.metadata.create_all + additive migrations +
-# seeds default lodge / RK lodge / admin / rkadmin / superadmin users.
-# All idempotent — re-running just no-ops on already-seeded rows.
-say "Initializing database + seeding defaults..."
-DATABASE_URL="sqlite:///./lodge_lms.db" python3 -c "
-import warnings, logging
-warnings.filterwarnings('ignore')
-logging.getLogger('apscheduler').setLevel(logging.ERROR)
-from app.database import Base, engine
-from app import models
-from app.auto_migrate import run_additive_migrations
-Base.metadata.create_all(bind=engine)
-run_additive_migrations(engine)
-print('  schema ready, defaults seeded')
-"
-ok "database ready"
-
-deactivate
+echo -e "${CYAN}Installing backend dependencies...${NC}"
+pip install -q -r requirements.txt
 cd ..
 
-# ── 5. Frontend deps ─────────────────────────────────────────────
+# ── Kill any processes on our ports ──────────────────────────────────
+for port in 8000 3000 3001 3002; do
+  pid=$(lsof -ti tcp:$port 2>/dev/null || true)
+  if [ -n "$pid" ]; then
+    kill -9 $pid 2>/dev/null || true
+    echo -e "${YELLOW}  Freed port $port${NC}"
+  fi
+done
+sleep 1
+
+# ── Start backend ─────────────────────────────────────────────────────
+echo -e "${CYAN}Starting backend on :8000...${NC}"
+cd backend
+source venv/bin/activate
+DATABASE_URL="sqlite:///lodge_lms.db" \
+  uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload \
+  > /tmp/rusto-backend.log 2>&1 &
+BACKEND_PID=$!
+echo "  Backend PID: $BACKEND_PID"
+cd ..
+
+# Wait for backend ready
+echo -e "${CYAN}Waiting for backend...${NC}"
+for i in $(seq 1 20); do
+  if curl -fsS http://localhost:8000/api/health >/dev/null 2>&1; then
+    echo -e "${GREEN}  ✓ Backend ready${NC}"
+    break
+  fi
+  sleep 1
+done
+
+# ── Start all 3 frontend portals ─────────────────────────────────────
+echo -e "${CYAN}Starting all 3 frontend portals...${NC}"
 cd frontend
-if [ ! -d node_modules ]; then
-    say "Installing frontend dependencies (this can take 1-2 minutes)..."
-    npm install --no-audit --no-fund --loglevel=error
-    ok "frontend deps installed"
-else
-    ok "frontend deps already installed"
-fi
+
+# Combined (port 3000)
+npm run dev -- --port 3000 > /tmp/rusto-fe-combined.log 2>&1 &
+FE_COMBINED=$!
+
+# PMS portal (port 3001)
+npm run dev:pms > /tmp/rusto-fe-pms.log 2>&1 &
+FE_PMS=$!
+
+# Customer portal (port 3002)
+npm run dev:customer > /tmp/rusto-fe-customer.log 2>&1 &
+FE_CUSTOMER=$!
+
+echo "  Combined  PID: $FE_COMBINED"
+echo "  PMS       PID: $FE_PMS"
+echo "  Customer  PID: $FE_CUSTOMER"
 cd ..
 
-# ── 6. Done ──────────────────────────────────────────────────────
-printf "\n${GREEN}${BOLD}✓ Setup complete${RESET}\n\n"
-printf "${BOLD}Run in two terminals:${RESET}\n"
-printf "  ${GOLD}Terminal 1 (backend):${RESET}\n"
-printf "    cd backend\n"
-printf "    source venv/bin/activate\n"
-printf "    uvicorn app.main:app --reload\n\n"
-printf "  ${GOLD}Terminal 2 (frontend):${RESET}\n"
-printf "    cd frontend\n"
-printf "    npm run dev\n\n"
-printf "${BOLD}Then open:${RESET}\n"
-printf "  ${NAVY}http://localhost:3000${RESET}\n\n"
-printf "${BOLD}Default logins:${RESET}\n"
-printf "  Lodge admin:  ${GOLD}admin${RESET} / ${GOLD}Admin@1234${RESET}\n"
-printf "  Super admin:  ${GOLD}superadmin${RESET} / ${GOLD}superadmin123${RESET}\n\n"
-printf "${BOLD}Try lodge registration:${RESET}\n"
-printf "  ${NAVY}http://localhost:3000/register${RESET}  (no login needed)\n\n"
+# Wait for frontends
+sleep 4
+echo -e "${CYAN}Waiting for frontends...${NC}"
+for port in 3000 3001 3002; do
+  for i in $(seq 1 15); do
+    if curl -fsS http://localhost:$port >/dev/null 2>&1; then
+      echo -e "${GREEN}  ✓ Port $port ready${NC}"
+      break
+    fi
+    sleep 1
+  done
+done
+
+# ── Done ──────────────────────────────────────────────────────────────
+echo ""
+echo -e "${GREEN}════════════════════════════════════════════${NC}"
+echo -e "${GREEN}  ✓ All services running!                  ${NC}"
+echo -e "${GREEN}════════════════════════════════════════════${NC}"
+echo ""
+echo -e "  ${YELLOW}PMS Portal${NC}       → ${CYAN}http://localhost:3001${NC}"
+echo -e "  ${YELLOW}Customer Portal${NC}  → ${CYAN}http://localhost:3002${NC}"
+echo -e "  ${YELLOW}Combined Portal${NC}  → ${CYAN}http://localhost:3000${NC}"
+echo -e "  ${YELLOW}API / Swagger${NC}    → ${CYAN}http://localhost:8000/docs${NC}"
+echo ""
+echo -e "  Credentials:"
+echo -e "    ${CYAN}superadmin${NC} / superadmin123    (all lodges)"
+echo -e "    ${CYAN}admin${NC}      / Admin@1234         (lodge admin)"
+echo -e "    ${CYAN}staff1${NC}     / Staff1@1234        (staff)"
+echo -e "    ${CYAN}staff2${NC}     / Staff2@1234        (staff)"
+echo -e "    Customer: phone=${CYAN}9000000000${NC}  password=${CYAN}Demo@1234${NC}"
+echo ""
+echo -e "  Logs: /tmp/rusto-backend.log | /tmp/rusto-fe-*.log"
+echo ""
+echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
+echo ""
+
+# Keep running; trap Ctrl+C to kill all children
+trap "echo ''; echo 'Stopping...'; kill $BACKEND_PID $FE_COMBINED $FE_PMS $FE_CUSTOMER 2>/dev/null; exit 0" INT TERM
+wait

@@ -135,34 +135,34 @@ export default function Import() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-playfair text-2xl font-bold text-navy">Import Customers</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Bulk import guest records from Excel or CSV. Duplicates are detected by phone number.</p>
+          <h1 className="font-display text-2xl font-bold text-navy">Import Customers</h1>
+          <p className="text-sm text-ink-500 mt-0.5">Bulk import guest records from Excel or CSV. Duplicates are detected by phone number.</p>
         </div>
         <button
           onClick={downloadTemplate}
-          className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 border border-ink-200 rounded-xl text-sm text-ink-700 hover:bg-ink-50 transition-colors"
         >
           <Download size={14} /> Download Template
         </button>
       </div>
 
       {/* Stepper */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-ink-100 p-4">
         <div className="flex items-center">
           {STEPS.map((s, i) => (
             <div key={i} className="flex items-center flex-1">
-              <div className={`flex items-center gap-2 ${i <= step ? "text-navy" : "text-gray-400"}`}>
+              <div className={`flex items-center gap-2 ${i <= step ? "text-navy" : "text-ink-400"}`}>
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
                   i < step ? "bg-navy border-navy text-white" :
                   i === step ? "border-navy text-navy" :
-                  "border-gray-200 text-gray-400"
+                  "border-ink-200 text-ink-400"
                 }`}>
                   {i < step ? <CheckCircle size={14} /> : i + 1}
                 </div>
                 <span className="text-sm font-medium hidden sm:block">{s}</span>
               </div>
               {i < STEPS.length - 1 && (
-                <div className={`flex-1 h-0.5 mx-3 ${i < step ? "bg-navy" : "bg-gray-200"}`} />
+                <div className={`flex-1 h-0.5 mx-3 ${i < step ? "bg-navy" : "bg-ink-200"}`} />
               )}
             </div>
           ))}
@@ -177,7 +177,7 @@ export default function Import() {
           onDrop={handleFileDrop}
           onClick={() => fileRef.current.click()}
           className={`bg-white rounded-2xl shadow-sm border-2 border-dashed p-12 text-center cursor-pointer transition-all ${
-            dragOver ? "border-gold bg-amber-50" : "border-gray-200 hover:border-gold hover:bg-gray-50"
+            dragOver ? "border-gold bg-amber-50" : "border-ink-200 hover:border-gold hover:bg-ink-50"
           }`}
         >
           <input
@@ -190,16 +190,16 @@ export default function Import() {
           {loading ? (
             <div>
               <div className="animate-spin w-12 h-12 border-4 border-gold border-t-transparent rounded-full mx-auto mb-4" />
-              <p className="text-gray-500">Parsing file...</p>
+              <p className="text-ink-500">Parsing file...</p>
             </div>
           ) : (
             <>
               <div className="w-16 h-16 bg-navy/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <FileSpreadsheet size={28} className="text-navy" />
               </div>
-              <p className="text-lg font-semibold text-gray-800">Drop your file here</p>
-              <p className="text-sm text-gray-500 mt-1">or click to browse</p>
-              <p className="text-xs text-gray-400 mt-3">Supports .xlsx, .xls, .csv files</p>
+              <p className="text-lg font-semibold text-ink-800">Drop your file here</p>
+              <p className="text-sm text-ink-500 mt-1">or click to browse</p>
+              <p className="text-xs text-ink-400 mt-3">Supports .xlsx, .xls, .csv files</p>
             </>
           )}
         </div>
@@ -215,19 +215,19 @@ export default function Import() {
             </p>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
-              <div className="grid grid-cols-3 gap-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <div className="bg-white rounded-2xl shadow-sm border border-ink-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-ink-100 bg-ink-50">
+              <div className="grid grid-cols-3 gap-4 text-xs font-semibold text-ink-500 uppercase tracking-wider">
                 <span>System Field</span>
                 <span>Required</span>
                 <span>Your Column</span>
               </div>
             </div>
-            <div className="divide-y divide-gray-50">
+            <div className="divide-y divide-ink-100">
               {REQUIRED_FIELDS.map(field => (
                 <div key={field.key} className="px-6 py-3 grid grid-cols-3 gap-4 items-center">
-                  <span className="text-sm font-medium text-gray-800">{field.label}</span>
-                  <span className={`text-xs font-medium ${field.required ? "text-red-600" : "text-gray-400"}`}>
+                  <span className="text-sm font-medium text-ink-800">{field.label}</span>
+                  <span className={`text-xs font-medium ${field.required ? "text-red-600" : "text-ink-400"}`}>
                     {field.required ? "Required" : "Optional"}
                   </span>
                   <select
@@ -236,7 +236,7 @@ export default function Import() {
                     className={`px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:border-gold bg-white ${
                       field.required && !mapping[field.key]
                         ? "border-red-300 bg-red-50"
-                        : "border-gray-200"
+                        : "border-ink-200"
                     }`}
                   >
                     <option value="">— Not mapped —</option>
@@ -251,24 +251,24 @@ export default function Import() {
 
           {/* Preview */}
           {preview.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100">
+            <div className="bg-white rounded-2xl shadow-sm border border-ink-100 overflow-hidden">
+              <div className="px-6 py-4 border-b border-ink-100">
                 <h3 className="font-semibold text-navy text-sm">Preview (first {preview.length} rows)</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-ink-50">
                     <tr>
                       {columns.slice(0, 6).map(c => (
-                        <th key={c} className="text-left px-4 py-2 text-gray-500 font-medium">{c}</th>
+                        <th key={c} className="text-left px-4 py-2 text-ink-500 font-medium">{c}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-ink-100">
                     {preview.map((row, i) => (
                       <tr key={i}>
                         {columns.slice(0, 6).map(c => (
-                          <td key={c} className="px-4 py-2 text-gray-700">{row[c] ?? "—"}</td>
+                          <td key={c} className="px-4 py-2 text-ink-700">{row[c] ?? "—"}</td>
                         ))}
                       </tr>
                     ))}
@@ -279,7 +279,7 @@ export default function Import() {
           )}
 
           <div className="flex gap-3">
-            <button onClick={reset} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50">
+            <button onClick={reset} className="px-4 py-2.5 border border-ink-200 rounded-xl text-sm text-ink-700 hover:bg-ink-50">
               Back
             </button>
             <button
@@ -306,8 +306,8 @@ export default function Import() {
                 {importResult.success > 0 ? <CheckCircle size={24} className="text-white" /> : <XCircle size={24} className="text-white" />}
               </div>
               <div>
-                <h3 className="font-playfair text-xl font-bold text-gray-900">Import Complete</h3>
-                <p className="text-sm text-gray-600">{importResult.total} rows processed</p>
+                <h3 className="font-display text-xl font-bold text-navy">Import Complete</h3>
+                <p className="text-sm text-ink-600">{importResult.total} rows processed</p>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -318,14 +318,14 @@ export default function Import() {
           </div>
 
           {importResult.errors?.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 bg-red-50">
+            <div className="bg-white rounded-2xl shadow-sm border border-ink-100 overflow-hidden">
+              <div className="px-6 py-4 border-b border-ink-100 bg-red-50">
                 <h3 className="font-semibold text-red-700 text-sm">Error Details ({importResult.errors.length} rows)</h3>
               </div>
-              <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+              <div className="divide-y divide-ink-100 max-h-64 overflow-y-auto">
                 {importResult.errors.map((err, i) => (
                   <div key={i} className="px-6 py-3 flex items-start gap-3">
-                    <span className="text-xs font-medium text-gray-400 mt-0.5 whitespace-nowrap">Row {err.row}</span>
+                    <span className="text-xs font-medium text-ink-400 mt-0.5 whitespace-nowrap">Row {err.row}</span>
                     <span className="text-sm text-red-600">{err.reason || err.message || 'Unknown error'}</span>
                   </div>
                 ))}
@@ -346,8 +346,8 @@ function ResultStat({ label, value, color }) {
   const colors = { green: "text-green-700", amber: "text-amber-700", red: "text-red-700" };
   return (
     <div className="text-center">
-      <p className={`text-3xl font-playfair font-bold ${colors[color]}`}>{value}</p>
-      <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+      <p className={`text-3xl font-display font-bold ${colors[color]}`}>{value}</p>
+      <p className="text-xs text-ink-500 mt-0.5">{label}</p>
     </div>
   );
 }

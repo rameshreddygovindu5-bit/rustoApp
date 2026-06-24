@@ -16,12 +16,19 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from ..database import get_db
 from ..models import (ShiftSession, ShiftStatus, Expense, Invoice, PaymentMethod)
 from ..auth import get_current_user, resolve_lodge_scope
+from ..permissions import require_permission
 from ..services.audit_service import log_audit
 
 router = APIRouter(prefix="/api/shifts", tags=["shifts"])
@@ -53,7 +60,7 @@ def _compute_cash_in_out(db: Session, shift: ShiftSession) -> tuple[float, float
     the Checkin (no PaymentMethod enum), so we case-insensitively match
     'cash'.
     """
-    end_time = shift.closed_at or datetime.utcnow()
+    end_time = shift.closed_at or _utcnow()
     cash_in_q = (db.query(func.coalesce(func.sum(Invoice.total_amount), 0))
                  .filter(Invoice.lodge_id == shift.lodge_id,
                          Invoice.created_at >= shift.opened_at,
@@ -73,7 +80,7 @@ def _compute_cash_in_out(db: Session, shift: ShiftSession) -> tuple[float, float
     return cash_in, cash_out
 
 
-@router.get("/current")
+@router.get("/current", dependencies=[Depends(require_permission("shifts.read"))])
 def current_shift(db: Session = Depends(get_db),
                   current_user=Depends(get_current_user),
                   lodge_id: int = Depends(resolve_lodge_scope)):
@@ -97,7 +104,7 @@ def current_shift(db: Session = Depends(get_db),
     return out
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(require_permission("shifts.read"))])
 def list_shifts(limit: int = 50,
                 db: Session = Depends(get_db),
                 current_user=Depends(get_current_user),
@@ -114,7 +121,7 @@ class OpenRequest(BaseModel):
     opening_balance: float
 
 
-@router.post("/open")
+@router.post("/open", dependencies=[Depends(require_permission("shifts.write"))])
 def open_shift(body: OpenRequest, request: Request,
                db: Session = Depends(get_db),
                current_user=Depends(get_current_user),
@@ -156,7 +163,7 @@ class CloseRequest(BaseModel):
     handover_notes: Optional[str] = None
 
 
-@router.post("/close")
+@router.post("/close", dependencies=[Depends(require_permission("shifts.write"))])
 def close_shift(body: CloseRequest, request: Request,
                 db: Session = Depends(get_db),
                 current_user=Depends(get_current_user),
@@ -176,7 +183,7 @@ def close_shift(body: CloseRequest, request: Request,
     discrepancy = body.closing_balance - expected
 
     shift.status = ShiftStatus.closed
-    shift.closed_at = datetime.utcnow()
+    shift.closed_at = _utcnow()
     shift.closing_balance = Decimal(str(body.closing_balance))
     shift.expected_closing_balance = Decimal(str(round(expected, 2)))
     shift.discrepancy = Decimal(str(round(discrepancy, 2)))

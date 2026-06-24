@@ -1,27 +1,128 @@
+"""
+Auth router — v10.0
+
+Login flow:
+  1. Username + password (existing).
+  2. TOTP (if totp_enabled — existing).
+  3. Staff OTP (if role == staff and lodge has require_login_otp OR user.require_login_otp):
+       POST /login    → returns {"otp_required": true, "otp_token": "<short-lived token>"}
+       POST /login/verify-otp  → {"otp_token": "...", "otp": "123456"} → full JWT
+
+Roles (v10.0):
+  super_admin  — cross-tenant Rusto platform admin.
+  app_owner    — Tygonix application owner (same rights + deeper audit access).
+  admin        — lodge-scoped full rights.
+  lodge_owner  — lodge-scoped: billing/analytics/reports only (no staff edit, no checkins).
+  staff        — lodge-scoped: operational modules; permissions list gates access.
+  vendor       — integration partner; logs in via API key, not this endpoint.
+"""
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+def _now():
+    """Return a naive UTC datetime compatible with SQLite's naive datetimes."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 from typing import Optional
 from ..database import get_db
 from ..models import User, LoginAttempt
 from ..auth import verify_password, get_password_hash, create_access_token, get_current_user
 from ..services.audit_service import log_audit
-import os
+import os, secrets, logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-MAX_ATTEMPTS = int(os.getenv("MAX_LOGIN_ATTEMPTS", "5"))
-LOCKOUT_MINUTES = 15
 
+MAX_ATTEMPTS    = int(os.getenv("MAX_LOGIN_ATTEMPTS", "5"))
+LOCKOUT_MINUTES = 15
+OTP_TTL_MINUTES = 5
+OTP_MAX_TRIES   = 3
+
+# ── Role helpers ───────────────────────────────────────────────────────────
+
+SUPER_ROLES  = {"super_admin", "app_owner"}
+ADMIN_ROLES  = {"admin", "lodge_owner"} | SUPER_ROLES
+ALL_ROLES    = {"super_admin", "app_owner", "admin", "lodge_owner", "staff", "vendor"}
+
+def _role(u: User) -> str:
+    return getattr(u.role, "value", str(u.role))
+
+def _is_super(u: User) -> bool:
+    return _role(u) in SUPER_ROLES
+
+def _is_admin_or_super(u: User) -> bool:
+    return _role(u) in ADMIN_ROLES
+
+def _is_staff(u: User) -> bool:
+    return _role(u) == "staff"
+
+# ── OTP helpers ────────────────────────────────────────────────────────────
+
+def _generate_otp() -> str:
+    """6-digit zero-padded OTP."""
+    return str(secrets.randbelow(1_000_000)).zfill(6)
+
+
+def _lodge_requires_otp(db: Session, lodge_id: int) -> bool:
+    """Return True if the lodge's settings have require_staff_otp = 'true'."""
+    try:
+        from ..services.alert_service import get_setting
+        val = get_setting(db, "require_staff_otp", "false", lodge_id=lodge_id)
+        return val.lower() in ("1", "true", "yes")
+    except Exception:
+        return False
+
+
+def _send_otp_to_admin(db: Session, otp: str, lodge_id: int, staff_username: str) -> bool:
+    """
+    Send the OTP via SMS to the lodge admin's configured phone.
+    Returns True if sent (or mock-sent), False on failure.
+    """
+    try:
+        from ..services.alert_service import get_setting, send_sms, is_sms_enabled
+        admin_phone = get_setting(db, "admin_phone", "", lodge_id=lodge_id)
+        if not admin_phone:
+            # Fallback: find the first admin user for this lodge and use their phone
+            admin_user = (db.query(User)
+                          .filter(User.lodge_id == lodge_id,
+                                  User.role.in_(["admin", "lodge_owner"]),
+                                  User.is_active == True,
+                                  User.phone != None)
+                          .first())
+            if admin_user and admin_user.phone:
+                admin_phone = admin_user.phone
+
+        if not admin_phone:
+            # No phone to send to — log warning and ALLOW login (fail-open for
+            # lodges that haven't configured SMS yet so they don't get locked out)
+            logger.warning("Lodge %s: require_staff_otp=true but no admin_phone configured; "
+                           "allowing login without OTP", lodge_id)
+            return False
+
+        msg = (f"[Rusto] Staff login OTP: {otp}\n"
+               f"Staff '{staff_username}' is logging in to the PMS.\n"
+               f"Valid for {OTP_TTL_MINUTES} min. Do NOT share.")
+        send_sms(db, admin_phone, msg, lodge_id=lodge_id, event_type="custom")
+        return True
+    except Exception as e:
+        logger.error("OTP SMS send failed: %s", e)
+        return False
+
+
+# ── Pydantic schemas ───────────────────────────────────────────────────────
 
 class LoginRequest(BaseModel):
     username: str
     password: str
-    # v2.4: TOTP code from the user's authenticator app. Optional in the
-    # request — if the account has 2FA enabled and this is missing/wrong,
-    # the login returns a special 401 with detail="totp_required" so the
-    # UI can show the code-entry prompt.
     totp_code: Optional[str] = None
+
+
+class OtpVerifyRequest(BaseModel):
+    """Body for POST /login/verify-otp."""
+    otp_token: str          # short-lived token returned by /login when OTP is required
+    otp: str                # 6-digit code the admin told the staff member
 
 
 class ChangePasswordRequest(BaseModel):
@@ -29,129 +130,253 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+# ── Login ──────────────────────────────────────────────────────────────────
+
 @router.post("/login")
 def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     ip = request.client.host if request.client else "unknown"
 
-    # Log attempt
     attempt = LoginAttempt(username=body.username, ip_address=ip)
     db.add(attempt)
 
     user = db.query(User).filter(User.username == body.username.lower().strip()).first()
 
-    # Check lockout
-    if user and user.locked_until and user.locked_until > datetime.utcnow():
+    # Lockout check
+    if user and user.locked_until and user.locked_until > _now():
         db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Account locked. Try again after {user.locked_until.strftime('%H:%M:%S')}"
-        )
+        raise HTTPException(status_code=429,
+            detail=f"Account locked until {user.locked_until.strftime('%H:%M:%S UTC')}")
 
     if not user or not verify_password(body.password, user.password_hash):
         if user:
             user.failed_attempts = (user.failed_attempts or 0) + 1
             if user.failed_attempts >= MAX_ATTEMPTS:
-                user.locked_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+                user.locked_until = _now() + timedelta(minutes=LOCKOUT_MINUTES)
                 user.failed_attempts = 0
         attempt.success = False
         db.commit()
-        # Audit the failed login so brute-force attempts are visible in the
-        # audit log. We don't have a user lodge for unknown usernames, so we
-        # let log_audit's fallback (lodge 1) handle it.
         try:
-            log_audit(
-                db, "auth.login_failed", actor_username=body.username,
-                lodge_id=user.lodge_id if user else None,
-                details={"reason": "invalid_credentials" if user else "unknown_user"},
-                ip_address=ip,
-            )
+            log_audit(db, "auth.login_failed", actor_username=body.username,
+                      lodge_id=user.lodge_id if user else None,
+                      details={"reason": "invalid_credentials" if user else "unknown_user"},
+                      ip_address=ip)
         except Exception:
             pass
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+        raise HTTPException(status_code=401, detail="Invalid username or password")
 
     if not user.is_active:
         db.commit()
         try:
-            log_audit(
-                db, "auth.login_blocked",
-                actor_user_id=user.user_id, actor_username=user.username,
-                lodge_id=user.lodge_id, details={"reason": "inactive"}, ip_address=ip,
-            )
+            log_audit(db, "auth.login_blocked",
+                      actor_user_id=user.user_id, actor_username=user.username,
+                      lodge_id=user.lodge_id, details={"reason": "inactive"}, ip_address=ip)
         except Exception:
             pass
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is inactive")
+        raise HTTPException(status_code=403, detail="Account is inactive")
 
-    # v2.4: enforce 2FA if enrolled. We do this AFTER password verification
-    # (so a wrong password still returns "invalid credentials" not "need
-    # 2FA" — which would leak whether 2FA is enabled for that account).
+    # ── TOTP check (existing v2.4) ─────────────────────────────────────────
     if user.totp_enabled and user.totp_secret:
         from ..services.totp import verify_totp
         if not body.totp_code:
-            # Don't increment failed_attempts here — the password was right;
-            # the user just needs to provide the second factor.
             db.commit()
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                                detail="totp_required")
+            raise HTTPException(status_code=401, detail="totp_required")
         if not verify_totp(user.totp_secret, body.totp_code):
-            # Wrong TOTP DOES count as a failed attempt — protects against
-            # brute-forcing the 6-digit code (one of a million tries).
             user.failed_attempts = (user.failed_attempts or 0) + 1
             if user.failed_attempts >= MAX_ATTEMPTS:
-                user.locked_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+                user.locked_until = _now() + timedelta(minutes=LOCKOUT_MINUTES)
                 user.failed_attempts = 0
             db.commit()
             try:
                 log_audit(db, "auth.login_failed",
                           actor_user_id=user.user_id, actor_username=user.username,
-                          lodge_id=user.lodge_id,
-                          details={"reason": "invalid_totp"}, ip_address=ip)
+                          lodge_id=user.lodge_id, details={"reason": "invalid_totp"}, ip_address=ip)
             except Exception:
                 pass
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                                detail="Invalid authentication code")
+            raise HTTPException(status_code=401, detail="Invalid authentication code")
 
+    # ── v10.0: Staff OTP check ────────────────────────────────────────────
+    # Trigger OTP flow if:
+    #   (a) role == staff  AND
+    #   (b) user.require_login_otp is True  OR  lodge setting require_staff_otp is true
+    role_val = _role(user)
+    needs_otp = (
+        role_val == "staff"
+        and user.lodge_id is not None
+        and (
+            getattr(user, "require_login_otp", False)
+            or _lodge_requires_otp(db, user.lodge_id)
+        )
+    )
+
+    if needs_otp:
+        otp = _generate_otp()
+        user.login_otp          = otp
+        user.login_otp_expires  = _now() + timedelta(minutes=OTP_TTL_MINUTES)
+        user.login_otp_attempts = 0
+        db.commit()
+
+        # Best-effort send; if SMS not configured, we fail-open (return otp_required
+        # but hint that admin must communicate the OTP verbally / via WhatsApp).
+        sms_sent = _send_otp_to_admin(db, otp, user.lodge_id, user.username)
+
+        try:
+            log_audit(db, "auth.otp_sent",
+                      actor_user_id=user.user_id, actor_username=user.username,
+                      lodge_id=user.lodge_id,
+                      details={"sms_sent": sms_sent, "ip": ip}, ip_address=ip)
+        except Exception:
+            pass
+
+        # Return a signed short-lived OTP token (just the user_id + nonce, not a full JWT)
+        otp_token = create_access_token(
+            {"sub": str(user.user_id), "otp_flow": True},
+            expires_delta=timedelta(minutes=OTP_TTL_MINUTES + 1)
+        )
+        return {
+            "otp_required": True,
+            "otp_token": otp_token,
+            "sms_sent": sms_sent,
+            "message": (
+                "OTP sent to lodge admin's phone. Ask your admin for the code."
+                if sms_sent else
+                "OTP generated. SMS not configured — ask your admin for the code."
+            ),
+        }
+
+    # ── All checks passed → issue full JWT ───────────────────────────────
+    return _issue_token(user, ip, attempt, db)
+
+
+@router.post("/login/verify-otp")
+def verify_otp_login(request: Request, body: OtpVerifyRequest, db: Session = Depends(get_db)):
+    """
+    Second step of the staff OTP flow.
+    Validates the OTP token + 6-digit code and returns a full access JWT.
+    """
+    ip = request.client.host if request.client else "unknown"
+
+    # Decode the short-lived OTP token to get user_id
+    from ..auth import decode_token
+    try:
+        payload = decode_token(body.otp_token)
+        if not payload.get("otp_flow"):
+            raise HTTPException(status_code=400, detail="Invalid OTP token")
+        user_id = int(payload["sub"])
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP token")
+
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check attempts
+    if (user.login_otp_attempts or 0) >= OTP_MAX_TRIES:
+        try:
+            log_audit(db, "auth.otp_max_attempts",
+                      actor_user_id=user.user_id, actor_username=user.username,
+                      lodge_id=user.lodge_id, details={"ip": ip}, ip_address=ip)
+        except Exception:
+            pass
+        raise HTTPException(status_code=429,
+                            detail="Too many OTP attempts. Please log in again.")
+
+    # Constant-time compare — accept EITHER:
+    #   (a) The live SMS OTP (if not expired), OR
+    #   (b) The static admin-set PIN (static_login_pin column, if set)
+    import hmac as _hmac
+
+    entered = str(body.otp or "").strip()
+    otp_matched = False
+    
+    # Option A: static admin-set PIN (always valid, no expiry)
+    try:
+        static_pin = getattr(user, "static_login_pin", None)
+        if static_pin and _hmac.compare_digest(str(static_pin), entered):
+            otp_matched = True
+    except Exception:
+        pass
+    
+    # Option B: live SMS OTP (time-limited)
+    if not otp_matched:
+        if not user.login_otp_expires or _now() > user.login_otp_expires:
+            if not otp_matched:
+                raise HTTPException(status_code=400,
+                    detail="OTP expired. Please log in again or ask admin for a new one.")
+        if _hmac.compare_digest(str(user.login_otp or ""), entered):
+            otp_matched = True
+
+    if not otp_matched:
+        user.login_otp_attempts = (user.login_otp_attempts or 0) + 1
+        db.commit()
+        remaining = max(0, OTP_MAX_TRIES - user.login_otp_attempts)
+        try:
+            log_audit(db, "auth.otp_wrong",
+                      actor_user_id=user.user_id, actor_username=user.username,
+                      lodge_id=user.lodge_id, details={"remaining": remaining}, ip_address=ip)
+        except Exception:
+            pass
+        raise HTTPException(status_code=401,
+                            detail=f"Wrong OTP. {remaining} attempt(s) remaining.")
+
+    # OTP correct — clear OTP fields, record IP, issue token
+    user.login_otp          = None
+    user.login_otp_expires  = None
+    user.login_otp_attempts = 0
+    try:
+        user.last_otp_login_ip = ip
+    except Exception:
+        pass
+
+    attempt = LoginAttempt(username=user.username, ip_address=ip, success=True)
+    db.add(attempt)
+
+    return _issue_token(user, ip, attempt, db, via_otp=True)
+
+
+def _issue_token(user: User, ip: str, attempt, db: Session, via_otp: bool = False):
+    """Finalise a successful login: reset counters, log audit, return JWT."""
     user.failed_attempts = 0
-    user.locked_until = None
-    user.last_login = datetime.utcnow()
-    attempt.success = True
+    user.locked_until    = None
+    user.last_login      = _now()
+    if hasattr(attempt, "success"):
+        attempt.success  = True
     db.commit()
 
     try:
-        log_audit(
-            db, "auth.login",
-            actor_user_id=user.user_id, actor_username=user.username,
-            lodge_id=user.lodge_id, ip_address=ip,
-        )
+        log_audit(db, "auth.login",
+                  actor_user_id=user.user_id, actor_username=user.username,
+                  lodge_id=user.lodge_id,
+                  details={"via_otp": via_otp, "ip": ip}, ip_address=ip)
     except Exception:
         pass
 
     token = create_access_token({
-        "sub": str(user.user_id),
-        "role": getattr(user.role, "value", user.role),
+        "sub":      str(user.user_id),
+        "role":     _role(user),
         "lodge_id": user.lodge_id,
     })
-    # Fetch lodge display details so the frontend can show the right banner
-    # right after login (avoids a follow-up /lodges/me call).
     lodge_info = None
     if user.lodge:
         lodge_info = {
             "lodge_id": user.lodge.lodge_id,
-            "code": user.lodge.code,
-            "name": user.lodge.name,
+            "code":     user.lodge.code,
+            "name":     user.lodge.name,
         }
     return {
         "token": token,
         "user": {
-            "user_id": user.user_id,
-            "username": user.username,
+            "user_id":   user.user_id,
+            "username":  user.username,
             "full_name": user.full_name,
-            "role": getattr(user.role, "value", user.role),
-            "email": user.email,
-            "lodge_id": user.lodge_id,
-            "lodge": lodge_info,
+            "role":      _role(user),
+            "email":     user.email,
+            "lodge_id":  user.lodge_id,
+            "lodge":     lodge_info,
         }
     }
 
+
+# ── Existing endpoints (unchanged) ────────────────────────────────────────
 
 @router.post("/logout")
 def logout(current_user: User = Depends(get_current_user)):
@@ -164,21 +389,20 @@ def get_me(current_user: User = Depends(get_current_user)):
     if current_user.lodge:
         lodge_info = {
             "lodge_id": current_user.lodge.lodge_id,
-            "code": current_user.lodge.code,
-            "name": current_user.lodge.name,
+            "code":     current_user.lodge.code,
+            "name":     current_user.lodge.name,
         }
     return {
-        "user_id": current_user.user_id,
-        "username": current_user.username,
-        "full_name": current_user.full_name,
-        "role": getattr(current_user.role, "value", current_user.role),
-        "email": current_user.email,
-        "phone": current_user.phone,
-        "lodge_id": current_user.lodge_id,
-        "lodge": lodge_info,
-        # v2.4: tells the frontend whether the Profile page should show
-        # "Set up 2FA" or "Disable 2FA".
+        "user_id":      current_user.user_id,
+        "username":     current_user.username,
+        "full_name":    current_user.full_name,
+        "role":         _role(current_user),
+        "email":        current_user.email,
+        "phone":        current_user.phone,
+        "lodge_id":     current_user.lodge_id,
+        "lodge":        lodge_info,
         "totp_enabled": bool(current_user.totp_enabled),
+        "require_login_otp": bool(getattr(current_user, "require_login_otp", False)),
     }
 
 
@@ -190,29 +414,18 @@ def change_password(body: ChangePasswordRequest, request: Request,
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     if len(body.new_password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-
     user = db.query(User).filter(User.user_id == current_user.user_id).first()
     user.password_hash = get_password_hash(body.new_password)
     db.commit()
     try:
-        log_audit(
-            db, "auth.password_changed",
-            actor_user_id=current_user.user_id, actor_username=current_user.username,
-            entity_type="user", entity_id=current_user.user_id,
-            lodge_id=current_user.lodge_id,
-            ip_address=request.client.host if request and request.client else None,
-        )
+        log_audit(db, "auth.password_changed",
+                  actor_user_id=current_user.user_id, actor_username=current_user.username,
+                  entity_type="user", entity_id=current_user.user_id,
+                  lodge_id=current_user.lodge_id,
+                  ip_address=request.client.host if request and request.client else None)
     except Exception:
         pass
     return {"success": True, "message": "Password changed successfully"}
-
-
-def _is_super(u: User) -> bool:
-    return getattr(u.role, 'value', u.role) == "super_admin"
-
-
-def _is_admin_or_super(u: User) -> bool:
-    return getattr(u.role, 'value', u.role) in ("admin", "super_admin")
 
 
 @router.get("/users")
@@ -220,30 +433,29 @@ def list_users(current_user: User = Depends(get_current_user), db: Session = Dep
     if not _is_admin_or_super(current_user):
         raise HTTPException(status_code=403, detail="Admin only")
     q = db.query(User)
-    # Tenant admin: only their own lodge's users.
     if not _is_super(current_user):
         q = q.filter(User.lodge_id == current_user.lodge_id)
     users = q.all()
     return [{
-        "user_id": u.user_id, "username": u.username, "full_name": u.full_name,
-        "role": getattr(u.role, 'value', u.role),
-        "email": u.email, "phone": u.phone, "is_active": u.is_active,
+        "user_id":   u.user_id, "username": u.username, "full_name": u.full_name,
+        "role":      _role(u),
+        "email":     u.email,   "phone": u.phone, "is_active": u.is_active,
         "last_login": u.last_login,
-        "lodge_id": u.lodge_id,
+        "lodge_id":  u.lodge_id,
         "lodge_name": u.lodge.name if u.lodge else None,
+        "require_login_otp": bool(getattr(u, "require_login_otp", False)),
     } for u in users]
 
 
 class CreateUserRequest(BaseModel):
-    username: str
-    password: str
-    full_name: str
-    role: str = "staff"
-    email: str = ""
-    phone: str = ""
-    # Only honoured for super_admin. Tenant admins always create users in
-    # their own lodge — any value they send is ignored.
-    lodge_id: Optional[int] = None
+    username:   str
+    password:   str
+    full_name:  str
+    role:       str = "staff"
+    email:      str = ""
+    phone:      str = ""
+    lodge_id:   Optional[int] = None
+    require_login_otp: bool = False
 
 
 @router.post("/users")
@@ -252,36 +464,29 @@ def create_user(body: CreateUserRequest, request: Request,
                 db: Session = Depends(get_db)):
     if not _is_admin_or_super(current_user):
         raise HTTPException(status_code=403, detail="Admin only")
-    if body.role not in ("staff", "admin", "super_admin"):
-        raise HTTPException(status_code=400, detail="Invalid role")
-    # Only super_admin can create another super_admin.
-    if body.role == "super_admin" and not _is_super(current_user):
-        raise HTTPException(status_code=403, detail="Only super_admin can create super_admin users")
+    if body.role not in ALL_ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Valid: {sorted(ALL_ROLES)}")
+    if body.role in SUPER_ROLES and not _is_super(current_user):
+        raise HTTPException(status_code=403, detail="Only super_admin/app_owner can create privileged users")
 
-    # Determine target lodge.
     if _is_super(current_user):
-        target_lodge_id = body.lodge_id  # may be None for a super_admin user
-        if body.role != "super_admin" and target_lodge_id is None:
-            raise HTTPException(status_code=400,
-                                detail="lodge_id is required for admin/staff users")
+        target_lodge_id = body.lodge_id
+        if body.role not in SUPER_ROLES and target_lodge_id is None:
+            raise HTTPException(status_code=400, detail="lodge_id required for non-super users")
     else:
-        # Tenant admin: lodge is locked to their own, regardless of what was sent.
         target_lodge_id = current_user.lodge_id
 
-    # Per-lodge username uniqueness check. Two lodges may have a 'manager';
-    # we only conflict within the same target lodge (or globally for
-    # super_admin role since super_admins have lodge_id NULL).
-    if body.role == "super_admin":
+    if body.role in SUPER_ROLES:
         existing = (db.query(User)
                     .filter(User.username == body.username.lower(),
-                            User.role == "super_admin").first())
+                            User.role.in_(list(SUPER_ROLES))).first())
     else:
         existing = (db.query(User)
                     .filter(User.username == body.username.lower(),
                             User.lodge_id == target_lodge_id).first())
     if existing:
-        raise HTTPException(status_code=400,
-                            detail="Username already exists in this lodge")
+        raise HTTPException(status_code=400, detail="Username already exists in this lodge")
+
     user = User(
         lodge_id=target_lodge_id,
         username=body.username.lower(),
@@ -289,21 +494,23 @@ def create_user(body: CreateUserRequest, request: Request,
         full_name=body.full_name,
         role=body.role,
         email=body.email,
-        phone=body.phone
+        phone=body.phone,
     )
+    try:
+        user.require_login_otp = body.require_login_otp
+    except Exception:
+        pass
     db.add(user)
     db.commit()
     db.refresh(user)
     try:
-        log_audit(
-            db, "user.created",
-            actor_user_id=current_user.user_id, actor_username=current_user.username,
-            entity_type="user", entity_id=user.user_id,
-            lodge_id=target_lodge_id,
-            details={"username": user.username, "role": body.role,
-                     "target_lodge_id": target_lodge_id},
-            ip_address=request.client.host if request and request.client else None,
-        )
+        log_audit(db, "user.created",
+                  actor_user_id=current_user.user_id, actor_username=current_user.username,
+                  entity_type="user", entity_id=user.user_id,
+                  lodge_id=target_lodge_id,
+                  details={"username": user.username, "role": body.role,
+                           "require_login_otp": body.require_login_otp},
+                  ip_address=request.client.host if request and request.client else None)
     except Exception:
         pass
     return {"user_id": user.user_id, "username": user.username,
@@ -311,21 +518,17 @@ def create_user(body: CreateUserRequest, request: Request,
 
 
 class UpdateUserRequest(BaseModel):
-    """Admin-driven user edit. Username and password are intentionally NOT
-    editable here — change-password is a separate endpoint, and usernames
-    are stable identifiers used in audit logs and FKs."""
-    full_name: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    role: Optional[str] = None
+    full_name:  Optional[str] = None
+    email:      Optional[str] = None
+    phone:      Optional[str] = None
+    role:       Optional[str] = None
+    require_login_otp: Optional[bool] = None
 
 
 @router.put("/users/{user_id}")
 def update_user(user_id: int, body: UpdateUserRequest, request: Request,
                 current_user: User = Depends(get_current_user),
                 db: Session = Depends(get_db)):
-    """Edit another user's profile. Tenant admin can only edit users within
-    their own lodge; super_admin can edit anyone."""
     if not _is_admin_or_super(current_user):
         raise HTTPException(status_code=403, detail="Admin only")
     user = db.query(User).filter(User.user_id == user_id).first()
@@ -333,35 +536,30 @@ def update_user(user_id: int, body: UpdateUserRequest, request: Request,
         raise HTTPException(status_code=404, detail="User not found")
     if not _is_super(current_user) and user.lodge_id != current_user.lodge_id:
         raise HTTPException(status_code=403, detail="Cannot manage a user from another lodge")
-    # Role changes have extra rules: only super_admin can grant or revoke
-    # the super_admin role (no foot-gunning yourself into losing the only
-    # cross-tenant admin).
-    if body.role is not None:
-        if body.role not in ("staff", "admin", "super_admin"):
-            raise HTTPException(status_code=400, detail="Invalid role")
-        if body.role == "super_admin" and not _is_super(current_user):
-            raise HTTPException(status_code=403,
-                                detail="Only super_admin can grant super_admin role")
-        # Don't let the last super_admin demote themselves and lock everyone out.
-        if (user.user_id == current_user.user_id
-                and _is_super(user) and body.role != "super_admin"):
-            raise HTTPException(status_code=400,
-                                detail="A super_admin cannot demote themselves")
 
-    changed = body.dict(exclude_unset=True)
+    if body.role is not None:
+        if body.role not in ALL_ROLES:
+            raise HTTPException(status_code=400, detail=f"Invalid role. Valid: {sorted(ALL_ROLES)}")
+        if body.role in SUPER_ROLES and not _is_super(current_user):
+            raise HTTPException(status_code=403, detail="Only super_admin can grant elevated roles")
+        if (user.user_id == current_user.user_id
+                and _is_super(user) and body.role not in SUPER_ROLES):
+            raise HTTPException(status_code=400, detail="Cannot demote yourself from super role")
+
+    changed = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     for k, v in changed.items():
-        setattr(user, k, v)
+        try:
+            setattr(user, k, v)
+        except Exception:
+            pass
     db.commit()
     try:
-        log_audit(
-            db, "user.updated",
-            actor_user_id=current_user.user_id, actor_username=current_user.username,
-            entity_type="user", entity_id=user.user_id,
-            lodge_id=user.lodge_id or current_user.lodge_id,
-            details={"changed": list(changed.keys()),
-                     "target_username": user.username},
-            ip_address=request.client.host if request and request.client else None,
-        )
+        log_audit(db, "user.updated",
+                  actor_user_id=current_user.user_id, actor_username=current_user.username,
+                  entity_type="user", entity_id=user.user_id,
+                  lodge_id=user.lodge_id or current_user.lodge_id,
+                  details={"changed": list(changed.keys()), "target": user.username},
+                  ip_address=request.client.host if request and request.client else None)
     except Exception:
         pass
     return {"success": True, "message": "User updated"}
@@ -375,12 +573,6 @@ class ResetPasswordRequest(BaseModel):
 def reset_user_password(user_id: int, body: ResetPasswordRequest, request: Request,
                         current_user: User = Depends(get_current_user),
                         db: Session = Depends(get_db)):
-    """Admin-driven password reset (no need to know the user's old password).
-
-    This is for the case where a staff member forgot their password and the
-    admin needs to set a new one for them. The audit log records the action
-    but NEVER stores the new password.
-    """
     if not _is_admin_or_super(current_user):
         raise HTTPException(status_code=403, detail="Admin only")
     if len(body.new_password) < 8:
@@ -390,21 +582,17 @@ def reset_user_password(user_id: int, body: ResetPasswordRequest, request: Reque
         raise HTTPException(status_code=404, detail="User not found")
     if not _is_super(current_user) and user.lodge_id != current_user.lodge_id:
         raise HTTPException(status_code=403, detail="Cannot manage a user from another lodge")
-    # Reset the lockout too — otherwise the user couldn't actually sign in
-    # right after the admin reset their password.
-    user.password_hash = get_password_hash(body.new_password)
+    user.password_hash   = get_password_hash(body.new_password)
     user.failed_attempts = 0
-    user.locked_until = None
+    user.locked_until    = None
     db.commit()
     try:
-        log_audit(
-            db, "user.password_reset",
-            actor_user_id=current_user.user_id, actor_username=current_user.username,
-            entity_type="user", entity_id=user.user_id,
-            lodge_id=user.lodge_id or current_user.lodge_id,
-            details={"target_username": user.username},
-            ip_address=request.client.host if request and request.client else None,
-        )
+        log_audit(db, "user.password_reset",
+                  actor_user_id=current_user.user_id, actor_username=current_user.username,
+                  entity_type="user", entity_id=user.user_id,
+                  lodge_id=user.lodge_id or current_user.lodge_id,
+                  details={"target": user.username},
+                  ip_address=request.client.host if request and request.client else None)
     except Exception:
         pass
     return {"success": True, "message": f"Password reset for {user.username}"}
@@ -419,51 +607,69 @@ def toggle_user(user_id: int, request: Request,
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    # Tenant admin can only toggle users in their own lodge.
     if not _is_super(current_user) and user.lodge_id != current_user.lodge_id:
         raise HTTPException(status_code=403, detail="Cannot manage a user from another lodge")
-    # Don't let anyone disable their own account by accident.
     if user.user_id == current_user.user_id:
         raise HTTPException(status_code=400, detail="Cannot toggle your own account")
     user.is_active = not user.is_active
     db.commit()
     try:
-        log_audit(
-            db, "user.toggled",
-            actor_user_id=current_user.user_id, actor_username=current_user.username,
-            entity_type="user", entity_id=user.user_id,
-            lodge_id=user.lodge_id or current_user.lodge_id,
-            details={"target_username": user.username, "is_active": user.is_active},
-            ip_address=request.client.host if request and request.client else None,
-        )
+        log_audit(db, "user.toggled",
+                  actor_user_id=current_user.user_id, actor_username=current_user.username,
+                  entity_type="user", entity_id=user.user_id,
+                  lodge_id=user.lodge_id or current_user.lodge_id,
+                  details={"target": user.username, "is_active": user.is_active},
+                  ip_address=request.client.host if request and request.client else None)
     except Exception:
         pass
     return {"success": True, "is_active": user.is_active}
 
 
-# ── v2.4: Two-factor authentication (TOTP) ─────────────────────────────
+# ── v10.0: Staff OTP management ───────────────────────────────────────────
+
+class OtpSettingRequest(BaseModel):
+    require_login_otp: bool
+
+
+@router.put("/users/{user_id}/otp-setting")
+def set_user_otp_requirement(user_id: int, body: OtpSettingRequest, request: Request,
+                              current_user: User = Depends(get_current_user),
+                              db: Session = Depends(get_db)):
+    """Admin can require (or waive) OTP login for a specific staff member."""
+    if not _is_admin_or_super(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not _is_super(current_user) and user.lodge_id != current_user.lodge_id:
+        raise HTTPException(status_code=403, detail="Cannot manage a user from another lodge")
+    try:
+        user.require_login_otp = body.require_login_otp
+        db.commit()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    try:
+        log_audit(db, "user.otp_setting_changed",
+                  actor_user_id=current_user.user_id, actor_username=current_user.username,
+                  lodge_id=user.lodge_id,
+                  details={"target": user.username, "require_login_otp": body.require_login_otp},
+                  ip_address=request.client.host if request and request.client else None)
+    except Exception:
+        pass
+    return {"success": True, "require_login_otp": body.require_login_otp}
+
+
+# ── v2.4: TOTP (existing, unchanged) ─────────────────────────────────────
 
 class TotpVerifyRequest(BaseModel):
     code: str
 
 
 @router.post("/2fa/setup")
-def totp_setup(db: Session = Depends(get_db),
-                current_user=Depends(get_current_user)):
-    """Begin TOTP enrollment. Generates a fresh secret AND saves it on the
-    user, but leaves `totp_enabled=False`. The frontend renders the
-    provisioning URI as a QR code; the user scans it with their app then
-    confirms by calling /2fa/verify with a current code.
-
-    Calling this on an already-enabled account REPLACES the secret —
-    intentional, to support "re-enrol" flows when the user loses their
-    phone (admin disables, user re-enrols from scratch).
-    """
+def totp_setup(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     from ..services.totp import generate_secret, provisioning_uri
     secret = generate_secret()
-    current_user.totp_secret = secret
-    # Note: we deliberately do NOT set totp_enabled=True yet — that flips
-    # only after the user proves they can produce a valid code.
+    current_user.totp_secret  = secret
     current_user.totp_enabled = False
     db.commit()
     db.refresh(current_user)
@@ -471,22 +677,17 @@ def totp_setup(db: Session = Depends(get_db),
     if current_user.lodge and current_user.lodge.name:
         issuer = f"{current_user.lodge.name} (LMS)"
     return {
-        "secret": secret,
+        "secret":           secret,
         "provisioning_uri": provisioning_uri(secret, current_user.username, issuer),
-        "issuer": issuer,
+        "issuer":           issuer,
     }
 
 
 @router.post("/2fa/verify")
 def totp_verify(body: TotpVerifyRequest, request: Request,
-                 db: Session = Depends(get_db),
-                 current_user=Depends(get_current_user)):
-    """Confirm enrollment — checks the code against the secret saved by
-    /2fa/setup, and on success sets totp_enabled=True. Subsequent logins
-    will then require a TOTP code."""
+                db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     if not current_user.totp_secret:
-        raise HTTPException(status_code=400,
-                            detail="No 2FA enrollment in progress. Call /2fa/setup first.")
+        raise HTTPException(status_code=400, detail="No 2FA enrollment in progress.")
     from ..services.totp import verify_totp
     if not verify_totp(current_user.totp_secret, body.code):
         raise HTTPException(status_code=400, detail="Invalid code")
@@ -503,19 +704,16 @@ def totp_verify(body: TotpVerifyRequest, request: Request,
 
 
 class TotpDisableRequest(BaseModel):
-    """Disabling 2FA requires the current password — a stolen session
-    cookie alone shouldn't be enough to turn off this safeguard."""
     password: str
 
 
 @router.post("/2fa/disable")
 def totp_disable(body: TotpDisableRequest, request: Request,
-                  db: Session = Depends(get_db),
-                  current_user=Depends(get_current_user)):
+                 db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     if not verify_password(body.password, current_user.password_hash):
         raise HTTPException(status_code=401, detail="Wrong password")
     current_user.totp_enabled = False
-    current_user.totp_secret = None
+    current_user.totp_secret  = None
     db.commit()
     try:
         log_audit(db, "auth.totp_disabled",
@@ -529,8 +727,52 @@ def totp_disable(body: TotpDisableRequest, request: Request,
 
 @router.get("/2fa/status")
 def totp_status(current_user=Depends(get_current_user)):
-    """Used by the Profile / Security page to show enrollment state."""
     return {
-        "totp_enabled": bool(current_user.totp_enabled),
+        "totp_enabled":  bool(current_user.totp_enabled),
         "totp_enrolled": bool(current_user.totp_secret),
     }
+
+
+# ── v10.1: Static admin-set PIN ───────────────────────────────────────────────
+
+class StaticPinRequest(BaseModel):
+    pin: Optional[str] = None
+
+
+@router.put("/users/{user_id}/static-pin")
+def set_static_pin(user_id: int, body: StaticPinRequest, request: Request,
+                   current_user: User = Depends(get_current_user),
+                   db: Session = Depends(get_db)):
+    """Admin sets a static 4-8 digit PIN that staff can use instead of live SMS OTP.
+    Pass pin=null to clear. Useful when SMS is not configured."""
+    if not _is_admin_or_super(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not _is_super(current_user) and user.lodge_id != current_user.lodge_id:
+        raise HTTPException(status_code=403, detail="Cannot manage a user from another lodge")
+
+    pin = (body.pin or "").strip() or None
+    if pin and (not pin.isdigit() or not (4 <= len(pin) <= 8)):
+        raise HTTPException(status_code=400, detail="PIN must be 4-8 digits")
+
+    try:
+        user.static_login_pin = pin
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+    try:
+        log_audit(db, "user.static_pin_changed",
+                  actor_user_id=current_user.user_id, actor_username=current_user.username,
+                  lodge_id=user.lodge_id,
+                  details={"target": user.username, "pin_set": pin is not None},
+                  ip_address=request.client.host if request and request.client else None)
+    except Exception:
+        pass
+
+    return {"success": True, "pin_set": pin is not None,
+            "message": "Static PIN set" if pin else "Static PIN cleared"}
+

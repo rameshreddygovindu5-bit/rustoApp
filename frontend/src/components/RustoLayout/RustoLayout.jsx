@@ -2,11 +2,12 @@ import React, { useState, useEffect } from "react";
 import { Link, NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { User, LogOut, Menu, X, BookOpen,
          ChevronDown, ArrowRight,
-         Instagram, Twitter, Facebook, Youtube, Heart} from "lucide-react";
+         Instagram, Twitter, Facebook, Youtube, Heart, Crown} from "lucide-react";
 import { useCustomerAuth } from "../../context/CustomerAuthContext";
 import { useSettings } from "../../context/SettingsContext";
 import { RustoMark } from "../RustoLogo/RustoLogo";
 import PortalSwitcher from "../Layout/PortalSwitcher";
+import { usePortal } from "../../context/PortalContext";
 import { toast } from "react-toastify";
 
 /**
@@ -17,15 +18,13 @@ import { toast } from "react-toastify";
 
 const NAV_LINKS = [
   { to: "/",        label: "Home" },
-  { to: "/search",  label: "Destinations" },
-  { to: "/#experiences", label: "Experiences" },
-  { to: "/search",  label: "Lodges" },
-  { to: "/#offers", label: "Offers" },
-  { to: "/#membership", label: "Membership" },
-  { to: "/#about",  label: "About" },
+  { to: "/search",  label: "Find Lodges" },
+  { to: "/about",   label: "About" },
+  { to: "/membership", label: "Membership" },
 ];
 
 export default function RustoLayout() {
+  const { effectivePortal, matchedLodge, setOverride } = usePortal()
   const { customer, logout } = useCustomerAuth();
   const { settings } = useSettings();
   const navigate = useNavigate();
@@ -102,7 +101,7 @@ export default function RustoLayout() {
                                   group-hover:opacity-100 transition-opacity duration-500 -z-10"/>
               </div>
               <div className="leading-tight">
-                <div className="font-sans text-2xl font-semibold tracking-tight text-white">
+                <div className="font-display text-2xl font-semibold tracking-tight text-white">
                   Rusto
                 </div>
                 <div className="text-2xs hidden sm:block tracking-eyebrow uppercase font-semibold text-amber-glow">
@@ -157,6 +156,7 @@ export default function RustoLayout() {
                           <MenuItem to="/account" Icon={User} label="My account"/>
                           <MenuItem to="/account/bookings" Icon={BookOpen} label="My bookings"/>
                           <MenuItem to="/wishlist" Icon={Heart} label="My Wishlist"/>
+                          <MenuItem to="/membership" Icon={Crown} label="Membership & Rewards"/>
                           <div className="my-1 border-t border-white/10"/>
                           <button onClick={() => { logout(); navigate("/"); }}
                                   className="w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-xl
@@ -171,14 +171,15 @@ export default function RustoLayout() {
               ) : (
                 <>
                   <Link to="/signin"
-                        className="text-sm font-semibold px-4 py-2 rounded-xl transition-all hidden lg:inline-block text-white/80 hover:text-white hover:bg-white/10">
-                    Login
+                        className="text-sm font-semibold px-4 py-2 rounded-xl transition-all hidden lg:inline-block text-white/70 hover:text-white hover:bg-white/10">
+                    Sign In
                   </Link>
                   <Link to="/signup"
-                        className="text-sm font-semibold px-4 py-2 rounded-xl transition-all hidden lg:inline-block text-white/80 hover:text-white hover:bg-white/10">
+                        className="text-sm font-semibold px-4 py-2.5 rounded-xl transition-all hidden lg:inline-block font-bold text-white"
+                        style={{background:"var(--c-primary, #1E3A8A)"}}>
                     Register
                   </Link>
-                  <Link to="/register-lodge" className="btn-gold text-navy text-sm hidden sm:inline-flex px-5 py-2">
+                  <Link to="/register-lodge" className="btn-gold text-navy-dark text-sm font-bold hidden sm:inline-flex px-5 py-2">
                     Become Host
                   </Link>
                 </>
@@ -260,6 +261,10 @@ export default function RustoLayout() {
             <span className="text-lg">🔍</span>
             <span>Search</span>
           </NavLink>
+          <NavLink to="/membership" className={({ isActive }) => `flex flex-col items-center gap-1 text-[9px] uppercase tracking-widest font-bold ${isActive ? "text-[#D4AF37]" : "text-white/60"}`}>
+            <Crown size={20}/>
+            <span>Membership</span>
+          </NavLink>
           <NavLink to="/wishlist" className={({ isActive }) => `flex flex-col items-center gap-1 text-[9px] uppercase tracking-widest font-bold ${isActive ? "text-[#D4AF37]" : "text-white/60"}`}>
             <span className="text-lg">❤️</span>
             <span>Wishlist</span>
@@ -297,12 +302,17 @@ export default function RustoLayout() {
                   Best price guaranteed.
                 </p>
                 <div className="flex items-center gap-2">
-                  {[Instagram, Twitter, Facebook, Youtube].map((Icon, i) => (
-                    <a key={i} href="#" aria-label="social"
+                  {[
+                    { Icon: Instagram, href: "https://instagram.com/rusto.in",   label: "Instagram" },
+                    { Icon: Twitter,   href: "https://twitter.com/rusto_in",      label: "Twitter" },
+                    { Icon: Facebook,  href: "https://facebook.com/rusto.in",     label: "Facebook" },
+                    { Icon: Youtube,   href: "https://youtube.com/@rusto",        label: "YouTube" },
+                  ].map(({ Icon, href, label }) => (
+                    <a key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label}
                         className="w-10 h-10 rounded-xl bg-white/5 hover:bg-gold hover:text-navy-dark
                                     text-white/70 flex items-center justify-center transition-all duration-200
                                     hover:scale-110 hover:shadow-gold">
-                    <Icon size={16}/>
+                      <Icon size={16}/>
                     </a>
                   ))}
                 </div>
@@ -313,23 +323,23 @@ export default function RustoLayout() {
                 { to: "/search", label: "Search by city" },
                 { to: "/signup", label: "Create account" },
                 { to: "/wishlist", label: "My Wishlist" },
-                { to: "/account/bookings", label: "My bookings" },
+                { to: "/account", label: "My bookings" },
               ]}/>
               <FooterColumn title="For hosts" links={[
                 { to: "/register-lodge", label: "List your lodge" },
                 { to: "/login", label: "Host portal" },
               ]}/>
               <FooterColumn title="Company" links={[
-                { to: "#", label: "About us" },
-                { to: "#", label: "Careers" },
-                { to: "#", label: "Press" },
-                { to: "#", label: "Contact" },
+                { to: "/about",   label: "About Rusto" },
+                { to: "/about", label: "Contact us" },
+                { to: "/register-lodge", label: "Partner with us" },
+                { to: "/terms",   label: "Legal" },
               ]}/>
               <FooterColumn title="Legal" links={[
-                { to: "#", label: "Terms of service" },
-                { to: "#", label: "Privacy policy" },
-                { to: "#", label: "Cookie policy" },
-                { to: "#", label: "Refunds" },
+                { to: "/terms",   label: "Terms of service" },
+                { to: "/privacy", label: "Privacy policy" },
+                { to: "/terms#cookies", label: "Cookie policy" },
+                { to: "/terms#refunds", label: "Refunds" },
               ]}/>
             </div>
 
@@ -365,7 +375,6 @@ function FooterColumn({ title, links }) {
         {links.map((l, i) => (
           <li key={i}>
             <Link to={l.to}
-                  onClick={(e) => l.to === "#" && (e.preventDefault(), toast.info(`Elite RUSTO Concierge: The "${l.label}" section is available via our 24/7 WhatsApp Concierge.`))}
                   className="text-white/60 hover:text-white transition-colors duration-150
                              inline-block relative group">
               {l.label}

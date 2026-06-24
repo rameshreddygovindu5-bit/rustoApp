@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rusto — Travel Anywhere. Rest Everywhere.</title>
+    <meta name="description" content="Book lodges, hotels and homestays across India. Best prices, instant confirmation." />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#07131C" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+      * { margin:0; padding:0; box-sizing:border-box }
+      html, body { height:100%; background:#07131C; font-family:'Plus Jakarta Sans',sans-serif; }
+      #root { height:100% }
+      #customer-loader {
+        position:fixed; inset:0; background:#07131C;
+        display:flex; flex-direction:column; align-items:center; justify-content:center;
+        z-index:9999; transition:opacity .4s;
+      }
+      .loader-ring {
+        width:160px; height:160px; border-radius:50%; border:2px solid transparent;
+        border-top-color:#D4AF37; border-right-color:rgba(212,175,55,.2);
+        animation:rotate 12s linear infinite, pulse 3s infinite;
+        display:flex; align-items:center; justify-content:center;
+      }
+      .loader-letter { font-family:'Outfit',sans-serif; font-size:64px; font-weight:300; color:#D4AF37; }
+      .loader-tag {
+        margin-top:16px; font-size:8px; font-weight:700; letter-spacing:.3em;
+        text-transform:uppercase; color:rgba(245,231,196,.6);
+        animation:breathe 2s ease-in-out infinite;
+      }
+      @keyframes rotate { 100% { transform:rotate(360deg) } }
+      @keyframes pulse  { 0%,100%{opacity:.8} 50%{opacity:1;border-width:3px} }
+      @keyframes breathe{ 0%,100%{opacity:.5;transform:scale(.96)} 50%{opacity:1;transform:scale(1.02)} }
+      .customer-loaded #customer-loader { opacity:0; pointer-events:none }
+    </style>
+  </head>
+  <body>
+    <div id="customer-loader">
+      <div class="loader-ring">
+        <span class="loader-letter">R</span>
+      </div>
+      <div class="loader-tag">Rusto · Travel Anywhere. Rest Everywhere.</div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main-customer.jsx"></script>
+    <script>
+      window.addEventListener('DOMContentLoaded', function() {
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            document.body.classList.add('customer-loaded');
+          });
+        });
+      });
+    </script>
+  </body>
+</html>

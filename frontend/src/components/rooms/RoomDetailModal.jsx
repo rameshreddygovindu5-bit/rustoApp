@@ -76,7 +76,7 @@ export default function RoomDetailModal({ room, onClose, onCheckout }) {
         {/* Header */}
         <div className="bg-navy text-white px-6 py-4 flex items-center justify-between">
           <div>
-            <h2 className="font-playfair text-xl font-bold">Room {room.room_number}</h2>
+            <h2 className="font-display text-xl font-bold">Room {room.room_number}</h2>
             <p className="text-sm text-white/70">{room.room_type?.replace('_', ' ').toUpperCase()} · Floor {room.floor}</p>
           </div>
           <button
@@ -94,15 +94,15 @@ export default function RoomDetailModal({ room, onClose, onCheckout }) {
         <div className="p-6 space-y-5 max-h-[85vh] overflow-y-auto">
           {/* Room Info (Always shown) */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-3 bg-gray-50 rounded-xl">
-              <p className="text-[10px] text-gray-500 uppercase font-bold">Base Tariff</p>
+            <div className="p-3 bg-ink-50 rounded-xl">
+              <p className="text-[10px] text-ink-500 uppercase font-bold">Base Tariff</p>
               <p className="text-lg font-bold text-navy">₹{room.base_tariff?.toLocaleString('en-IN')}</p>
             </div>
-            <div className="p-3 bg-gray-50 rounded-xl">
-              <p className="text-[10px] text-gray-500 uppercase font-bold">Status</p>
+            <div className="p-3 bg-ink-50 rounded-xl">
+              <p className="text-[10px] text-ink-500 uppercase font-bold">Status</p>
               <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold mt-1 ${
                 room.status === 'available' ? 'bg-green-100 text-green-700' : 
-                room.status === 'occupied' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                room.status === 'occupied' ? 'bg-red-100 text-red-700' : 'bg-ink-100 text-ink-600'
               }`}>
                 {room.status?.toUpperCase()}
               </span>
@@ -110,14 +110,14 @@ export default function RoomDetailModal({ room, onClose, onCheckout }) {
           </div>
 
           {loading ? (
-            <div className="py-10 text-center text-gray-400">
+            <div className="py-10 text-center text-ink-400">
               <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
               Loading details...
             </div>
           ) : checkin ? (
             <>
               {/* Guest Info */}
-              <div className="bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-100">
+              <div className="bg-ink-50 rounded-xl p-4 space-y-3 border border-ink-100">
                 <h3 className="font-semibold text-navy text-xs uppercase tracking-wider">Guest Details</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <InfoRow icon={<User size={14} />} label="Name" value={`${checkin.customer?.first_name} ${checkin.customer?.last_name}`} />
@@ -128,7 +128,7 @@ export default function RoomDetailModal({ room, onClose, onCheckout }) {
               </div>
 
               {/* Stay Info */}
-              <div className="bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-100">
+              <div className="bg-ink-50 rounded-xl p-4 space-y-3 border border-ink-100">
                 <h3 className="font-semibold text-navy text-xs uppercase tracking-wider">Stay Details</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <InfoRow icon={<Calendar size={14} />} label="Check-in" value={formatDateTime(checkin.checkin_datetime)} />
@@ -212,7 +212,7 @@ export default function RoomDetailModal({ room, onClose, onCheckout }) {
                   
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="text-[10px] font-bold text-gray-500 uppercase">Additional Charges (₹)</label>
+                      <label className="text-[10px] font-bold text-ink-500 uppercase">Additional Charges (₹)</label>
                       <input
                         type="number"
                         className="w-full mt-1 px-3 py-2 border border-red-200 rounded-xl focus:outline-none focus:border-red-500 text-sm"
@@ -221,7 +221,7 @@ export default function RoomDetailModal({ room, onClose, onCheckout }) {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-gray-500 uppercase">Discount (₹)</label>
+                      <label className="text-[10px] font-bold text-ink-500 uppercase">Discount (₹)</label>
                       <input
                         type="number"
                         className="w-full mt-1 px-3 py-2 border border-red-200 rounded-xl focus:outline-none focus:border-red-500 text-sm"
@@ -232,7 +232,7 @@ export default function RoomDetailModal({ room, onClose, onCheckout }) {
                   </div>
 
                   <div className="mb-6">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase">Payment Method</label>
+                    <label className="text-[10px] font-bold text-ink-500 uppercase">Payment Method</label>
                     <select
                       className="w-full mt-1 px-3 py-2 border border-red-200 rounded-xl focus:outline-none focus:border-red-500 text-sm"
                       value={checkoutData.payment_mode}
@@ -246,7 +246,7 @@ export default function RoomDetailModal({ room, onClose, onCheckout }) {
                   </div>
 
                   <div className="flex gap-3">
-                    <button onClick={() => setShowConfirm(false)} className="flex-1 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors">Cancel</button>
+                    <button onClick={() => setShowConfirm(false)} className="flex-1 py-2.5 bg-white border border-ink-200 text-ink-700 rounded-xl font-medium hover:bg-ink-50 transition-colors">Cancel</button>
                     <button onClick={handleCheckout} disabled={checkingOut} className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 disabled:opacity-50 transition-all">
                       {checkingOut ? "Processing..." : "Confirm Checkout"}
                     </button>
@@ -267,7 +267,7 @@ export default function RoomDetailModal({ room, onClose, onCheckout }) {
                   </button>
                 </div>
 
-                <div className="border-t border-gray-100 pt-6">
+                <div className="border-t border-ink-100 pt-6">
                   <h3 className="font-semibold text-navy text-xs uppercase tracking-wider mb-4">Quick Status Update</h3>
                   <div className="grid grid-cols-3 gap-3">
                     {['available', 'maintenance', 'blocked'].map(st => (
@@ -286,8 +286,8 @@ export default function RoomDetailModal({ room, onClose, onCheckout }) {
                         }}
                         className={`py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${
                           room.status === st 
-                            ? "bg-gray-50 border-gray-200 text-gray-400 cursor-default" 
-                            : "border-gray-100 text-gray-600 hover:border-navy hover:bg-navy/5"
+                            ? "bg-ink-50 border-ink-200 text-ink-400 cursor-default" 
+                            : "border-ink-100 text-ink-600 hover:border-navy hover:bg-navy/5"
                         }`}
                       >
                         {st.toUpperCase()}
@@ -309,8 +309,8 @@ function InfoRow({ icon, label, value }) {
     <div className="flex items-start gap-2">
       <span className="text-gold mt-0.5">{icon}</span>
       <div>
-        <p className="text-xs text-gray-500">{label}</p>
-        <p className="text-sm font-medium text-gray-800">{value || "—"}</p>
+        <p className="text-xs text-ink-500">{label}</p>
+        <p className="text-sm font-medium text-ink-800">{value || "—"}</p>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
+import './pms-theme.css'  // Warm Neutrals theme for PMS portal
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

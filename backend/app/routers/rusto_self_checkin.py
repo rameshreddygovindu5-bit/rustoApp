@@ -16,8 +16,14 @@ Endpoints:
 """
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -26,7 +32,7 @@ from pydantic import BaseModel
 from ..database import get_db
 from ..models import (SelfCheckinToken, CustomerBooking, CustomerBookingStatus,
                        Lodge)
-from ..auth import get_current_user, require_admin, resolve_lodge_scope
+from ..auth import require_admin, resolve_lodge_scope
 from ..rusto_auth import get_current_customer
 
 logger = logging.getLogger(__name__)
@@ -45,7 +51,7 @@ def _token_dict(t: SelfCheckinToken) -> dict:
         "valid_until": t.valid_until.isoformat(),
         "used_at":     t.used_at.isoformat() if t.used_at else None,
         "is_valid":    (t.used_at is None and
-                        t.valid_from <= datetime.utcnow() <= t.valid_until),
+                        t.valid_from <= _utcnow() <= t.valid_until),
         "qr_data": f"rusto://self-checkin/{t.token}",
     }
 
@@ -131,7 +137,7 @@ def validate_token(
         raise HTTPException(400, "Invalid check-in code")
     if t.used_at:
         raise HTTPException(400, "This check-in code has already been used")
-    now = datetime.utcnow()
+    now = _utcnow()
     if not (t.valid_from <= now <= t.valid_until):
         raise HTTPException(400, "Check-in code is not valid at this time")
 
@@ -147,6 +153,59 @@ def validate_token(
     t.used_at = now
     bk.status = CustomerBookingStatus.checked_in.value
     db.commit()
+
+    # Auto-create PMS Checkin record so lodge admin can see the self-check-in
+    try:
+        from ..models import (Checkin, CheckinStatus, Customer as PmsCustomer,
+                               Room as PmsRoom)
+        # Find or create a PMS customer record for this Rusto customer
+        pms_cust = db.query(PmsCustomer).filter(
+            PmsCustomer.lodge_id == t.lodge_id,
+            PmsCustomer.phone == customer.phone,
+        ).first()
+        if not pms_cust:
+            pms_cust = PmsCustomer(
+                lodge_id=t.lodge_id,
+                full_name=bk.contact_name or customer.full_name,
+                phone=customer.phone,
+                email=customer.email or "",
+            )
+            db.add(pms_cust)
+            db.flush()
+
+        # Find the room (if assigned by lodge)
+        room = None
+        if t.room_number:
+            room = db.query(PmsRoom).filter(
+                PmsRoom.lodge_id == t.lodge_id,
+                PmsRoom.room_number == t.room_number,
+            ).first()
+
+        # Create checkin if not already exists for this booking
+        existing_ci = db.query(Checkin).filter(
+            Checkin.lodge_id == t.lodge_id,
+            Checkin.customer_id == pms_cust.customer_id,
+            Checkin.checkin_date == bk.checkin_date,
+        ).first()
+        if not existing_ci:
+            ci = Checkin(
+                lodge_id=t.lodge_id,
+                customer_id=pms_cust.customer_id,
+                room_id=room.room_id if room else None,
+                checkin_date=bk.checkin_date,
+                checkout_date=bk.checkout_date,
+                adults=bk.adults or 1,
+                children=bk.children or 0,
+                tariff_per_night=float(bk.tariff_per_night),
+                status=CheckinStatus.active.value,
+                source="rusto_self_checkin",
+                notes=f"Self-checked in via Rusto QR. Online booking ref: {bk.booking_ref}",
+            )
+            db.add(ci)
+            db.commit()
+    except Exception as _ci_err:
+        import logging as _log
+        _log.getLogger(__name__).warning("PMS checkin sync failed: %s", _ci_err)
 
     lodge = db.query(Lodge).filter(Lodge.lodge_id == t.lodge_id).first()
     return {

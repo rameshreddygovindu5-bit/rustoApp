@@ -27,11 +27,17 @@ Rate limiting & quotas honored from agency config (daily_booking_limit, etc.).
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, field_validator, EmailStr, Field
 from typing import Optional, List
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 import re, uuid
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from ..database import get_db
 from ..models import (Agency, AgencyApiCall, Booking, BookingStatus, BookingSource,
@@ -96,7 +102,7 @@ def _rooms_available_for_dates(db: Session, room_type: str,
 
 def _next_booking_ref(db: Session, lodge_id: int, lodge_code: str = "udu") -> str:
     """Per-lodge ref like UDU-202605-0001 / RK-202605-0001."""
-    today = datetime.utcnow()
+    today = _utcnow()
     code_prefix = (lodge_code[:3].upper() if lodge_code else "UDU")
     prefix = f"{code_prefix}-{today.strftime('%Y%m')}-"
     last = (db.query(Booking)
@@ -155,7 +161,7 @@ class GuestInfo(BaseModel):
     id_type: Optional[str] = "aadhar"
     id_number: Optional[str] = None
 
-    @validator("phone")
+    @field_validator("phone", mode="before")
     def _phone_check(cls, v):
         v = re.sub(r"\D", "", v)
         if len(v) < 10:
@@ -176,17 +182,40 @@ class CreateBookingRequest(BaseModel):
     payment_status: str = Field(default="unpaid",
                                 description="unpaid | prepaid | partial")
 
-    @validator("room_type")
+    @field_validator("room_type", mode="before")
+    @classmethod
     def _rt(cls, v):
         if v not in ("deluxe_ac", "ac", "non_ac", "house"):
             raise ValueError("invalid room_type")
         return v
 
-    @validator("checkout_date")
-    def _co(cls, v, values):
-        ci = values.get("checkin_date")
-        if ci and v <= ci:
-            raise ValueError("checkout_date must be after checkin_date")
+    @field_validator("checkout_date", mode="before")
+    @classmethod
+    def _co(cls, v):
+        # Note: cross-field validation (checkin vs checkout) is done at endpoint level
+        # since Pydantic V2 field validators don't receive other fields by default
+        if isinstance(v, str):
+            from datetime import date as _date
+            try:
+                v = _date.fromisoformat(v)
+            except ValueError:
+                raise ValueError(f"Invalid date format: {v}")
+        return v
+
+    @field_validator("checkin_date", mode="before")
+    @classmethod
+    def _ci(cls, v):
+        if isinstance(v, str):
+            from datetime import date as _date
+            try:
+                v = _date.fromisoformat(v)
+            except ValueError:
+                raise ValueError(f"Invalid date format: {v}")
+        # Past date check
+        from datetime import date as _date
+        today = _date.today()
+        if isinstance(v, _date) and v < today:
+            raise ValueError("checkin_date cannot be in the past")
         return v
 
 
@@ -317,7 +346,7 @@ def create_booking(body: CreateBookingRequest, request: Request,
     # Daily limit?
     if agency.daily_booking_limit and agency.daily_booking_limit > 0:
         from sqlalchemy import cast, Date as SqlDate
-        today = datetime.utcnow().date()
+        today = _utcnow().date()
         today_count = (db.query(Booking)
                        .filter(Booking.agency_id == agency.agency_id,
                                Booking.lodge_id == agency.lodge_id,
@@ -488,7 +517,7 @@ def cancel_partner_booking(booking_ref: str, body: CancelBookingRequest,
                             detail=f"Cannot cancel a booking in status: {b.status.value}")
 
     b.status = BookingStatus.cancelled
-    b.cancelled_at = datetime.utcnow()
+    b.cancelled_at = _utcnow()
     b.cancellation_reason = body.reason
     db.commit()
     db.refresh(b)

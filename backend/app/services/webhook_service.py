@@ -12,9 +12,15 @@ Headers we send:
   X-LMS-Delivery-Id:   <delivery row id>
 """
 import json, hmac, hashlib, logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from ..models import Agency, Booking, WebhookDelivery, WebhookStatus
 
@@ -59,7 +65,7 @@ def queue_webhook(db: Session, agency: Agency, booking: Booking, event_type: str
 
     payload = {
         "event": event_type,
-        "delivered_at": datetime.utcnow().isoformat() + "Z",
+        "delivered_at": _utcnow().isoformat() + "Z",
         "data": _booking_payload(booking),
     }
     delivery = WebhookDelivery(
@@ -102,7 +108,7 @@ def _attempt(db: Session, agency: Agency, delivery: WebhookDelivery):
         "X-LMS-Signature": _sign(agency.webhook_secret or "", body),
     }
     delivery.attempt_count = (delivery.attempt_count or 0) + 1
-    delivery.last_attempt_at = datetime.utcnow()
+    delivery.last_attempt_at = _utcnow()
 
     try:
         resp = requests.post(agency.webhook_url, data=body, headers=headers, timeout=TIMEOUT_SECONDS)

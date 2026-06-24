@@ -35,6 +35,8 @@ export function SettingsProvider({ children }) {
     hotel_email: "",
     agent_enabled: "true",
     premium_theme_enabled: "true",
+    enabled_modules: null,       // null = all modules enabled (legacy mode)
+    property_category: "lodge",  // drives module defaults
   })
 
   const refresh = () => {

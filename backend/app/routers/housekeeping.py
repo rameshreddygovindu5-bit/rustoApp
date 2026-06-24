@@ -15,12 +15,19 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
+
+def _utcnow():
+    """Naive UTC for SQLite datetime columns."""
+    return __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    ).replace(tzinfo=None)
 
 from ..database import get_db
 from ..models import (HousekeepingTask, HousekeepingStatus, HousekeepingTaskType,
                       Room, User)
 from ..auth import get_current_user, require_admin, resolve_lodge_scope
+from ..permissions import require_permission
 from ..services.audit_service import log_audit
 
 router = APIRouter(prefix="/api/housekeeping", tags=["housekeeping"])
@@ -46,7 +53,7 @@ def _to_dict(t: HousekeepingTask) -> dict:
     }
 
 
-@router.get("/tasks")
+@router.get("/tasks", dependencies=[Depends(require_permission("housekeeping.read"))])
 def list_tasks(status: Optional[str] = Query(None),
                room_id: Optional[int] = None,
                assigned_to: Optional[int] = None,
@@ -65,7 +72,7 @@ def list_tasks(status: Optional[str] = Query(None),
     return [_to_dict(t) for t in q.limit(500).all()]
 
 
-@router.get("/stats")
+@router.get("/stats", dependencies=[Depends(require_permission("housekeeping.read"))])
 def stats(db: Session = Depends(get_db),
           current_user=Depends(get_current_user),
           lodge_id: int = Depends(resolve_lodge_scope)):
@@ -79,7 +86,7 @@ def stats(db: Session = Depends(get_db),
     return {"by_status": counts}
 
 
-@router.get("/tasks/{task_id}")
+@router.get("/tasks/{task_id}", dependencies=[Depends(require_permission("housekeeping.read"))])
 def get_task(task_id: int, db: Session = Depends(get_db),
              current_user=Depends(get_current_user),
              lodge_id: int = Depends(resolve_lodge_scope)):
@@ -98,7 +105,7 @@ class TaskCreate(BaseModel):
     assigned_to: Optional[int] = None
 
 
-@router.post("/tasks")
+@router.post("/tasks", dependencies=[Depends(require_permission("housekeeping.write"))])
 def create_task(body: TaskCreate, request: Request,
                 db: Session = Depends(get_db),
                 current_user=Depends(require_admin),
@@ -146,7 +153,7 @@ class TaskAssign(BaseModel):
     assigned_to: int
 
 
-@router.patch("/tasks/{task_id}/assign")
+@router.patch("/tasks/{task_id}/assign", dependencies=[Depends(require_permission("housekeeping.manage"))])
 def assign_task(task_id: int, body: TaskAssign, request: Request,
                 db: Session = Depends(get_db),
                 current_user=Depends(require_admin),
@@ -178,7 +185,7 @@ def assign_task(task_id: int, body: TaskAssign, request: Request,
     return _to_dict(t)
 
 
-@router.patch("/tasks/{task_id}/start")
+@router.patch("/tasks/{task_id}/start", dependencies=[Depends(require_permission("housekeeping.write"))])
 def start_task(task_id: int, request: Request,
                db: Session = Depends(get_db),
                current_user=Depends(get_current_user),
@@ -195,7 +202,7 @@ def start_task(task_id: int, request: Request,
     if t.assigned_to is None:
         t.assigned_to = current_user.user_id
     t.status = HousekeepingStatus.in_progress
-    t.started_at = datetime.utcnow()
+    t.started_at = _utcnow()
     db.commit()
     db.refresh(t)
     try:
@@ -214,7 +221,7 @@ class TaskComplete(BaseModel):
     completion_notes: Optional[str] = None
 
 
-@router.patch("/tasks/{task_id}/complete")
+@router.patch("/tasks/{task_id}/complete", dependencies=[Depends(require_permission("housekeeping.write"))])
 def complete_task(task_id: int, body: TaskComplete, request: Request,
                   db: Session = Depends(get_db),
                   current_user=Depends(get_current_user),
@@ -228,7 +235,7 @@ def complete_task(task_id: int, body: TaskComplete, request: Request,
         raise HTTPException(status_code=400,
                             detail=f"Cannot complete a task in '{t.status.value}' state")
     t.status = HousekeepingStatus.completed
-    t.completed_at = datetime.utcnow()
+    t.completed_at = _utcnow()
     if body.completion_notes:
         t.completion_notes = body.completion_notes
     # When the cleaning task that was triggered by a checkout completes,
@@ -263,7 +270,7 @@ class TaskInspect(BaseModel):
     notes: Optional[str] = None
 
 
-@router.patch("/tasks/{task_id}/inspect")
+@router.patch("/tasks/{task_id}/inspect", dependencies=[Depends(require_permission("housekeeping.manage"))])
 def inspect_task(task_id: int, body: TaskInspect, request: Request,
                  db: Session = Depends(get_db),
                  current_user=Depends(require_admin),
@@ -280,7 +287,7 @@ def inspect_task(task_id: int, body: TaskInspect, request: Request,
         raise HTTPException(status_code=400,
                             detail="Inspection only applies to completed tasks")
     t.inspected_by = current_user.user_id
-    t.inspected_at = datetime.utcnow()
+    t.inspected_at = _utcnow()
     if not body.passed:
         t.status = HousekeepingStatus.inspection_failed
         if body.notes:

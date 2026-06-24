@@ -1,82 +1,150 @@
 /**
- * Design tokens for the Rusto mobile app. Mirrors the web tailwind palette
- * (navy / gold / ink) so screens feel consistent across platforms.
+ * Rusto Design System v2 — "Indian Dusk" palette
  *
- * Keep this module the single source of truth — every component imports
- * from `@/theme` rather than hardcoding hex codes inline.
+ * Inspired by the hour when Indian temple spires catch the last saffron
+ * light against a deep indigo sky. Unique, warm, unmistakably hospitable.
+ *
+ * Web counterpart: frontend/src/index.css + tailwind.config.js
+ * Keep in sync: same hex values, same semantic names.
  */
 
+// ── Core palette ─────────────────────────────────────────────────────────────
 export const colors = {
-  // Brand
-  navy: "#10204F",
-  navyDark: "#0A1738",
-  navyLight: "#1F3470",
-  gold: "#C9A84C",
-  goldDark: "#B08F30",
-  goldLight: "#DCC064",
-  goldGlow: "#F4E9C9",
+  // Deep Indigo — primary surfaces, navbars, hero backgrounds
+  navy:       "#0D1F2D",   // Midnight Indigo
+  navyDark:   "#07131C",   // Obsidian Depth
+  navyLight:  "#162E42",   // Dusk Indigo
+  navyMid:    "#1E3D57",   // Twilight Steel
 
-  // Neutrals (Ink palette)
-  ink50: "#FAF9F6",
-  ink100: "#F0EEE7",
-  ink200: "#E0DCC9",
-  ink300: "#C9C2A8",
-  ink400: "#9A9485",
-  ink500: "#706A5C",
-  ink600: "#4F4A40",
-  ink700: "#363328",
-  ink800: "#1F1D17",
-  ink900: "#0E0D09",
+  // Saffron Gold — the sacred fire. Used SPARINGLY on CTAs, accents, highlights.
+  gold:       "#E8A020",   // Temple Saffron
+  goldDark:   "#C4841A",   // Aged Brass
+  goldLight:  "#F2BF5E",   // Afternoon Amber
+  goldGlow:   "#FDF3DC",   // Warm Glow
+  goldMid:    "#D4951E",   // Molten Gold
+
+  // Champagne / Warm Ivory — text surfaces, cards
+  champagne:  "#F7EDD8",   // Morning Ivory
+  ivory:      "#FDFAF3",   // Sandalwood White
+
+  // Terracotta accent — special CTAs, membership, elite touches
+  terracotta: "#C85D3A",   // Temple Clay
+  terraLight: "#F4B8A8",   // Dusted Rose
+
+  // Sage — success, confirmations
+  sage:       "#2A7D5F",   // Lotus Green
+  sageBg:     "#DFFBEF",   // Mint Mist
+
+  // Ink neutrals — refined warm grays (no cold blue-gray)
+  ink50:  "#FAFAF8",
+  ink100: "#F2F0EB",
+  ink200: "#E0DDD4",
+  ink300: "#C5C0B2",
+  ink400: "#9B9486",
+  ink500: "#736C5E",
+  ink600: "#524D41",
+  ink700: "#38342A",
+  ink800: "#201E17",
+  ink900: "#0F0E0B",
 
   // Semantic
-  white: "#FFFFFF",
-  black: "#000000",
-  success: "#22C55E",
-  successBg: "#DCFCE7",
-  warning: "#F59E0B",
-  warningBg: "#FEF3C7",
-  danger: "#EF4444",
-  dangerBg: "#FEE2E2",
-  info: "#3B82F6",
-  infoBg: "#DBEAFE",
+  white:   "#FFFFFF",
+  black:   "#000000",
+  success: "#2A7D5F",
+  successBg: "#DFFBEF",
+  warning: "#E8A020",
+  warningBg: "#FDF3DC",
+  danger:  "#C94040",
+  dangerBg:"#FDEAEA",
+  info:    "#1E6FA8",
+  infoBg:  "#D9EFFE",
+
+  // Glass / overlay
+  glassLight:  "rgba(253,250,243,0.10)",
+  glassDark:   "rgba(7,19,28,0.55)",
+  overlay:     "rgba(7,19,28,0.72)",
+  goldOverlay: "rgba(232,160,32,0.18)",
 } as const;
 
-// 4-pt scale matching the web's Tailwind spacing
+// ── Spacing — 4-pt grid ───────────────────────────────────────────────────────
 export const spacing = {
-  xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32, huge: 48,
+  xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32, huge: 48, giant: 64,
 } as const;
 
+// ── Border radius ─────────────────────────────────────────────────────────────
 export const radius = {
-  sm: 8, md: 12, lg: 16, xl: 20, xxl: 28, full: 9999,
+  xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28, xxxl: 36, full: 9999,
 } as const;
 
+// ── Typography ────────────────────────────────────────────────────────────────
 export const typography = {
-  // System fonts — keeps bundle small + native feel.
-  // The web uses Playfair (display) + DM Sans (body); on native we lean on
-  // platform-native serifs/sans-serif for first-paint speed. Could swap to
-  // expo-font + Google Fonts later for pixel-perfect parity.
-  display: { fontWeight: "700" as const, letterSpacing: -0.5 },
+  display: { fontWeight: "800" as const, letterSpacing: -0.8 },
+  heading: { fontWeight: "700" as const, letterSpacing: -0.4 },
   body:    { fontWeight: "400" as const },
-  bold:    { fontWeight: "600" as const },
-  eyebrow: { fontSize: 11, letterSpacing: 1.5, fontWeight: "700" as const, textTransform: "uppercase" as const },
-
-  sizes: {
-    xs: 11, sm: 13, base: 15, md: 17, lg: 20, xl: 24, xxl: 30, hero: 36,
+  medium:  { fontWeight: "500" as const },
+  bold:    { fontWeight: "700" as const },
+  eyebrow: {
+    fontSize: 10, letterSpacing: 2.0, fontWeight: "700" as const,
+    textTransform: "uppercase" as const,
   },
-};
+  sizes: {
+    xs: 10, sm: 12, base: 14, md: 16, lg: 18, xl: 22, xxl: 28, xxxl: 36, hero: 44,
+  },
+} as const;
 
+// ── Elevation shadows ─────────────────────────────────────────────────────────
+// iOS: shadow*, Android: elevation. Both always present.
 export const shadows = {
-  // React Native doesn't have CSS box-shadow; iOS uses shadow*, Android uses elevation.
+  none: {},
+  xs: {
+    shadowColor: colors.navyDark, shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 3, elevation: 1,
+  },
   soft: {
     shadowColor: colors.navyDark, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08, shadowRadius: 6, elevation: 2,
+    shadowOpacity: 0.10, shadowRadius: 8, elevation: 2,
   },
   card: {
     shadowColor: colors.navyDark, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12, shadowRadius: 12, elevation: 4,
+    shadowOpacity: 0.14, shadowRadius: 14, elevation: 4,
+  },
+  lifted: {
+    shadowColor: colors.navyDark, shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18, shadowRadius: 24, elevation: 8,
   },
   gold: {
     shadowColor: colors.gold, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
+    shadowOpacity: 0.42, shadowRadius: 14, elevation: 6,
   },
-};
+  goldLift: {
+    shadowColor: colors.gold, shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.30, shadowRadius: 24, elevation: 10,
+  },
+  terracotta: {
+    shadowColor: colors.terracotta, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35, shadowRadius: 12, elevation: 5,
+  },
+} as const;
+
+// ── Animation timing ──────────────────────────────────────────────────────────
+// Named durations — use these so all animations feel orchestrated, not scattered.
+export const timing = {
+  instant:  80,
+  fast:     180,
+  normal:   280,
+  slow:     420,
+  verySlow: 680,
+} as const;
+
+// ── Gradients (as arrays for LinearGradient) ──────────────────────────────────
+export const gradients = {
+  hero:         [colors.navyDark, colors.navy, colors.navyLight] as string[],
+  heroRadial:   [colors.navyLight, colors.navy, colors.navyDark] as string[],
+  gold:         [colors.goldDark, colors.gold, colors.goldLight] as string[],
+  goldWarm:     [colors.gold, colors.goldLight, colors.champagne] as string[],
+  card:         [colors.white, colors.ivory] as string[],
+  champagne:    [colors.ivory, colors.champagne] as string[],
+  terracotta:   [colors.terracotta, "#E8724F"] as string[],
+  navyToTeal:   ["#0D1F2D", "#0E2D3D", "#0F3A4E"] as string[],
+  sunset:       ["#0D1F2D", "#1A2A3A", "#C85D3A", "#E8A020"] as string[],
+} as const;
