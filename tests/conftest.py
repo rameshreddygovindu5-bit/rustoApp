@@ -24,11 +24,9 @@ PROD_DB = "../backend/lodge_lms.db"
 TEST_DB = "../backend/lodge_lms_test.db"
 
 # Copy production DB to test DB (gives tests real data to work with)
-if not os.path.exists(TEST_DB) or (
-    os.path.exists(PROD_DB) and
-    os.path.getmtime(PROD_DB) > os.path.getmtime(TEST_DB)
-):
-    shutil.copy2(PROD_DB, TEST_DB)
+if os.path.exists(PROD_DB):
+    if not os.path.exists(TEST_DB) or os.path.getmtime(PROD_DB) > os.path.getmtime(TEST_DB):
+        shutil.copy2(PROD_DB, TEST_DB)
 
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB}"
 
