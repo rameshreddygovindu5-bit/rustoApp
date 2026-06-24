@@ -142,11 +142,25 @@ async def lifespan(app: FastAPI):
 
 def seed_initial_data():
     from .database import SessionLocal
-    from .models import Room, Setting, User, RoomType, RoomStatus
+    from .models import Room, Setting, User, RoomType, RoomStatus, Lodge
     from .auth import get_password_hash
 
     db = SessionLocal()
     try:
+        if db.query(Lodge).count() == 0:
+            default_lodge = Lodge(
+                lodge_id=1,
+                name="Rusto Default Lodge",
+                code="rk",
+                published=True,
+                address="123 Test St",
+                city="Test City",
+                phone="9000000000"
+            )
+            db.add(default_lodge)
+            db.flush()
+            logger.info("Seeded default lodge (code: rk)")
+
         if db.query(Room).count() == 0:
             rooms_data = [
                 {"room_number": "101", "floor": 1, "room_type": "deluxe_ac", "has_ac": True, "base_tariff": 1800, "max_occupancy": 2, "amenities": '["TV","WiFi","AC","Geyser","Mini Fridge"]'},
