@@ -11,6 +11,10 @@ concurrency:
   group: production-deploy-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   # ══════════════════════════════════════════════════════════════════
   # JOB 1: Run all tests (blocks deploy if any fail)
