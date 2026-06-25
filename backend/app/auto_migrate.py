@@ -36,6 +36,9 @@ _ADDITIVE_COLUMNS = {
         ("rooms_count",          "INTEGER DEFAULT 1"),
         ("advance_amount",       "NUMERIC(10,2) DEFAULT 0"),
         ("advance_payment_mode", "VARCHAR(20) DEFAULT 'cash'"),
+        ("meal_plan",            "VARCHAR(20)"),
+        ("promo_code",           "VARCHAR(40)"),
+        ("promo_discount",       "NUMERIC(10,2) DEFAULT 0"),
     ],
     "checkins": [
         ("advance_paid",         "NUMERIC(10,2) DEFAULT 0"),
