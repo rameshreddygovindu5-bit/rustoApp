@@ -501,8 +501,8 @@ export default function Login() {
             )}
           </div>
 
-          {/* Demo logins — only shown on generic portal, not lodge-branded */}
-          {!isPms && (
+          {/* Demo logins — only shown on generic portal, not lodge-branded, and only on localhost */}
+          {!isPms && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
             <div className="mt-5 p-4 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-base">⚡</span>
