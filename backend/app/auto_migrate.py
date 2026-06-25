@@ -49,21 +49,21 @@ _ADDITIVE_COLUMNS = {
     # v2.4 — two-factor authentication on user accounts.
     "users": [
         ("totp_secret",          "VARCHAR(64)"),
-        ("totp_enabled",         "BOOLEAN DEFAULT 0"),
+        ("totp_enabled",         "BOOLEAN DEFAULT FALSE"),
         # v3.2 — per-user permission grants (JSON array). NULL = legacy defaults.
         ("permissions",          "TEXT"),
         # v10.0 — staff OTP login for premises-lock security.
         ("login_otp",            "VARCHAR(6)"),
-        ("login_otp_expires",    "DATETIME"),
+        ("login_otp_expires",    "TIMESTAMP"),
         ("login_otp_attempts",   "INTEGER DEFAULT 0"),
-        ("require_login_otp",    "BOOLEAN DEFAULT 0"),
+        ("require_login_otp",    "BOOLEAN DEFAULT FALSE"),
         ("last_otp_login_ip",    "VARCHAR(45)"),
         ("static_login_pin",    "VARCHAR(16)"),
     ],
     # v3.1 — marketplace fields on Lodge (Rusto customer-facing).
     # is_published gates whether the lodge appears in public search.
     "lodges": [
-        ("is_published",        "BOOLEAN DEFAULT 0"),
+        ("is_published",        "BOOLEAN DEFAULT FALSE"),
         ("public_description",  "TEXT"),
         ("public_city",         "VARCHAR(80)"),
         ("public_town",         "VARCHAR(80)"),
@@ -77,17 +77,17 @@ _ADDITIVE_COLUMNS = {
         ("starting_price",      "NUMERIC(10,2)"),
         ("amenities",           "TEXT"),
         # v7.0 — WhatsApp per-lodge config.
-        ("whatsapp_enabled",          "BOOLEAN DEFAULT 0"),
+        ("whatsapp_enabled",          "BOOLEAN DEFAULT FALSE"),
         ("whatsapp_phone_number_id",  "VARCHAR(40)"),
         ("whatsapp_access_token",     "VARCHAR(400)"),
         ("whatsapp_display_name",     "VARCHAR(80)"),
         # v9.0 — enhanced marketplace amenity + policy fields
-        ("power_backup",         "BOOLEAN DEFAULT 0"),
-        ("hot_water_24h",        "BOOLEAN DEFAULT 0"),
-        ("parking_available",    "BOOLEAN DEFAULT 0"),
+        ("power_backup",         "BOOLEAN DEFAULT FALSE"),
+        ("hot_water_24h",        "BOOLEAN DEFAULT FALSE"),
+        ("parking_available",    "BOOLEAN DEFAULT FALSE"),
         ("bus_stand_km",         "NUMERIC(4,1)"),
         ("railway_station_km",   "NUMERIC(4,1)"),
-        ("temple_nearby",        "BOOLEAN DEFAULT 0"),
+        ("temple_nearby",        "BOOLEAN DEFAULT FALSE"),
         ("checkin_time",         "VARCHAR(10) DEFAULT '12:00'"),
         ("checkout_time",        "VARCHAR(10) DEFAULT '11:00'"),
         ("property_type",        "VARCHAR(40) DEFAULT 'lodge'"),
@@ -95,8 +95,8 @@ _ADDITIVE_COLUMNS = {
         ("cancellation_policy",  "VARCHAR(40) DEFAULT 'flexible'"),
         ("cancellation_hours",   "INTEGER DEFAULT 24"),
         ("max_online_rooms_pct", "INTEGER DEFAULT 100"),
-        ("instant_confirm",      "BOOLEAN DEFAULT 1"),
-        ("allow_online_booking", "BOOLEAN DEFAULT 1"),
+        ("instant_confirm",      "BOOLEAN DEFAULT TRUE"),
+        ("allow_online_booking", "BOOLEAN DEFAULT TRUE"),
     ],
     # v7.1 — extended lodge registration: room-type breakdown + plan.
     "lodge_registration_requests": [
@@ -107,9 +107,9 @@ _ADDITIVE_COLUMNS = {
         ("payment_method",   "VARCHAR(40)"),
         ("payment_ref",      "VARCHAR(120)"),
         ("payment_amount",   "NUMERIC(12,2)"),
-        ("payment_date",     "DATETIME"),
+        ("payment_date",     "TIMESTAMP"),
         ("payment_notes",    "TEXT"),
-        ("follow_up_at",     "DATETIME"),
+        ("follow_up_at",     "TIMESTAMP"),
         ("follow_up_count",  "INTEGER DEFAULT 0"),
         ("assigned_to",      "VARCHAR(80)"),
         ("rooms_ac",         "INTEGER DEFAULT 0"),
@@ -128,12 +128,12 @@ _ADDITIVE_COLUMNS = {
         ("pending_billing_cycle",          "VARCHAR(10)"),
         ("pending_total_rooms",            "INTEGER"),
         ("pending_change_takes_effect_at", "DATE"),
-        ("pending_change_queued_at",       "DATETIME"),
+        ("pending_change_queued_at",       "TIMESTAMP"),
         # v8.3 — "cancel at period end" support.
         ("service_ends_at",                "DATE"),
     ],
     "lodge_billing_invoices": [
-        ("email_sent_at", "DATETIME"),
+        ("email_sent_at", "TIMESTAMP"),
     ],
 }
 
@@ -151,8 +151,8 @@ _NEW_TABLE_DDLS = [
         referral_code VARCHAR(20) UNIQUE,
         referred_by_code VARCHAR(20),
         referral_credits INTEGER NOT NULL DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""",
     "CREATE UNIQUE INDEX IF NOT EXISTS ix_rusto_mem_customer ON rusto_memberships(customer_id)",
     "CREATE UNIQUE INDEX IF NOT EXISTS ix_rusto_mem_referral ON rusto_memberships(referral_code)",
@@ -164,7 +164,7 @@ _NEW_TABLE_DDLS = [
         txn_type VARCHAR(20) NOT NULL,
         booking_id INTEGER REFERENCES rusto_customer_bookings(booking_id),
         description VARCHAR(200),
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""",
     "CREATE INDEX IF NOT EXISTS ix_rusto_ledger_member ON rusto_points_ledger(membership_id)",
     """CREATE TABLE IF NOT EXISTS rusto_room_photos (
@@ -174,7 +174,7 @@ _NEW_TABLE_DDLS = [
         url VARCHAR(500) NOT NULL,
         caption VARCHAR(200),
         sort_order INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""",
     "CREATE INDEX IF NOT EXISTS ix_room_photo_lodge_type ON rusto_room_photos(lodge_id, room_type)",
     """CREATE TABLE IF NOT EXISTS global_api_keys (
@@ -194,10 +194,10 @@ _NEW_TABLE_DDLS = [
         commission_pct NUMERIC(5,2) DEFAULT 10,
         status VARCHAR(20) DEFAULT 'active',
         total_calls INTEGER DEFAULT 0,
-        last_used_at DATETIME,
+        last_used_at TIMESTAMP,
         created_by INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""",
     "CREATE UNIQUE INDEX IF NOT EXISTS ix_global_api_key ON global_api_keys(api_key)",
     """CREATE TABLE IF NOT EXISTS global_api_calls (
@@ -208,7 +208,7 @@ _NEW_TABLE_DDLS = [
         status_code INTEGER,
         response_ms INTEGER,
         ip_address VARCHAR(45),
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""",
     # meal_plan column for rusto_customer_bookings
     "ALTER TABLE rusto_customer_bookings ADD COLUMN IF NOT EXISTS meal_plan VARCHAR(20)",
@@ -376,7 +376,7 @@ def _rebuild_settings_table_if_needed(engine):
                 setting_group VARCHAR(50),
                 description VARCHAR(255),
                 is_sensitive BOOLEAN,
-                updated_at DATETIME,
+                updated_at TIMESTAMP,
                 updated_by INTEGER REFERENCES users(user_id)
             )
         """))
@@ -612,10 +612,10 @@ _SQLITE_PER_LODGE_REBUILDS = {
             email VARCHAR(100),
             phone VARCHAR(15),
             is_active BOOLEAN,
-            last_login DATETIME,
+            last_login TIMESTAMP,
             failed_attempts INTEGER,
-            locked_until DATETIME,
-            created_at DATETIME
+            locked_until TIMESTAMP,
+            created_at TIMESTAMP
         )""",
         copy_cols="user_id, lodge_id, username, password_hash, full_name, role, "
                   "email, phone, is_active, last_login, failed_attempts, "
@@ -647,8 +647,8 @@ _SQLITE_PER_LODGE_REBUILDS = {
             imported_from_excel BOOLEAN,
             is_active BOOLEAN,
             sms_opt_in BOOLEAN,
-            created_at DATETIME,
-            updated_at DATETIME
+            created_at TIMESTAMP,
+            updated_at TIMESTAMP
         )""",
         copy_cols="customer_id, lodge_id, first_name, last_name, phone, email, "
                   "address, city, state, id_type, id_number, id_proof_path, "
@@ -705,10 +705,10 @@ _SQLITE_PER_LODGE_REBUILDS = {
             total_bookings INTEGER,
             total_revenue NUMERIC(12, 2),
             status VARCHAR(20),
-            last_used_at DATETIME,
-            created_at DATETIME,
+            last_used_at TIMESTAMP,
+            created_at TIMESTAMP,
             created_by INTEGER REFERENCES users(user_id),
-            updated_at DATETIME
+            updated_at TIMESTAMP
         )""",
         copy_cols="agency_id, lodge_id, name, code, contact_email, contact_phone, "
                   "contact_person, address, website, api_key, api_secret_hash, "
