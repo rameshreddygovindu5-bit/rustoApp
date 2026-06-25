@@ -253,12 +253,12 @@ def get_dashboard_data(db: Session = Depends(get_db),
 
     thirty_days_ago = today - timedelta(days=30)
     daily_checkins = db.query(
-        func.date(Checkin.checkin_datetime).label("day"),
+        cast(Checkin.checkin_datetime, Date).label("day"),
         func.count(Checkin.checkin_id).label("count")
     ).filter(
         Checkin.lodge_id == lodge_id,
         Checkin.checkin_datetime >= thirty_days_ago
-    ).group_by(func.date(Checkin.checkin_datetime)).order_by(func.date(Checkin.checkin_datetime)).all()
+    ).group_by(cast(Checkin.checkin_datetime, Date)).order_by(cast(Checkin.checkin_datetime, Date)).all()
 
     # v10.2 — pending confirmed online bookings (from Rusto marketplace)
     try:

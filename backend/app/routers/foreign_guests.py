@@ -192,9 +192,9 @@ def export_csv(status: Optional[str] = None,
     if status:
         q = q.filter(ForeignGuestRegistration.status == status)
     if from_date:
-        q = q.filter(func.date(ForeignGuestRegistration.created_at) >= from_date)
+        q = q.filter(cast(ForeignGuestRegistration.created_at, Date) >= from_date)
     if to_date:
-        q = q.filter(func.date(ForeignGuestRegistration.created_at) <= to_date)
+        q = q.filter(cast(ForeignGuestRegistration.created_at, Date) <= to_date)
 
     buf = io.StringIO()
     w = csv.writer(buf)

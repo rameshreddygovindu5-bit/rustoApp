@@ -142,7 +142,7 @@ def bookings_trend(
     start, end = _date_range(days)
 
     rows = (db.query(
-        func.date(CustomerBooking.created_at).label("day"),
+        cast(CustomerBooking.created_at, Date).label("day"),
         func.count(CustomerBooking.booking_id).label("bookings"),
         func.sum(case(
             (CustomerBooking.status.in_([
@@ -153,8 +153,8 @@ def bookings_trend(
             else_=0
         )).label("gmv"),
     ).filter(CustomerBooking.created_at >= start)
-     .group_by(func.date(CustomerBooking.created_at))
-     .order_by(func.date(CustomerBooking.created_at)).all())
+     .group_by(cast(CustomerBooking.created_at, Date))
+     .order_by(cast(CustomerBooking.created_at, Date)).all())
 
     return {
         "trend": [
@@ -162,7 +162,6 @@ def bookings_trend(
             for r in rows
         ]
     }
-
 
 @router.get("/lodges")
 def lodge_leaderboard(
@@ -216,7 +215,6 @@ def lodge_leaderboard(
         ]
     }
 
-
 @router.get("/customers")
 def customer_growth(
     days: int = Query(90, ge=7, le=365),
@@ -228,11 +226,11 @@ def customer_growth(
 
     # Daily signups
     daily = (db.query(
-        func.date(RustoCustomer.created_at).label("day"),
+        cast(RustoCustomer.created_at, Date).label("day"),
         func.count(RustoCustomer.customer_id).label("signups"),
     ).filter(RustoCustomer.created_at >= start)
-     .group_by(func.date(RustoCustomer.created_at))
-     .order_by(func.date(RustoCustomer.created_at)).all())
+     .group_by(cast(RustoCustomer.created_at, Date))
+     .order_by(cast(RustoCustomer.created_at, Date)).all())
 
     # Repeat bookers
     bk_counts = (db.query(
