@@ -10,7 +10,7 @@ purpose), then mark `submitted` after filing with FRRO.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, cast, Date
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date, datetime, timezone

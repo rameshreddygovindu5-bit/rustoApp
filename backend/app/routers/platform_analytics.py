@@ -28,7 +28,7 @@ def _utcnow():
     ).replace(tzinfo=None)
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, and_, case, distinct
+from sqlalchemy import func, and_, case, distinct, cast, Date
 from sqlalchemy.orm import Session
 
 from ..database import get_db
