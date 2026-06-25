@@ -16,6 +16,7 @@ export default defineConfig({
 
   // Use the PMS-specific HTML as entry
   root: '.',
+  base: '/pms/',
   build: {
     outDir: 'dist-pms',
     emptyOutDir: true,
