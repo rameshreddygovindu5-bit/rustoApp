@@ -114,13 +114,15 @@ def list_lodges(current_user: User = Depends(get_current_user),
     so the dropdown becomes a real selector for them.
     """
     role = getattr(current_user.role, "value", current_user.role)
-    if role == "super_admin":
+    # super_admin and app_owner are cross-tenant roles — they see every lodge.
+    # (app_owner is "like super_admin + audit access" per the role definition.)
+    if role in ("super_admin", "app_owner"):
         rows = db.query(Lodge).order_by(Lodge.lodge_id).all()
     else:
         rows = (db.query(Lodge)
                 .filter(Lodge.lodge_id == current_user.lodge_id)
                 .all())
-    use_rich = role == "super_admin"
+    use_rich = role in ("super_admin", "app_owner")
     return [_to_dict(l, db=db if use_rich else None, rich=use_rich) for l in rows]
 
 

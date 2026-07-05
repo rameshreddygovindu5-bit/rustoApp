@@ -35,6 +35,13 @@ if os.path.exists(PROD_DB) and (
 
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB}"
 
+# Tests deliberately submit wrong passwords (to verify 401 handling). Without
+# raising this, those attempts lock the shared test accounts and every later
+# test that logs in as the same user fails with a spurious 401. A very high
+# threshold keeps the accounts usable for the whole session while still
+# letting the "wrong password returns 401" assertions pass.
+os.environ["MAX_LOGIN_ATTEMPTS"] = "100000"
+
 # ── Start backend server once for all tests ─────────────────────────
 _server_started = False
 _server_port    = 9900
@@ -154,6 +161,12 @@ def reset_test_db_rooms():
                 "UPDATE checkins SET status='checked_out' "
                 "WHERE status IN ('active', 'checked_in')"
             )
+            # Clear any account lockouts from failed-login tests so later
+            # tests can still authenticate (prevents cross-test lockout).
+            try:
+                conn.execute("UPDATE users SET failed_attempts=0, locked_until=NULL")
+            except Exception:
+                pass
             # Cancel stale internal bookings (keep only last 5)
             conn.execute(
                 "UPDATE bookings SET status='cancelled' "
@@ -274,3 +287,117 @@ def pytest_configure(config):
     warnings.filterwarnings("ignore", message=".*WebSocketServerProtocol.*")
     warnings.filterwarnings("ignore", message=".*urllib3.*chardet.*")
     warnings.filterwarnings("ignore", message=".*declarative_base.*", category=DeprecationWarning)
+
+# ── Comprehensive test data seed ─────────────────────────────────────
+# The suite expects a richer dataset than the app's built-in seed:
+# lodge code "udumulas" (a source-app leftover the tests hardcode),
+# published lodges, and staff1/staff2 users. This fixture reconciles the
+# app's seed with those expectations. Idempotent; runs once per session
+# after the server (and its seed_initial_data) has started.
+@pytest.fixture(autouse=True, scope="session")
+def seed_test_data(reset_test_db_rooms):
+    try:
+        from app.database import SessionLocal
+        from app.models import Lodge, User, UserRole, RustoCustomer
+        from app.auth import get_password_hash
+        from app.rusto_auth import hash_customer_password
+        db = SessionLocal()
+        try:
+            # Lodge 1 must answer to code "udumulas" (tests hardcode it).
+            def publish(l, city="Guntur"):
+                l.is_active = True
+                l.is_published = True
+                for attr, val in [("allow_online_booking", True),
+                                  ("public_city", city),
+                                  ("public_description", f"{l.name} — comfortable stay."),
+                                  ("starting_price", 1000)]:
+                    if hasattr(l, attr):
+                        setattr(l, attr, val)
+            l1 = db.query(Lodge).filter_by(lodge_id=1).first()
+            if l1:
+                l1.code = "udumulas"
+            else:
+                l1 = Lodge(code="udumulas", name="Udumula's Grand", is_active=True)
+                db.add(l1); db.flush()
+            publish(l1)
+
+            # A second published lodge coded "rk".
+            l2 = db.query(Lodge).filter_by(code="rk").first()
+            if not l2:
+                l2 = Lodge(code="rk", name="RK Residency", is_active=True)
+                db.add(l2); db.flush()
+            publish(l2, city="Vijayawada")
+            db.flush()
+
+            def ensure_user(username, password, role, lodge_id, full_name):
+                u = db.query(User).filter_by(username=username).first()
+                if not u:
+                    u = User(username=username)
+                    db.add(u)
+                u.password_hash = get_password_hash(password)
+                u.role = role
+                u.lodge_id = lodge_id
+                u.full_name = full_name
+                u.is_active = True
+                if hasattr(u, "totp_enabled"):
+                    u.totp_enabled = False
+                if hasattr(u, "require_login_otp"):
+                    u.require_login_otp = False
+                return u
+
+            ensure_user("admin",      "Admin@1234",    UserRole.admin,       l1.lodge_id, "Lodge Admin")
+            ensure_user("staff1",     "Staff1@1234",   UserRole.staff,       l1.lodge_id, "Staff One")
+            ensure_user("staff2",     "Staff2@1234",   UserRole.staff,       l1.lodge_id, "Staff Two")
+            ensure_user("superadmin", "superadmin123", UserRole.super_admin, l1.lodge_id, "Super Admin")
+
+            # Lodge 2 (rk) needs its own settings row-set (app only seeds
+            # settings for lodge 1). Copy the key settings so multi-tenant
+            # isolation tests see non-empty, separate settings per lodge.
+            from app.models import Setting
+            existing_rk = db.query(Setting).filter_by(lodge_id=l2.lodge_id).count()
+            if existing_rk == 0:
+                seed_settings = [
+                    ("hotel_name", "RK Residency"),
+                    ("hotel_address", "Vijayawada"),
+                    ("hotel_phone", ""),
+                    ("hotel_email", ""),
+                    ("currency", "INR"),
+                    ("timezone", "Asia/Kolkata"),
+                    ("checkin_time", "12:00"),
+                    ("checkout_time", "11:00"),
+                ]
+                for key, val in seed_settings:
+                    db.add(Setting(lodge_id=l2.lodge_id, setting_key=key,
+                                   setting_value=val))
+                db.flush()
+
+            # Lodge-side customer (agent + PMS tests need one on lodge 1).
+            from app.models import Customer
+            lc = db.query(Customer).filter_by(lodge_id=l1.lodge_id, phone="9333322221").first()
+            if not lc:
+                lc = Customer(lodge_id=l1.lodge_id, first_name="Ravi", last_name="Kumar",
+                              phone="9333322221")
+                db.add(lc)
+            lc.first_name = "Ravi"; lc.last_name = "Kumar"
+            if hasattr(lc, "blacklisted"):
+                lc.blacklisted = False
+            if hasattr(lc, "id_type"):
+                lc.id_type = lc.id_type or "aadhar"
+            if hasattr(lc, "id_number"):
+                lc.id_number = lc.id_number or "222233334444"
+
+            # Marketplace customer for /api/rusto/auth/login tests.
+            cust = db.query(RustoCustomer).filter_by(phone="9000000000").first()
+            if not cust:
+                cust = RustoCustomer(phone="9000000000", full_name="Demo Customer")
+                db.add(cust)
+            cust.password_hash = hash_customer_password("Demo@1234")
+            cust.is_active = True
+
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        import sys
+        print(f"[seed_test_data] warning: {e}", file=sys.stderr)
+    yield

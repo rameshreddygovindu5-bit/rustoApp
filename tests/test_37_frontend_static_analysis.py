@@ -536,14 +536,14 @@ class TestProductionReadiness:
             assert key in env, f".env.production.example missing {key}"
 
     def test_ci_workflow_has_test_gate(self):
-        with open(ROOT + "/.github/workflows/deploy.yml") as f:
+        with open(ROOT + "/.github/workflows/pipeline.yml") as f:
             workflow = f.read()
         assert "needs: test" in workflow or "needs: build" in workflow, \
             "CI/CD workflow must gate deploy on tests"
         assert "pytest" in workflow, "CI/CD must run pytest"
 
     def test_ci_workflow_builds_both_portals(self):
-        with open(ROOT + "/.github/workflows/deploy.yml") as f:
+        with open(ROOT + "/.github/workflows/pipeline.yml") as f:
             workflow = f.read()
         assert "PORTAL=pms" in workflow, "CI must build PMS portal"
         assert "PORTAL=customer" in workflow, "CI must build Customer portal"

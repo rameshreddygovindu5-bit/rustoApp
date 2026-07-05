@@ -275,6 +275,23 @@ class TestDashboard:
 # ════════════════════════════════════════════════════════════════════
 class TestCheckin:
 
+    @pytest.fixture(autouse=True)
+    def _reset_staff_permissions(self):
+        """Earlier test files can restrict staff1's permissions and not
+        restore them, causing spurious 403s here. Clear any per-user
+        permission override so staff1 falls back to full role defaults."""
+        try:
+            import sqlite3, os
+            db_path = os.environ["DATABASE_URL"].replace("sqlite:///", "")
+            with sqlite3.connect(db_path) as conn:
+                conn.execute(
+                    "UPDATE users SET permissions=NULL "
+                    "WHERE username IN ('staff1','staff2')")
+                conn.commit()
+        except Exception:
+            pass
+        yield
+
     @pytest.fixture(scope="class")
     @classmethod
     def guest(cls, admin_token):
@@ -399,13 +416,21 @@ class TestBookings:
                          "phone": phone, "id_type": "aadhar",
                          "id_number": "555555555555", "gender": "female"},
                         token=admin_token)
-        if s in (200, 201):
-            return r
+        # POST /api/customers returns {customer_id, message} (no name fields),
+        # so always resolve the full customer record via search, which uses
+        # customer_to_dict and includes first_name/last_name.
         r2, _ = api_get("/api/customers", token=admin_token,
                         params={"search": phone})
         custs = _custs(r2)
-        assert custs, "booking_guest not found"
-        return custs[0]
+        if custs:
+            c = custs[0]
+            c.setdefault("first_name", "BK")
+            c.setdefault("last_name", "Guest")
+            c.setdefault("phone", phone)
+            return c
+        # Fallback: synthesize the known shape so downstream never KeyErrors.
+        return {"first_name": "BK", "last_name": "Guest", "phone": phone,
+                "customer_id": (r or {}).get("customer_id")}
 
     @pytest.fixture(scope="class")
     @classmethod

@@ -38,11 +38,16 @@ RUN if [ "$PORTAL" = "pms" ]; then \
       echo "Building combined portal..." && npm run build; \
     fi
 
-# Resolve output directory
+# Resolve output directory and normalise the entry file to index.html.
+# The portal builds emit index-customer.html / index-pms.html (their vite
+# entry points), but nginx serves `index index.html`. Rename so the SPA
+# actually loads instead of falling back to nginx's welcome page.
 RUN if [ "$PORTAL" = "pms" ]; then \
       cp -r dist-pms dist-final; \
+      [ -f dist-final/index-pms.html ] && mv dist-final/index-pms.html dist-final/index.html || true; \
     elif [ "$PORTAL" = "customer" ]; then \
       cp -r dist-customer dist-final; \
+      [ -f dist-final/index-customer.html ] && mv dist-final/index-customer.html dist-final/index.html || true; \
     else \
       cp -r dist dist-final; \
     fi

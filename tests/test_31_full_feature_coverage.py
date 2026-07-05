@@ -510,6 +510,12 @@ class TestStaffModuleAssignment:
             pytest.skip("No staff users available for permission test")
 
         uid = staff_members[0]["user_id"]
+        # Snapshot the current permissions so we can restore them afterwards —
+        # otherwise this restriction leaks into later tests that log in as the
+        # same staff user and would get spurious 403s.
+        before, _ = api_get(f"/api/staff/{uid}", token=lodge_token)
+        original_perms = before.get("permissions") if isinstance(before, dict) else None
+
         new_perms = ["bookings.read", "checkins.read", "rooms.read"]
         r, s = api_patch(f"/api/staff/{uid}", {"permissions": new_perms}, token=lodge_token)
         assert s in (200, 204), f"Permission update failed: {s} {r}"
@@ -520,6 +526,9 @@ class TestStaffModuleAssignment:
         effective = set(updated.get("permissions_effective", []))
         for p in new_perms:
             assert p in effective, f"Permission {p} not in effective set: {effective}"
+
+        # Restore original permissions (None = fall back to role defaults / full).
+        api_patch(f"/api/staff/{uid}", {"permissions": original_perms}, token=lodge_token)
 
     def test_staff_cannot_patch_staff(self, lodge_token):
         """Staff endpoint is admin-only — customer token must not work."""
