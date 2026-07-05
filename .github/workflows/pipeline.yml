@@ -208,7 +208,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ needs.resolve.outputs.role_arn }}
-          aws-region: ${{ needs.resolve.outputs.region }}
+          aws-region: ${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}
       - name: Log in to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
       - name: Ensure ECR repositories exist
@@ -295,7 +295,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ needs.resolve.outputs.role_arn }}
-          aws-region: ${{ needs.resolve.outputs.region }}
+          aws-region: ${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.9.8"
@@ -343,7 +343,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ needs.resolve.outputs.role_arn }}
-          aws-region: ${{ needs.resolve.outputs.region }}
+          aws-region: ${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.9.8"
@@ -433,7 +433,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ needs.resolve.outputs.role_arn }}
-          aws-region: ${{ needs.resolve.outputs.region }}
+          aws-region: ${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.9.8"
