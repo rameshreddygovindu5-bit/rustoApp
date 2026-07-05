@@ -40,14 +40,15 @@ RUN if [ "$PORTAL" = "pms" ]; then \
 
 # Resolve output directory and normalise the entry file to index.html.
 # The portal builds emit index-customer.html / index-pms.html (their vite
-# entry points), but nginx serves `index index.html`. Rename so the SPA
-# actually loads instead of falling back to nginx's welcome page.
+# entry points). The nginx base image ships its own stock index.html (the
+# "Welcome to nginx" page), so we must OVERWRITE it (cp -f), not just place
+# the portal file alongside — otherwise nginx serves the welcome page.
 RUN if [ "$PORTAL" = "pms" ]; then \
       cp -r dist-pms dist-final; \
-      [ -f dist-final/index-pms.html ] && mv dist-final/index-pms.html dist-final/index.html || true; \
+      [ -f dist-final/index-pms.html ] && cp -f dist-final/index-pms.html dist-final/index.html || true; \
     elif [ "$PORTAL" = "customer" ]; then \
       cp -r dist-customer dist-final; \
-      [ -f dist-final/index-customer.html ] && mv dist-final/index-customer.html dist-final/index.html || true; \
+      [ -f dist-final/index-customer.html ] && cp -f dist-final/index-customer.html dist-final/index.html || true; \
     else \
       cp -r dist dist-final; \
     fi
