@@ -14,6 +14,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
 
+  // Served under /pms by the outer nginx, so assets must be referenced as
+  // /pms/assets/... — otherwise the browser requests /assets/... which the
+  // outer nginx routes to the customer container (→ 404 for index-pms-*.js).
+  base: '/pms/',
+
   // Use the PMS-specific HTML as entry
   root: '.',
   build: {

@@ -32,7 +32,7 @@ import { useSettings } from "../context/SettingsContext";
 export default function RegisterLodge() {
   const navigate = useNavigate();
   const { settings } = useSettings();
-  const isPremiumTheme = settings.premium_theme_enabled !== 'false';
+  const isPremiumTheme = settings?.premium_theme_enabled !== 'false';
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(null);

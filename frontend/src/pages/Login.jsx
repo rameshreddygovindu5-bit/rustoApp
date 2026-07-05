@@ -52,7 +52,7 @@ export default function Login() {
   const lodgeCity   = branding?.hotel_city   || null
   const lodgeWeb    = branding?.hotel_website || null
 
-  const isPremiumTheme = settings.premium_theme_enabled !== 'false'
+  const isPremiumTheme = settings?.premium_theme_enabled !== 'false'
 
   // Demo credentials — only show on generic/Rusto login, not lodge-branded
   const DEMO_CREDS = [

@@ -43,9 +43,14 @@ RUN if [ "$PORTAL" = "pms" ]; then \
 # entry points). The nginx base image ships its own stock index.html (the
 # "Welcome to nginx" page), so we must OVERWRITE it (cp -f), not just place
 # the portal file alongside — otherwise nginx serves the welcome page.
+#
+# PMS is served under /pms (base: '/pms/'), so its files live in a pms/
+# subdir and reference /pms/assets/... — this keeps its assets from
+# colliding with the customer portal's /assets/ at the outer nginx.
 RUN if [ "$PORTAL" = "pms" ]; then \
-      cp -r dist-pms dist-final; \
-      [ -f dist-final/index-pms.html ] && cp -f dist-final/index-pms.html dist-final/index.html || true; \
+      mkdir -p dist-final/pms; \
+      cp -r dist-pms/* dist-final/pms/; \
+      [ -f dist-final/pms/index-pms.html ] && cp -f dist-final/pms/index-pms.html dist-final/pms/index.html || true; \
     elif [ "$PORTAL" = "customer" ]; then \
       cp -r dist-customer dist-final; \
       [ -f dist-final/index-customer.html ] && cp -f dist-final/index-customer.html dist-final/index.html || true; \
@@ -59,8 +64,16 @@ FROM nginx:1.25-alpine
 # Copy built assets
 COPY --from=build /app/dist-final /usr/share/nginx/html
 
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx configuration — PMS serves under /pms/ so it needs its own
+# config; the customer/combined portals use the default static config.
+ARG PORTAL=combined
+COPY nginx.conf     /tmp/nginx-default.conf
+COPY nginx-pms.conf /tmp/nginx-pms.conf
+RUN if [ "$PORTAL" = "pms" ]; then \
+      cp /tmp/nginx-pms.conf /etc/nginx/conf.d/default.conf; \
+    else \
+      cp /tmp/nginx-default.conf /etc/nginx/conf.d/default.conf; \
+    fi
 
 EXPOSE 80
 

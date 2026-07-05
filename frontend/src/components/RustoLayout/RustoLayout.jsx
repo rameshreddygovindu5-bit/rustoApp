@@ -73,7 +73,7 @@ export default function RustoLayout() {
   const transparentNav = location.pathname === "/" && !scrolled;
   const isAuthPage = location.pathname === "/signin" || location.pathname === "/signup";
 
-  const isPremiumTheme = settings.premium_theme_enabled !== "false";
+  const isPremiumTheme = settings?.premium_theme_enabled !== "false";
 
   return (
     <div className={`${isPremiumTheme ? "rusto-layout" : ""} min-h-screen flex flex-col relative overflow-hidden`}>
