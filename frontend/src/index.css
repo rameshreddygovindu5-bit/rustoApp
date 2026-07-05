@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Rusto booking design tokens — defined globally so they resolve
+   anywhere (the scoped copies live under .rb in rusto-booking.css). */
+:root {
+  --rb-clay:      #B45A38;
+  --rb-clay-dark: #7A3E2D;
+  --rb-clay-soft: #F3E3DA;
+  --rb-cream:     #FBF7F2;
+  --rb-cream-2:   #F4EDE4;
+  --rb-ink:       #2A211C;
+  --rb-ink-2:     #6B5D53;
+  --rb-ink-3:     #9C8E82;
+  --rb-line:      #E7DDD2;
+  --rb-gold:      #C8862B;
+  --rb-green:     #2E7D5B;
+  --rb-green-bg:  #E4F1EA;
+}
+
 :root {
 
   /* ── Missing vars used by pages ─────────────────────────────── */

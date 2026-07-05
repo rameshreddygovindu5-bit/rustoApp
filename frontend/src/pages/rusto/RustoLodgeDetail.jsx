@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { MapPin, Star, Heart, ChevronLeft, Bolt, Wifi, Car, Wind, Coffee,
-         ShieldCheck, Check, Loader2, X, ChevronRight } from "lucide-react";
+         ShieldCheck, Check, Loader2, X, ChevronRight, Share2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { rustoPublicAPI, rustoBookingsAPI, rustoWishlistAPI, reviewsAPI } from "../../services/api";
 import { useCustomerAuth } from "../../context/CustomerAuthContext";
@@ -82,6 +82,19 @@ export default function RustoLodgeDetail() {
     catch { setSaved(was); }
   };
 
+  const onShare = async () => {
+    const url = window.location.href;
+    const title = lodge?.name ? `${lodge.name} on Rusto` : "Rusto";
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, url });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        toast.success("Link copied to clipboard");
+      }
+    } catch { /* user dismissed the share sheet — no action needed */ }
+  };
+
   const onBook = async () => {
     if (!customer) {
       navigate(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
@@ -125,7 +138,9 @@ export default function RustoLodgeDetail() {
   const photos = lodge.photos?.length ? lodge.photos : [{ url: FALLBACK_IMG }];
   const rating = reviewMeta.avg || lodge.avg_rating;
   const city = lodge.public_city || lodge.city || "";
-  const amenities = lodge.amenities || [];
+  const amenities = Array.isArray(lodge.amenities)
+    ? lodge.amenities
+    : (typeof lodge.amenities === "string" ? lodge.amenities.split(",").map(s => s.trim()).filter(Boolean) : []);
   const rooms = availability?.rooms || [];
   const roomTotal = (picked?.price_per_night || 0) * (nights || 0) * (form.rooms || 1);
 
@@ -137,10 +152,15 @@ export default function RustoLodgeDetail() {
           <button className="rb-btn rb-btn-ghost" style={{ padding: "8px 14px" }} onClick={() => navigate(-1)}>
             <ChevronLeft size={16} /> Back
           </button>
-          <button className="rb-btn rb-btn-ghost" style={{ padding: "8px 14px" }} onClick={toggleSave}>
-            <Heart size={16} style={{ fill: saved ? "#E24B4A" : "none", color: saved ? "#E24B4A" : "currentColor" }} />
-            {saved ? "Saved" : "Save"}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="rb-btn rb-btn-ghost" style={{ padding: "8px 14px" }} onClick={onShare}>
+              <Share2 size={16} /> Share
+            </button>
+            <button className="rb-btn rb-btn-ghost" style={{ padding: "8px 14px" }} onClick={toggleSave}>
+              <Heart size={16} style={{ fill: saved ? "#E24B4A" : "none", color: saved ? "#E24B4A" : "currentColor" }} />
+              {saved ? "Saved" : "Save"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -197,11 +217,26 @@ export default function RustoLodgeDetail() {
             <section className="rb-detail-section">
               <h2 className="rb-section-title">What this place offers</h2>
               <div className="rb-amenity-grid">
-                {amenities.map((a, i) => {
+                {amenities?.map((a, i) => {
                   const key = String(a).toLowerCase();
                   const Icon = AMENITY_ICONS[key] || Check;
                   return <div key={i} className="rb-amenity"><Icon size={18} /> <span>{String(a).replace(/_/g, " ")}</span></div>;
                 })}
+              </div>
+            </section>
+          )}
+
+          {/* Property facilities (object of booleans) */}
+          {lodge.facilities && (
+            <section className="rb-detail-section">
+              <h2 className="rb-section-title">Property facilities</h2>
+              <div className="rb-amenity-grid">
+                {lodge.facilities?.parking && <div className="rb-amenity"><Car size={18} /> <span>Parking available</span></div>}
+                {lodge.facilities?.restaurant && <div className="rb-amenity"><Coffee size={18} /> <span>Restaurant on-site</span></div>}
+                {lodge.facilities?.wifi && <div className="rb-amenity"><Wifi size={18} /> <span>Free Wi-Fi</span></div>}
+                {lodge.facilities?.power_backup && <div className="rb-amenity"><Check size={18} /> <span>Power backup</span></div>}
+                {lodge.facilities?.reception_24hr && <div className="rb-amenity"><Check size={18} /> <span>24-hour reception</span></div>}
+                {lodge.facilities?.hot_water && <div className="rb-amenity"><Check size={18} /> <span>Hot water</span></div>}
               </div>
             </section>
           )}
