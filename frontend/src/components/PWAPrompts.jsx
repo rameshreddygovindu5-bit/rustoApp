@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Download, RefreshCw, X } from "lucide-react";
 import { RustoMark } from "./RustoLogo/RustoLogo";
+import { useSettings } from "../context/SettingsContext";
 
 /**
  * PWAPrompts — two small UI affordances that ride along on top of the
@@ -43,6 +44,8 @@ function isIos() {
 }
 
 export default function PWAPrompts() {
+  const { settings } = useSettings();
+  const brand = settings?.hotel_name || "Rusto";
   const [installEvent, setInstallEvent] = useState(null);     // captured beforeinstallprompt
   const [installVisible, setInstallVisible] = useState(false); // gating logic
   const [iosHintVisible, setIosHintVisible] = useState(false);
@@ -154,7 +157,7 @@ function InstallBanner({ installing, onInstall, onDismiss }) {
       <div className="bg-white rounded-2xl shadow-lux border border-gold/30 p-4 flex items-start gap-3">
         <RustoMark size={40} className="flex-shrink-0"/>
         <div className="flex-1 min-w-0">
-          <p className="font-display font-bold text-navy text-sm">Install Rusto</p>
+          <p className="font-display font-bold text-navy text-sm">Install {brand}</p>
           <p className="text-2xs text-ink-500 mt-0.5">
             Get faster access — opens like an app, works on your home screen.
           </p>
@@ -182,7 +185,7 @@ function IosInstallHint({ onDismiss }) {
       <div className="bg-white rounded-2xl shadow-lux border border-gold/30 p-4 flex items-start gap-3">
         <RustoMark size={40} className="flex-shrink-0"/>
         <div className="flex-1 min-w-0">
-          <p className="font-display font-bold text-navy text-sm">Add Rusto to Home Screen</p>
+          <p className="font-display font-bold text-navy text-sm">Add {brand} to Home Screen</p>
           <p className="text-2xs text-ink-500 mt-0.5 leading-relaxed">
             Tap <span className="inline-block px-1 py-0.5 bg-ink-100 rounded text-2xs font-mono">Share</span> in Safari, then <strong>Add to Home Screen</strong> for a full-screen app experience.
           </p>
@@ -204,7 +207,7 @@ function UpdateToast({ onApply, onDismiss }) {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold">Update available</p>
-          <p className="text-2xs text-white/60">A new version of Rusto is ready.</p>
+          <p className="text-2xs text-white/60">A new version of {brand} is ready.</p>
         </div>
         <button onClick={onApply} className="btn-gold text-2xs px-3 py-1.5 whitespace-nowrap">
           Reload

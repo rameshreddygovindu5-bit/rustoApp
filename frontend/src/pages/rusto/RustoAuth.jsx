@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, Phone, Lock, User, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
 import { useCustomerAuth } from "../../context/CustomerAuthContext";
+import { useSettings } from "../../context/SettingsContext";
+import { RustoMark } from "../../components/RustoLogo/RustoLogo";
 import { toast } from "react-toastify";
 
 export function RustoLogin()  { return <AuthPage mode="login"/>; }
@@ -11,6 +13,7 @@ function AuthPage({ mode }) {
   const [params]   = useSearchParams();
   const navigate   = useNavigate();
   const { customer, login, signup } = useCustomerAuth();
+  const { settings } = useSettings();
   const isSignup   = mode === "signup";
   const next       = params.get("next") || "/";
 
@@ -139,10 +142,8 @@ function AuthPage({ mode }) {
         {/* Brand */}
         <div style={{textAlign:"center",marginBottom:32}}>
           <Link to="/" style={{display:"inline-flex",alignItems:"center",gap:10,textDecoration:"none"}}>
-            <div style={{width:42,height:42,borderRadius:12,background:"var(--brand-navy,#1B2A4A)",
-              display:"flex",alignItems:"center",justifyContent:"center",
-              fontFamily:"var(--font-display)",fontWeight:800,fontSize:20,color:"var(--brand-gold,#C9A84C)"}}>R</div>
-            <span style={{fontFamily:"var(--font-display)",fontWeight:700,fontSize:22,color:"var(--text-primary,#0F172A)"}}>Rusto</span>
+            <RustoMark size={42} />
+            <span style={{fontFamily:"var(--font-display)",fontWeight:700,fontSize:22,color:"var(--text-primary,#0F172A)"}}>{settings?.hotel_name || "Rusto"}</span>
           </Link>
           <h1 style={{fontFamily:"var(--font-display)",fontSize:24,fontWeight:700,
             color:"var(--text-primary,#0F172A)",marginTop:28,marginBottom:6,letterSpacing:"-0.02em"}}>

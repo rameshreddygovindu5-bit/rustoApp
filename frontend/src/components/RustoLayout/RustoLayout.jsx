@@ -102,10 +102,10 @@ export default function RustoLayout() {
               </div>
               <div className="leading-tight">
                 <div className="font-display text-2xl font-semibold tracking-tight text-white">
-                  Rusto
+                  {settings?.hotel_name || "Rusto"}
                 </div>
                 <div className="text-2xs hidden sm:block tracking-eyebrow uppercase font-semibold text-amber-glow">
-                  Rest Everywhere
+                  {settings?.hotel_tagline || "Rest Everywhere"}
                 </div>
               </div>
             </Link>
@@ -200,7 +200,7 @@ export default function RustoLayout() {
           <div className="relative flex items-center justify-between p-5 border-b border-white/10">
             <div className="flex items-center gap-2.5">
               <RustoMark size={40}/>
-              <span className="font-display text-2xl font-bold text-white">Rusto</span>
+              <span className="font-display text-2xl font-bold text-white">{settings?.hotel_name || "Rusto"}</span>
             </div>
             <button onClick={() => setMobileOpen(false)}
                     className="p-2 rounded-xl text-white hover:bg-white/10 transition-colors">
@@ -290,9 +290,9 @@ export default function RustoLayout() {
                 <div className="flex items-center gap-2.5 mb-4">
                   <RustoMark size={40}/>
                   <div>
-                    <div className="font-display text-2xl font-bold text-white">Rusto</div>
+                    <div className="font-display text-2xl font-bold text-white">{settings?.hotel_name || "Rusto"}</div>
                     <div className="text-2xs text-gold/80 tracking-eyebrow uppercase font-semibold">
-                      Rest Everywhere
+                      {settings?.hotel_tagline || "Rest Everywhere"}
                     </div>
                   </div>
                 </div>
