@@ -12,7 +12,6 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 
 import { CustomerAuthProvider }  from './context/CustomerAuthContext'
-import { SettingsProvider }      from './context/SettingsContext'
 import ErrorBoundary             from './components/ErrorBoundary/ErrorBoundary'
 import RustoLayout               from './components/RustoLayout/RustoLayout'
 import PWAPrompts                from './components/PWAPrompts'
@@ -68,15 +67,13 @@ function CustomerRoutes() {
 export default function AppCustomer() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <SettingsProvider>
-        <CustomerAuthProvider>
-          <CustomerRoutes />
-          <ToastContainer position="bottom-right" autoClose={3000}
-            hideProgressBar={false} newestOnTop closeOnClick
-            pauseOnHover draggable theme="light" />
-          <PWAPrompts />
-        </CustomerAuthProvider>
-      </SettingsProvider>
+      <CustomerAuthProvider>
+        <CustomerRoutes />
+        <ToastContainer position="bottom-right" autoClose={3000}
+          hideProgressBar={false} newestOnTop closeOnClick
+          pauseOnHover draggable theme="light" />
+        <PWAPrompts />
+      </CustomerAuthProvider>
     </BrowserRouter>
   )
 }

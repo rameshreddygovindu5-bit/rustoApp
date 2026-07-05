@@ -308,7 +308,7 @@ class TestPlanModuleGateLogic:
 
     @pytest.fixture(autouse=True)
     def import_gates(self):
-        sys.path.insert(0, "../backend")
+        sys.path.insert(0, "/home/claude/rusto-fix-upload/backend")
         from app.plan_module_gates import (
             get_allowed_modules, filter_to_plan, plan_allows_module,
             PLAN_MODULE_GATES, CORE_MODULES,
@@ -548,12 +548,12 @@ class TestStaffModuleAssignment:
 class TestFrontendNewFiles:
     """New RBAC frontend files must exist and contain the right patterns."""
 
-    SRC = "../frontend/src"
+    SRC = "/home/claude/rusto-fix-upload/frontend/src"
 
     def _read(self, relpath):
         path = os.path.join(self.SRC, relpath)
         assert os.path.exists(path), f"File missing: {relpath}"
-        with open(path, encoding="utf-8") as f:
+        with open(path) as f:
             return f.read()
 
     def test_module_gate_context_exists(self):

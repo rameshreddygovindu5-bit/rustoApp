@@ -28,10 +28,10 @@ def _utcnow():
     ).replace(tzinfo=None)
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, and_, case, distinct, cast, Date
+from sqlalchemy import func, and_, case, distinct
 from sqlalchemy.orm import Session
 
-from ..database import get_db, extract_date
+from ..database import get_db
 from ..models import (Lodge, CustomerBooking, CustomerBookingStatus,
                        RustoCustomer, Review, ReviewStatus)
 from ..auth import get_current_user
@@ -142,7 +142,7 @@ def bookings_trend(
     start, end = _date_range(days)
 
     rows = (db.query(
-        extract_date(CustomerBooking.created_at).label("day"),
+        func.date(CustomerBooking.created_at).label("day"),
         func.count(CustomerBooking.booking_id).label("bookings"),
         func.sum(case(
             (CustomerBooking.status.in_([
@@ -153,8 +153,8 @@ def bookings_trend(
             else_=0
         )).label("gmv"),
     ).filter(CustomerBooking.created_at >= start)
-     .group_by(extract_date(CustomerBooking.created_at))
-     .order_by(extract_date(CustomerBooking.created_at)).all())
+     .group_by(func.date(CustomerBooking.created_at))
+     .order_by(func.date(CustomerBooking.created_at)).all())
 
     return {
         "trend": [
@@ -162,6 +162,7 @@ def bookings_trend(
             for r in rows
         ]
     }
+
 
 @router.get("/lodges")
 def lodge_leaderboard(
@@ -215,6 +216,7 @@ def lodge_leaderboard(
         ]
     }
 
+
 @router.get("/customers")
 def customer_growth(
     days: int = Query(90, ge=7, le=365),
@@ -226,11 +228,11 @@ def customer_growth(
 
     # Daily signups
     daily = (db.query(
-        extract_date(RustoCustomer.created_at).label("day"),
+        func.date(RustoCustomer.created_at).label("day"),
         func.count(RustoCustomer.customer_id).label("signups"),
     ).filter(RustoCustomer.created_at >= start)
-     .group_by(extract_date(RustoCustomer.created_at))
-     .order_by(extract_date(RustoCustomer.created_at)).all())
+     .group_by(func.date(RustoCustomer.created_at))
+     .order_by(func.date(RustoCustomer.created_at)).all())
 
     # Repeat bookers
     bk_counts = (db.query(

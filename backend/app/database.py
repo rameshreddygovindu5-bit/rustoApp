@@ -40,20 +40,3 @@ def get_db():
         yield db
     finally:
         db.close()
-
-from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.sql.expression import FunctionElement
-from sqlalchemy.types import Date
-
-class extract_date(FunctionElement):
-    type = Date()
-    name = 'extract_date'
-    inherit_cache = True
-
-@compiles(extract_date, 'postgresql')
-def _extract_date_pg(element, compiler, **kw):
-    return "CAST(%s AS DATE)" % compiler.process(element.clauses, **kw)
-
-@compiles(extract_date, 'sqlite')
-def _extract_date_sqlite(element, compiler, **kw):
-    return "date(%s)" % compiler.process(element.clauses, **kw)

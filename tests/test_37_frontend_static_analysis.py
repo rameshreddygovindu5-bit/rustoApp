@@ -12,12 +12,12 @@ Catches runtime crashes that backend API tests can't find:
 import os, re, glob, ast as _ast, json
 import pytest
 
-SRC = "../frontend/src"
-BACKEND = "../backend/app"
+SRC = "/home/claude/rusto-fix-upload/frontend/src"
+BACKEND = "/home/claude/rusto-fix-upload/backend/app"
 
 
 def read(path):
-    with open(path, encoding="utf-8") as f:
+    with open(path) as f:
         return f.read()
 
 
@@ -35,7 +35,7 @@ class TestTailwindClasses:
     """All custom Tailwind classes used in JSX must be defined in the config."""
 
     def _get_defined_animations(self):
-        cfg = read("../frontend/tailwind.config.js")
+        cfg = read("/home/claude/rusto-fix-upload/frontend/tailwind.config.js")
         anim_m = re.search(r'animation:\s*\{(.*?)\},\s*keyframes', cfg, re.DOTALL)
         if anim_m:
             return set(re.findall(r"'([\w-]+)':", anim_m.group(1)))
@@ -44,7 +44,7 @@ class TestTailwindClasses:
     def test_no_undefined_animate_classes(self):
         """All animate-X classes must be defined in tailwind.config.js or index.css."""
         defined = self._get_defined_animations()
-        css = read("../frontend/src/index.css")
+        css = read("/home/claude/rusto-fix-upload/frontend/src/index.css")
         # Add animations defined directly in CSS
         css_defined = set(re.findall(r'\.animate-([\w-]+)\s*\{', css))
         all_defined = defined | css_defined | {
@@ -504,14 +504,14 @@ class TestPortalDetection:
 
 # ── 9. Production readiness ────────────────────────────────────────────────────
 
-ROOT = ".."
+ROOT = "/home/claude/rusto-fix-upload"
 
 class TestProductionReadiness:
     """Verify all production-readiness files exist and are complete."""
 
     def test_docker_compose_has_all_services(self):
         import yaml
-        with open(ROOT + "/docker-compose.yml", encoding="utf-8") as f:
+        with open(ROOT + "/docker-compose.yml") as f:
             dc = yaml.safe_load(f)
         services = set(dc.get("services", {}).keys())
         required = {"db", "backend", "frontend", "frontend_pms", "frontend_customer"}
@@ -520,7 +520,7 @@ class TestProductionReadiness:
 
     def test_docker_compose_prod_has_split_portals(self):
         import yaml
-        with open(ROOT + "/docker-compose.prod.yml", encoding="utf-8") as f:
+        with open(ROOT + "/docker-compose.prod.yml") as f:
             dc = yaml.safe_load(f)
         services = set(dc.get("services", {}).keys())
         assert "frontend_pms" in services, "prod compose missing frontend_pms"
@@ -528,27 +528,27 @@ class TestProductionReadiness:
         assert "nginx" in services, "prod compose missing nginx"
 
     def test_env_example_has_all_integrations(self):
-        with open(ROOT + "/.env.production.example", encoding="utf-8") as f:
+        with open(ROOT + "/.env.production.example") as f:
             env = f.read()
         for key in ["RAZORPAY_KEY_ID", "TWILIO_ACCOUNT_SID", "MSG91_AUTH_KEY",
                     "SMTP_HOST", "ANTHROPIC_API_KEY", "JWT_SECRET_KEY"]:
             assert key in env, f".env.production.example missing {key}"
 
     def test_ci_workflow_has_test_gate(self):
-        with open(ROOT + "/.github/workflows/deploy.yml", encoding="utf-8") as f:
+        with open(ROOT + "/.github/workflows/deploy.yml") as f:
             workflow = f.read()
         assert "needs: test" in workflow or "needs: build" in workflow, \
             "CI/CD workflow must gate deploy on tests"
         assert "pytest" in workflow, "CI/CD must run pytest"
 
     def test_ci_workflow_builds_both_portals(self):
-        with open(ROOT + "/.github/workflows/deploy.yml", encoding="utf-8") as f:
+        with open(ROOT + "/.github/workflows/deploy.yml") as f:
             workflow = f.read()
         assert "PORTAL=pms" in workflow, "CI must build PMS portal"
         assert "PORTAL=customer" in workflow, "CI must build Customer portal"
 
     def test_nginx_has_both_portals(self):
-        with open(ROOT + "/nginx/conf.d/default.conf", encoding="utf-8") as f:
+        with open(ROOT + "/nginx/conf.d/default.conf") as f:
             nginx = f.read()
         assert "rusto_pms" in nginx or "frontend_pms" in nginx, \
             "nginx must route to PMS portal"

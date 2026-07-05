@@ -20,7 +20,7 @@ import os
 from datetime import date, timedelta
 from conftest import api_get, api_post, api_patch, api_delete
 
-MOBILE_SRC = "../mobile"
+MOBILE_SRC = "/home/claude/rusto-fix-upload/mobile"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -531,7 +531,7 @@ class TestMobileTypeContract:
     def _read_ts(self, relpath):
         path = os.path.join(MOBILE_SRC, relpath)
         assert os.path.exists(path), f"File not found: {relpath}"
-        with open(path, encoding="utf-8") as f:
+        with open(path) as f:
             return f.read()
 
     def test_lodge_interface_has_starting_tariff(self):
@@ -638,7 +638,7 @@ class TestMobileSourceFiles:
     def _read(self, relpath):
         path = os.path.join(MOBILE_SRC, relpath)
         assert os.path.exists(path), f"Missing: {relpath}"
-        with open(path, encoding="utf-8") as f:
+        with open(path) as f:
             return f.read()
 
     def test_client_ts_exports_api(self):

@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# EC2 first-boot bootstrap for the Udumula's Grand LMS app server.
+# Installs Docker, AWS CLI, swap, and an ECR auto-login timer. The app
+# itself is deployed by the CI pipeline after this completes.
+set -euxo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+AWS_REGION="${aws_region}"
+
+apt-get update -y
+apt-get install -y ca-certificates curl gnupg lsb-release unzip rsync jq
+
+# ── Docker ──────────────────────────────────────────────────────────
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list
+apt-get update -y
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+usermod -aG docker ubuntu
+systemctl enable --now docker
+
+# ── AWS CLI v2 ──────────────────────────────────────────────────────
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip
+unzip -q -o /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install --update
+
+# ── Swap (anti-OOM) ─────────────────────────────────────────────────
+if ! swapon --show | grep -q .; then
+  fallocate -l 4G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  sysctl -w vm.swappiness=10
+  echo 'vm.swappiness=10' >> /etc/sysctl.conf
+fi
+
+# ── ECR auto-login timer (token refresh every 8h) ───────────────────
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+ECR_REGISTRY="$${ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com"
+
+cat > /usr/local/bin/ecr-login.sh <<EOS
+#!/usr/bin/env bash
+set -e
+aws ecr get-login-password --region $${AWS_REGION} | docker login --username AWS --password-stdin $${ECR_REGISTRY}
+EOS
+chmod +x /usr/local/bin/ecr-login.sh
+
+cat > /etc/systemd/system/ecr-login.service <<'EOS'
+[Unit]
+Description=Refresh Docker auth to Amazon ECR
+After=network-online.target docker.service
+Wants=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ecr-login.sh
+EOS
+
+cat > /etc/systemd/system/ecr-login.timer <<'EOS'
+[Unit]
+Description=Periodically refresh Docker ECR login
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=8h
+Persistent=true
+[Install]
+WantedBy=timers.target
+EOS
+
+systemctl daemon-reload
+systemctl enable --now ecr-login.timer
+/usr/local/bin/ecr-login.sh || true
+
+mkdir -p /opt/rusto
+chown -R ubuntu:ubuntu /opt/rusto
+echo "Bootstrap complete."

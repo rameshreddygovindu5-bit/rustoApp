@@ -10,7 +10,7 @@ purpose), then mark `submitted` after filing with FRRO.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, cast, Date
+from sqlalchemy import func
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date, datetime, timezone
@@ -24,7 +24,7 @@ def _utcnow():
 
 from fastapi.responses import StreamingResponse
 
-from ..database import get_db, extract_date
+from ..database import get_db
 from ..models import (ForeignGuestRegistration, ForeignGuestStatus,
                       Customer, Checkin)
 from ..auth import get_current_user, require_admin, resolve_lodge_scope
@@ -192,9 +192,9 @@ def export_csv(status: Optional[str] = None,
     if status:
         q = q.filter(ForeignGuestRegistration.status == status)
     if from_date:
-        q = q.filter(extract_date(ForeignGuestRegistration.created_at) >= from_date)
+        q = q.filter(func.date(ForeignGuestRegistration.created_at) >= from_date)
     if to_date:
-        q = q.filter(extract_date(ForeignGuestRegistration.created_at) <= to_date)
+        q = q.filter(func.date(ForeignGuestRegistration.created_at) <= to_date)
 
     buf = io.StringIO()
     w = csv.writer(buf)

@@ -31,8 +31,8 @@ import urllib.error
 from datetime import date, datetime, timedelta
 
 # ── path setup ────────────────────────────────────────────────────────────
-sys.path.insert(0, "../backend")
-os.chdir("../backend")
+sys.path.insert(0, "/home/claude/rusto-fix-upload/backend")
+os.chdir("/home/claude/rusto-fix-upload/backend")
 
 from conftest import api_get, api_post, api_patch, api_delete
 
@@ -102,23 +102,11 @@ def _available_room(db):
 
 
 def _real_customer(db):
-    """Return the first non-blacklisted customer, creating one if needed."""
+    """Return the first non-blacklisted customer."""
     c = (db.query(Customer)
          .filter(Customer.lodge_id == 1, Customer.blacklisted == False)
          .first())
-    if not c:
-        c = Customer(
-            lodge_id=1,
-            first_name="Agent",
-            last_name="Test Customer",
-            phone="9999988888",
-            gender="male",
-            id_number="1234567890"
-        )
-        db.add(c)
-        db.commit()
-        db.refresh(c)
-    assert c, "Failed to create usable customer in test DB"
+    assert c, "No usable customer in test DB"
     return c
 
 

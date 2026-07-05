@@ -5,7 +5,7 @@ from typing import Optional
 from datetime import date, datetime, timedelta
 import io
 
-from ..database import get_db, extract_date
+from ..database import get_db
 from ..models import (Checkin, CheckinStatus, Invoice, Customer, Room,
                       RoomStatus, Alert, Setting)
 from ..auth import get_current_user, require_admin, resolve_lodge_scope
@@ -253,12 +253,12 @@ def get_dashboard_data(db: Session = Depends(get_db),
 
     thirty_days_ago = today - timedelta(days=30)
     daily_checkins = db.query(
-        extract_date(Checkin.checkin_datetime).label("day"),
+        func.date(Checkin.checkin_datetime).label("day"),
         func.count(Checkin.checkin_id).label("count")
     ).filter(
         Checkin.lodge_id == lodge_id,
         Checkin.checkin_datetime >= thirty_days_ago
-    ).group_by(extract_date(Checkin.checkin_datetime)).order_by(extract_date(Checkin.checkin_datetime)).all()
+    ).group_by(func.date(Checkin.checkin_datetime)).order_by(func.date(Checkin.checkin_datetime)).all()
 
     # v10.2 — pending confirmed online bookings (from Rusto marketplace)
     try:

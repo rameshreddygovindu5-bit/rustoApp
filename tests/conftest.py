@@ -14,19 +14,24 @@ import urllib.parse
 from datetime import date, timedelta
 
 # ── Add backend to path ─────────────────────────────────────────────
-sys.path.insert(0, "../backend")
-os.chdir("../backend")
+# Resolve paths relative to this file so tests run anywhere (CI included).
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_BACKEND = os.path.join(_REPO_ROOT, "backend")
+sys.path.insert(0, _BACKEND)
+os.chdir(_BACKEND)
 
 # Use a SEPARATE test database so tests don't pollute the production DB
 # The test DB is a copy of the production DB made fresh before tests run
 import shutil
-PROD_DB = "../backend/lodge_lms.db"
-TEST_DB = "../backend/lodge_lms_test.db"
+PROD_DB = os.path.join(_BACKEND, "lodge_lms.db")
+TEST_DB = os.path.join(_BACKEND, "lodge_lms_test.db")
 
 # Copy production DB to test DB (gives tests real data to work with)
-if os.path.exists(PROD_DB):
-    if not os.path.exists(TEST_DB) or os.path.getmtime(PROD_DB) > os.path.getmtime(TEST_DB):
-        shutil.copy2(PROD_DB, TEST_DB)
+if os.path.exists(PROD_DB) and (
+    not os.path.exists(TEST_DB) or
+    os.path.getmtime(PROD_DB) > os.path.getmtime(TEST_DB)
+):
+    shutil.copy2(PROD_DB, TEST_DB)
 
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB}"
 

@@ -1,0 +1,162 @@
+# ════════════════════════════════════════════════════════════════════
+# Rusto LMS — Production Nginx
+# 
+# With domain (Option A):
+#   pms.rusto.example.com   → PMS portal (lodge staff)
+#   book.rustogrand.com  → Customer portal (guests)
+#   rustogrand.com       → Customer portal (default)
+#
+# Without domain (Option B):
+#   Use ip-only.conf.example instead of this file
+#   http://YOUR_EC2_IP:3001  → PMS portal
+#   http://YOUR_EC2_IP:3002  → Customer portal
+# ════════════════════════════════════════════════════════════════════
+
+upstream rusto_backend     { server backend:8000;           keepalive 32; }
+upstream rusto_pms         { server frontend_pms:80;        keepalive 16; }
+upstream rusto_customer    { server frontend_customer:80;   keepalive 16; }
+
+limit_req_zone $binary_remote_addr zone=api_limit:10m   rate=60r/m;
+limit_req_zone $binary_remote_addr zone=login_limit:10m rate=10r/m;
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+# ── HTTP → HTTPS redirect ─────────────────────────────────────────────
+server {
+    listen 80 default_server;
+    server_name _;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        allow all;
+    }
+
+    location = /health {
+        proxy_pass http://rusto_backend/api/health;
+        access_log off;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ── PMS Portal — Staff access ─────────────────────────────────────────
+# URL: https://pms.rusto.example.com
+server {
+    listen 443 ssl http2;
+    server_name pms.rusto.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/rustogrand.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/rustogrand.com/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    client_max_body_size 25M;
+    gzip on; gzip_vary on; gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Frame-Options SAMEORIGIN always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location /api/ {
+        limit_req zone=api_limit burst=20 nodelay;
+        proxy_pass         http://rusto_backend;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   Connection        "";
+        proxy_read_timeout 300s;
+    }
+
+    location /api/auth/login {
+        limit_req zone=login_limit burst=5 nodelay;
+        proxy_pass         http://rusto_backend;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+
+    location /uploads/ {
+        alias /var/www/uploads/;
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800";
+    }
+
+    location / {
+        proxy_pass         http://rusto_pms;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+}
+
+# ── Customer Portal — Guest booking ──────────────────────────────────
+# URL: https://book.rustogrand.com  OR  https://rustogrand.com
+server {
+    listen 443 ssl http2 default_server;
+    server_name book.rusto.example.com rusto.example.com _;
+
+    ssl_certificate     /etc/letsencrypt/live/rustogrand.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/rustogrand.com/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache   shared:SSL:10m;
+
+    client_max_body_size 25M;
+    gzip on; gzip_vary on; gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Frame-Options SAMEORIGIN always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location /api/ {
+        limit_req zone=api_limit burst=30 nodelay;
+        proxy_pass         http://rusto_backend;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   Connection        "";
+        proxy_read_timeout 300s;
+    }
+
+    location /uploads/ {
+        alias /var/www/uploads/;
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800";
+    }
+
+    location = /health {
+        proxy_pass http://rusto_backend/api/health;
+        access_log off;
+    }
+
+    location / {
+        proxy_pass         http://rusto_customer;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+}

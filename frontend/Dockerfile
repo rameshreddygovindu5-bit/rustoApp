@@ -40,9 +40,9 @@ RUN if [ "$PORTAL" = "pms" ]; then \
 
 # Resolve output directory
 RUN if [ "$PORTAL" = "pms" ]; then \
-      cp -r dist-pms dist-final && mv dist-final/index-pms.html dist-final/index.html; \
+      cp -r dist-pms dist-final; \
     elif [ "$PORTAL" = "customer" ]; then \
-      cp -r dist-customer dist-final && mv dist-final/index-customer.html dist-final/index.html; \
+      cp -r dist-customer dist-final; \
     else \
       cp -r dist dist-final; \
     fi

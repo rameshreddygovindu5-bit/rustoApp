@@ -117,6 +117,8 @@ function PmsRoutes() {
     <Routes>
       {/* Every URL → login when not authenticated */}
       <Route path="/login"   element={user ? <Navigate to="/dashboard" replace/> : <Login />} />
+      <Route path="/dashboard" element={<ProtectedRoute><Layout/></ProtectedRoute>}>
+      </Route>
 
       {/* All PMS operational routes */}
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>

@@ -399,8 +399,8 @@ class TestBookings:
                          "phone": phone, "id_type": "aadhar",
                          "id_number": "555555555555", "gender": "female"},
                         token=admin_token)
-        if s not in (200, 201):
-            pass # might already exist
+        if s in (200, 201):
+            return r
         r2, _ = api_get("/api/customers", token=admin_token,
                         params={"search": phone})
         custs = _custs(r2)
@@ -630,12 +630,12 @@ class TestSuperAdmin:
         for l in lodges:
             assert "name" in l and "code" in l
 
-    def test_lodge_is_rusto(self, super_token):
+    def test_lodge_is_udumulas(self, super_token):
         r, s = api_get("/api/lodges", token=super_token)
         assert s == 200
         lodges = r if isinstance(r, list) else []
         codes = [l.get("code") for l in lodges]
-        assert "rusto" in codes
+        assert "udumulas" in codes
 
     def test_super_dashboard_lodge1(self, super_token):
         r, s = api_get("/api/reports/dashboard", token=super_token,
