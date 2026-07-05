@@ -7,7 +7,7 @@ import pytest
 import os
 import re
 
-SRC = "/home/claude/rusto-fix-upload/frontend/src"
+SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "src")
 
 # ── Load all page source files ──────────────────────────────────────
 def load_pages():

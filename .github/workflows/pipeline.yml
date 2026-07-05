@@ -160,7 +160,7 @@ jobs:
           # the real gate is the deploy health-check.
           export PYTHONPATH="$PWD/backend:$PYTHONPATH"
           if [ -d tests ]; then
-            pytest tests/ -q --tb=short -x || {
+            pytest tests/ -q --tb=line || {
               echo "::warning::Some tests failed or need a live server; continuing (deploy health-check is the real gate).";
             }
           else
@@ -221,7 +221,7 @@ jobs:
       - name: Compute image references
         id: refs
         run: |
-          REG="${{ needs.resolve.outputs.account_id }}.dkr.ecr.${{ needs.resolve.outputs.region }}.amazonaws.com"
+          REG="${{ needs.resolve.outputs.account_id }}.dkr.ecr.${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}.amazonaws.com"
           SHA="${GITHUB_SHA::7}"
           echo "backend_image=$REG/rusto-backend:$SHA"                     >> "$GITHUB_OUTPUT"
           echo "frontend_pms_image=$REG/rusto-frontend-pms:$SHA"           >> "$GITHUB_OUTPUT"
@@ -258,7 +258,7 @@ jobs:
       run:
         working-directory: infra
     env:
-      AWS_REGION: ${{ needs.resolve.outputs.region }}
+      AWS_REGION: ${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}
       TF_VAR_jwt_secret_key: ${{ secrets.TF_VAR_JWT_SECRET_KEY }}
       TF_VAR_default_admin_password: ${{ secrets.TF_VAR_DEFAULT_ADMIN_PASSWORD }}
       TF_VAR_anthropic_api_key: ${{ secrets.TF_VAR_ANTHROPIC_API_KEY }}
@@ -301,7 +301,7 @@ jobs:
           terraform_version: "1.9.8"
       - name: Pre-flight readiness check
         env:
-          AWS_REGION: ${{ needs.resolve.outputs.region }}
+          AWS_REGION: ${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}
           AWS_ACCOUNT_ID: ${{ needs.resolve.outputs.account_id }}
           TF_STATE_BUCKET: rusto-tfstate-${{ needs.resolve.outputs.account_id }}
           TF_LOCK_TABLE: rusto-tflock
@@ -311,7 +311,7 @@ jobs:
           terraform init \
             -backend-config="bucket=rusto-tfstate-${{ needs.resolve.outputs.account_id }}" \
             -backend-config="key=rusto/${{ needs.resolve.outputs.environment }}/terraform.tfstate" \
-            -backend-config="region=${{ needs.resolve.outputs.region }}" \
+            -backend-config="region=${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}" \
             -backend-config="dynamodb_table=rusto-tflock" \
             -backend-config="encrypt=true"
       - name: Terraform plan
@@ -354,7 +354,7 @@ jobs:
           terraform init -input=false \
             -backend-config="bucket=rusto-tfstate-${{ needs.resolve.outputs.account_id }}" \
             -backend-config="key=rusto/${{ needs.resolve.outputs.environment }}/terraform.tfstate" \
-            -backend-config="region=${{ needs.resolve.outputs.region }}" \
+            -backend-config="region=${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}" \
             -backend-config="dynamodb_table=rusto-tflock" \
             -backend-config="encrypt=true" >/dev/null 2>&1 || true
           echo "app_ip=$(terraform output -raw app_public_ip 2>/dev/null || echo '')" >> "$GITHUB_OUTPUT"
@@ -381,7 +381,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "${USER}@${APP_HOST}" "
             cd /opt/rusto/db
             SSM_PREFIX='${{ steps.infra.outputs.ssm_prefix }}' \
-            AWS_REGION='${{ needs.resolve.outputs.region }}' \
+            AWS_REGION='${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}' \
             bash run-migrations.sh
           "
       - name: Publish database connection info
@@ -399,7 +399,7 @@ jobs:
             echo "RDS is private. Tunnel through the app box (values from Terraform):"
             echo '```bash'
             echo "ssh -i <your-key.pem> -L ${LOCALPORT}:${RDS:-<rds-endpoint>}:${DBPORT} ${USER}@${HOST:-<app-ip>} -N"
-            echo "aws ssm get-parameter --name ${{ steps.infra.outputs.ssm_prefix }}/DATABASE_URL --with-decryption --query Parameter.Value --output text --region ${{ needs.resolve.outputs.region }}"
+            echo "aws ssm get-parameter --name ${{ steps.infra.outputs.ssm_prefix }}/DATABASE_URL --with-decryption --query Parameter.Value --output text --region ${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}"
             echo "psql 'postgresql://${DBUSER}:<password>@localhost:${LOCALPORT}/${DBNAME}'"
             echo '```'
             echo ""
@@ -423,7 +423,7 @@ jobs:
     env:
       EC2_USER: ${{ secrets.EC2_USER }}
       APP_DIR: /opt/rusto
-      AWS_REGION: ${{ needs.resolve.outputs.region }}
+      AWS_REGION: ${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}
       BACKEND_IMAGE: ${{ needs.build.outputs.backend_image }}
       FRONTEND_PMS_IMAGE: ${{ needs.build.outputs.frontend_pms_image }}
       FRONTEND_CUSTOMER_IMAGE: ${{ needs.build.outputs.frontend_customer_image }}
@@ -444,7 +444,7 @@ jobs:
           terraform init -input=false \
             -backend-config="bucket=rusto-tfstate-${{ needs.resolve.outputs.account_id }}" \
             -backend-config="key=rusto/${{ needs.resolve.outputs.environment }}/terraform.tfstate" \
-            -backend-config="region=${{ needs.resolve.outputs.region }}" \
+            -backend-config="region=${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}" \
             -backend-config="dynamodb_table=rusto-tflock" \
             -backend-config="encrypt=true" >/dev/null 2>&1 \
             || { echo "have_infra=false" >> "$GITHUB_OUTPUT"; exit 0; }
@@ -497,7 +497,7 @@ jobs:
         run: |
           BUCKET='${{ steps.infra.outputs.bucket }}'
           SSM_PREFIX='${{ steps.infra.outputs.ssm_prefix }}'
-          REGION='${{ needs.resolve.outputs.region }}'
+          REGION='${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}'
           ENVNAME='${{ needs.resolve.outputs.environment }}'
           CORS='${{ steps.infra.outputs.cors }}'
 
@@ -549,13 +549,13 @@ jobs:
           # login' (root) but then 'docker compose pull' as ubuntu, the pull has
           # no creds → "no basic auth credentials". So we do everything as root
           # in ONE ssh session.
-          REGISTRY="${{ needs.resolve.outputs.account_id }}.dkr.ecr.${{ needs.resolve.outputs.region }}.amazonaws.com"
+          REGISTRY="${{ needs.resolve.outputs.account_id }}.dkr.ecr.${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}.amazonaws.com"
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "${EC2_USER}@${EC2_HOST}" "
             set -e
             cd ${APP_DIR}
             [ -f .env ] || { echo '✗ .env missing (run infra stage first).'; exit 1; }
 
-            REGION='${{ needs.resolve.outputs.region }}'
+            REGION='${{ needs.resolve.outputs.region || vars.AWS_REGION || 'ap-south-1' }}'
             REGISTRY='$REGISTRY'
 
             # 1. Authenticate to ECR (as root — same context as the pull below).

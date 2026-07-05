@@ -20,7 +20,7 @@ import os
 from datetime import date, timedelta
 from conftest import api_get, api_post, api_patch, api_delete
 
-MOBILE_SRC = "/home/claude/rusto-fix-upload/mobile"
+MOBILE_SRC = "" + _REPO_ROOT + "/mobile"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -1,3 +1,4 @@
+import os
 """
 TEST SUITE 35 — End-to-End Role Testing (v10.0)
 ================================================
@@ -340,11 +341,11 @@ class TestLodgeStaffPersona:
         import os, glob, sqlite3 as _sqlite3
 
         real_otp = None
-        # The test server chdir'd to /home/claude/rusto-fix-upload/backend, so
+        # The test server chdir'd to " + _REPO_ROOT + "/backend, so
         # lms.db is relative to that directory.
         db_candidates = [
-            "/home/claude/rusto-fix-upload/backend/lms.db",
-        ] + glob.glob("/home/claude/rusto-fix-upload/**/*.db", recursive=True)
+            "" + _REPO_ROOT + "/backend/lms.db",
+        ] + glob.glob("" + _REPO_ROOT + "/**/*.db", recursive=True)
 
         for db_path in db_candidates:
             if not os.path.exists(db_path):
