@@ -16,6 +16,7 @@ import { AuthProvider, useAuth }     from './context/AuthContext'
 import { SettingsProvider }           from './context/SettingsContext'
 import { ModuleGateProvider }         from './context/ModuleGateContext'
 import PWAPrompts                     from './components/PWAPrompts'
+import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary'
 import { PmsPortalProvider }          from './context/PmsPortalContext'
 import { useEffect }                   from 'react'
 import { injectPmsTheme, removePmsTheme } from './utils/pmsThemeInjector'
@@ -188,6 +189,7 @@ export default function AppPms() {
 
   return (
     <div className="pms-warm" style={{ minHeight: '100vh' }}>
+    <ErrorBoundary>
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <PmsPortalProvider>
       <AuthProvider>
@@ -203,6 +205,7 @@ export default function AppPms() {
       </AuthProvider>
       </PmsPortalProvider>
     </BrowserRouter>
+    </ErrorBoundary>
     </div>
   )
 }

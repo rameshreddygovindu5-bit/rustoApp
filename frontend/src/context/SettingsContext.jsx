@@ -1,7 +1,25 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
 
-const SettingsContext = createContext({})
+// A complete default so consumers can safely destructure `settings` even if
+// they somehow render outside a <SettingsProvider>. Without this the default
+// is {} and `const { settings } = useSettings()` yields undefined → crash.
+const DEFAULT_SETTINGS = {
+  hotel_name: "Rusto",
+  hotel_tagline: "Travel Anywhere. Rest Everywhere.",
+  logo_path: "/logo.png",
+  hotel_phone: "",
+  hotel_email: "",
+  agent_enabled: "true",
+  premium_theme_enabled: "true",
+  enabled_modules: null,
+  property_category: "lodge",
+}
+const SettingsContext = createContext({
+  settings: DEFAULT_SETTINGS,
+  refresh: () => Promise.resolve(),
+  refreshSettings: () => Promise.resolve(),
+})
 
 /**
  * Holds the hotel-branding values (name, tagline, logo, theme colors).
@@ -27,17 +45,7 @@ export function SettingsProvider({ children }) {
   // and override these. (Previously this said "Udumula's Grand" which
   // confused users from other lodges who saw a competitor's name on
   // their login screen.)
-  const [settings, setSettings] = useState({
-    hotel_name: "Rusto",
-    hotel_tagline: "Travel Anywhere. Rest Everywhere.",
-    logo_path: "/logo.png",
-    hotel_phone: "",
-    hotel_email: "",
-    agent_enabled: "true",
-    premium_theme_enabled: "true",
-    enabled_modules: null,       // null = all modules enabled (legacy mode)
-    property_category: "lodge",  // drives module defaults
-  })
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
 
   const refresh = () => {
     const token = localStorage.getItem('lms_token')

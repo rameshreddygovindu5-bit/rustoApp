@@ -54,31 +54,6 @@ export default function Login() {
 
   const isPremiumTheme = settings?.premium_theme_enabled !== 'false'
 
-  // Demo credentials — only show on generic/Rusto login, not lodge-branded
-  const DEMO_CREDS = [
-    { label: "Super Admin",     u: "superadmin",   p: "superadmin123",  icon: "🌐", hint: "All properties",        color: "from-purple-900/60 to-purple-800/40 border-purple-500/30 hover:border-purple-400/60" },
-    { label: "Heritage Lodge",  u: "admin",         p: "Admin@1234",     icon: "🏛️", hint: "Udumula's Grand",       color: "from-navy/60 to-navy/40 border-gold/30 hover:border-gold/60" },
-    { label: "RK Lodge",        u: "rkadmin",       p: "rkadmin123",     icon: "🏠", hint: "Budget lodge",          color: "from-slate-800/60 to-slate-700/40 border-slate-500/30 hover:border-slate-400/60" },
-    { label: "Resort",          u: "resortadmin",   p: "Resort@1234",    icon: "🌴", hint: "Sunrise Beach Resort",  color: "from-teal-900/60 to-teal-800/40 border-teal-500/30 hover:border-teal-400/60" },
-    { label: "Hotel",           u: "hoteladmin",    p: "Hotel@1234",     icon: "🏩", hint: "Grand Hyderabad Hotel", color: "from-blue-900/60 to-blue-800/40 border-blue-500/30 hover:border-blue-400/60" },
-    { label: "Villa",           u: "villaadmin",    p: "Villa@1234",     icon: "🏰", hint: "Palm Pine Villa, Goa",  color: "from-emerald-900/60 to-emerald-800/40 border-emerald-500/30 hover:border-emerald-400/60" },
-    { label: "Homestay",        u: "homestayadmin", p: "Homestay@1234",  icon: "🏡", hint: "Hilltop Homestay",      color: "from-amber-900/60 to-amber-800/40 border-amber-500/30 hover:border-amber-400/60" },
-    { label: "Boutique",        u: "boutiqueadmin", p: "Boutique@1234",  icon: "✨", hint: "The Artisan, Jaipur",   color: "from-rose-900/60 to-rose-800/40 border-rose-500/30 hover:border-rose-400/60" },
-    { label: "Eco Resort",      u: "ecoadmin",      p: "Eco@1234",       icon: "🌿", hint: "Jungle Echo, Wayanad",  color: "from-green-900/60 to-green-800/40 border-green-500/30 hover:border-green-400/60" },
-  ]
-
-  const handleDemo = async (u, p) => {
-    setForm({ username: u, password: p })
-    setLoading(true); setError('')
-    try {
-      await login(u, p)
-      try { await refreshSettings() } catch {}
-      toast.success('Demo login successful')
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed')
-    } finally { setLoading(false) }
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.username || !form.password) { setError('Please enter username and password'); return }
@@ -500,30 +475,6 @@ export default function Login() {
               </form>
             )}
           </div>
-
-          {/* Demo logins — only shown on generic portal, not lodge-branded */}
-          {!isPms && (
-            <div className="mt-5 p-4 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-base">⚡</span>
-                <p className="text-xs font-bold text-white/70 uppercase tracking-widest">Quick Demo Login</p>
-                <span className="ml-auto text-[10px] text-white/30 font-mono">click any → auto signs in</span>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {DEMO_CREDS.map(d => (
-                  <button key={d.u} onClick={() => handleDemo(d.u, d.p)} disabled={loading}
-                          className={`flex flex-col items-start gap-0.5 p-2.5 rounded-xl border bg-gradient-to-br ${d.color} transition-all text-left disabled:opacity-50 group`}>
-                    <div className="flex items-center gap-1.5 w-full">
-                      <span className="text-sm">{d.icon}</span>
-                      <span className="text-[10px] font-bold text-white/90 leading-tight group-hover:text-white">{d.label}</span>
-                    </div>
-                    <span className="text-[8px] text-white/40 leading-tight pl-0.5">{d.hint}</span>
-                    <span className="text-[7px] font-mono text-white/25 pl-0.5">{d.u}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Footer */}
           <p className="text-center text-xs mt-6 text-ink-400">

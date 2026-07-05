@@ -2,7 +2,11 @@ import React, { createContext, useContext, useState, useEffect } from 'react'
 import { authAPI, lodgesAPI } from '../services/api'
 import { toast } from 'react-toastify'
 
-const AuthContext = createContext(null)
+const AuthContext = createContext({
+  user: null, login: () => Promise.resolve(), logout: () => {}, loading: false,
+  isAdmin: false, isSuperAdmin: false, isAppOwner: false, isLodgeOwner: false,
+  isStaff: false, isVendor: false, roleLabel: "",
+})
 
 /**
  * AuthContext — owner of identity AND the active tenant (lodge) scope.

@@ -49,21 +49,21 @@ _ADDITIVE_COLUMNS = {
     # v2.4 — two-factor authentication on user accounts.
     "users": [
         ("totp_secret",          "VARCHAR(64)"),
-        ("totp_enabled",         "BOOLEAN DEFAULT 0"),
+        ("totp_enabled",         "BOOLEAN DEFAULT false"),
         # v3.2 — per-user permission grants (JSON array). NULL = legacy defaults.
         ("permissions",          "TEXT"),
         # v10.0 — staff OTP login for premises-lock security.
         ("login_otp",            "VARCHAR(6)"),
         ("login_otp_expires",    "DATETIME"),
         ("login_otp_attempts",   "INTEGER DEFAULT 0"),
-        ("require_login_otp",    "BOOLEAN DEFAULT 0"),
+        ("require_login_otp",    "BOOLEAN DEFAULT false"),
         ("last_otp_login_ip",    "VARCHAR(45)"),
         ("static_login_pin",    "VARCHAR(16)"),
     ],
     # v3.1 — marketplace fields on Lodge (Rusto customer-facing).
     # is_published gates whether the lodge appears in public search.
     "lodges": [
-        ("is_published",        "BOOLEAN DEFAULT 0"),
+        ("is_published",        "BOOLEAN DEFAULT false"),
         ("public_description",  "TEXT"),
         ("public_city",         "VARCHAR(80)"),
         ("public_town",         "VARCHAR(80)"),
@@ -77,17 +77,17 @@ _ADDITIVE_COLUMNS = {
         ("starting_price",      "NUMERIC(10,2)"),
         ("amenities",           "TEXT"),
         # v7.0 — WhatsApp per-lodge config.
-        ("whatsapp_enabled",          "BOOLEAN DEFAULT 0"),
+        ("whatsapp_enabled",          "BOOLEAN DEFAULT false"),
         ("whatsapp_phone_number_id",  "VARCHAR(40)"),
         ("whatsapp_access_token",     "VARCHAR(400)"),
         ("whatsapp_display_name",     "VARCHAR(80)"),
         # v9.0 — enhanced marketplace amenity + policy fields
-        ("power_backup",         "BOOLEAN DEFAULT 0"),
-        ("hot_water_24h",        "BOOLEAN DEFAULT 0"),
-        ("parking_available",    "BOOLEAN DEFAULT 0"),
+        ("power_backup",         "BOOLEAN DEFAULT false"),
+        ("hot_water_24h",        "BOOLEAN DEFAULT false"),
+        ("parking_available",    "BOOLEAN DEFAULT false"),
         ("bus_stand_km",         "NUMERIC(4,1)"),
         ("railway_station_km",   "NUMERIC(4,1)"),
-        ("temple_nearby",        "BOOLEAN DEFAULT 0"),
+        ("temple_nearby",        "BOOLEAN DEFAULT false"),
         ("checkin_time",         "VARCHAR(10) DEFAULT '12:00'"),
         ("checkout_time",        "VARCHAR(10) DEFAULT '11:00'"),
         ("property_type",        "VARCHAR(40) DEFAULT 'lodge'"),
@@ -95,8 +95,8 @@ _ADDITIVE_COLUMNS = {
         ("cancellation_policy",  "VARCHAR(40) DEFAULT 'flexible'"),
         ("cancellation_hours",   "INTEGER DEFAULT 24"),
         ("max_online_rooms_pct", "INTEGER DEFAULT 100"),
-        ("instant_confirm",      "BOOLEAN DEFAULT 1"),
-        ("allow_online_booking", "BOOLEAN DEFAULT 1"),
+        ("instant_confirm",      "BOOLEAN DEFAULT true"),
+        ("allow_online_booking", "BOOLEAN DEFAULT true"),
     ],
     # v7.1 — extended lodge registration: room-type breakdown + plan.
     "lodge_registration_requests": [
@@ -141,7 +141,7 @@ _ADDITIVE_COLUMNS = {
 # but we also create explicitly for environments where create_all may not run.
 _NEW_TABLE_DDLS = [
     """CREATE TABLE IF NOT EXISTS rusto_memberships (
-        membership_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        membership_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
         customer_id INTEGER NOT NULL REFERENCES rusto_customers(customer_id),
         tier VARCHAR(20) NOT NULL DEFAULT 'explorer',
         rusto_points INTEGER NOT NULL DEFAULT 0,
@@ -151,34 +151,34 @@ _NEW_TABLE_DDLS = [
         referral_code VARCHAR(20) UNIQUE,
         referred_by_code VARCHAR(20),
         referral_credits INTEGER NOT NULL DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""",
     "CREATE UNIQUE INDEX IF NOT EXISTS ix_rusto_mem_customer ON rusto_memberships(customer_id)",
     "CREATE UNIQUE INDEX IF NOT EXISTS ix_rusto_mem_referral ON rusto_memberships(referral_code)",
     """CREATE TABLE IF NOT EXISTS rusto_points_ledger (
-        ledger_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ledger_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
         membership_id INTEGER NOT NULL REFERENCES rusto_memberships(membership_id),
         customer_id INTEGER NOT NULL REFERENCES rusto_customers(customer_id),
         points INTEGER NOT NULL,
         txn_type VARCHAR(20) NOT NULL,
         booking_id INTEGER REFERENCES rusto_customer_bookings(booking_id),
         description VARCHAR(200),
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""",
     "CREATE INDEX IF NOT EXISTS ix_rusto_ledger_member ON rusto_points_ledger(membership_id)",
     """CREATE TABLE IF NOT EXISTS rusto_room_photos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
         lodge_id INTEGER NOT NULL REFERENCES lodges(lodge_id),
         room_type VARCHAR(40) NOT NULL,
         url VARCHAR(500) NOT NULL,
         caption VARCHAR(200),
         sort_order INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""",
     "CREATE INDEX IF NOT EXISTS ix_room_photo_lodge_type ON rusto_room_photos(lodge_id, room_type)",
     """CREATE TABLE IF NOT EXISTS global_api_keys (
-        key_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
         partner_name VARCHAR(120) NOT NULL,
         partner_code VARCHAR(40) NOT NULL,
         contact_email VARCHAR(160),
@@ -196,19 +196,19 @@ _NEW_TABLE_DDLS = [
         total_calls INTEGER DEFAULT 0,
         last_used_at DATETIME,
         created_by INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""",
     "CREATE UNIQUE INDEX IF NOT EXISTS ix_global_api_key ON global_api_keys(api_key)",
     """CREATE TABLE IF NOT EXISTS global_api_calls (
-        call_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        call_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
         key_id INTEGER NOT NULL REFERENCES global_api_keys(key_id),
         method VARCHAR(10),
         path VARCHAR(200),
         status_code INTEGER,
         response_ms INTEGER,
         ip_address VARCHAR(45),
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""",
     # meal_plan column for rusto_customer_bookings
     "ALTER TABLE rusto_customer_bookings ADD COLUMN IF NOT EXISTS meal_plan VARCHAR(20)",
@@ -260,15 +260,24 @@ def _ensure_default_lodge(engine):
         # like is_published from the Rusto marketplace work). This way
         # the bootstrap survives every future "added NOT NULL column"
         # change to the Lodge model.
+        is_sqlite = engine.url.get_backend_name() == "sqlite"
         try:
-            conn.execute(text(
-                "INSERT OR IGNORE INTO lodges (lodge_id, code, name, is_active, is_published) "
-                "VALUES (1, 'rusto', :n, true, false)"
-            ), {"n": display_name})
+            if is_sqlite:
+                conn.execute(text(
+                    "INSERT OR IGNORE INTO lodges (lodge_id, code, name, is_active, is_published) "
+                    "VALUES (1, 'rusto', :n, true, false)"
+                ), {"n": display_name})
+            else:
+                # Postgres: OR IGNORE is not valid; use ON CONFLICT DO NOTHING.
+                conn.execute(text(
+                    "INSERT INTO lodges (lodge_id, code, name, is_active, is_published) "
+                    "VALUES (1, 'rusto', :n, true, false) "
+                    "ON CONFLICT DO NOTHING"
+                ), {"n": display_name})
         except Exception:
             # Fall back to a column-discovery + dynamic INSERT for safety
             # if some future column also lacks a SQL-level default.
-            if engine.url.get_backend_name() == "sqlite":
+            if is_sqlite:
                 cols = conn.execute(text("PRAGMA table_info(lodges)")).fetchall()
                 col_names = [c[1] for c in cols]
             else:
@@ -280,8 +289,9 @@ def _ensure_default_lodge(engine):
                        "is_active": True, "is_published": False}
             insert_cols = [c for c in col_names if c in values]
             placeholders = ", ".join(f":{c}" for c in insert_cols)
+            conflict = "" if is_sqlite else " ON CONFLICT DO NOTHING"
             conn.execute(text(
-                f"INSERT INTO lodges ({', '.join(insert_cols)}) VALUES ({placeholders})"
+                f"INSERT INTO lodges ({', '.join(insert_cols)}) VALUES ({placeholders}){conflict}"
             ), {c: values[c] for c in insert_cols})
         logger.info("Multi-tenant: created default lodge id=1 (%s)", display_name)
         return 1
