@@ -1,4 +1,5 @@
 import os
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 """
 TEST SUITE 35 — End-to-End Role Testing (v10.0)
 ================================================
@@ -344,8 +345,8 @@ class TestLodgeStaffPersona:
         # The test server chdir'd to " + _REPO_ROOT + "/backend, so
         # lms.db is relative to that directory.
         db_candidates = [
-            "" + _REPO_ROOT + "/backend/lms.db",
-        ] + glob.glob("" + _REPO_ROOT + "/**/*.db", recursive=True)
+            _REPO_ROOT + "/backend/lms.db",
+        ] + glob.glob(_REPO_ROOT + "/**/*.db", recursive=True)
 
         for db_path in db_candidates:
             if not os.path.exists(db_path):

@@ -17,10 +17,11 @@ Every mobile-facing API endpoint and screen workflow verified:
 import pytest
 import re
 import os
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from datetime import date, timedelta
 from conftest import api_get, api_post, api_patch, api_delete
 
-MOBILE_SRC = "" + _REPO_ROOT + "/mobile"
+MOBILE_SRC = _REPO_ROOT + "/mobile"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

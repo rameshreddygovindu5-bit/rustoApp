@@ -1,4 +1,5 @@
 import os
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 """
 TEST SUITE 36 — Feature Completeness (v10.0)
 ============================================
@@ -716,49 +717,49 @@ class TestFrontendVersioning:
 
     def test_layout_version_chip_updated(self):
         import re
-        with open("" + _REPO_ROOT + "/frontend/src/components/Layout/Layout.jsx") as f:
+        with open(_REPO_ROOT + "/frontend/src/components/Layout/Layout.jsx") as f:
             src = f.read()
         assert "v2.9" in src or "v2.8" in src or "v2." in src, "Version chip missing"
 
     def test_auth_context_has_role_label(self):
-        with open("" + _REPO_ROOT + "/frontend/src/context/AuthContext.jsx") as f:
+        with open(_REPO_ROOT + "/frontend/src/context/AuthContext.jsx") as f:
             src = f.read()
         assert "roleLabel" in src, "AuthContext missing roleLabel export"
         assert "app_owner" in src, "AuthContext missing app_owner role"
         assert "lodge_owner" in src, "AuthContext missing lodge_owner role"
 
     def test_users_page_has_all_roles(self):
-        with open("" + _REPO_ROOT + "/frontend/src/pages/Users.jsx") as f:
+        with open(_REPO_ROOT + "/frontend/src/pages/Users.jsx") as f:
             src = f.read()
         for role in ("lodge_owner", "app_owner", "vendor"):
             assert role in src, f"Users.jsx missing role: {role}"
 
     def test_security_page_has_otp_section(self):
-        with open("" + _REPO_ROOT + "/frontend/src/pages/Security.jsx") as f:
+        with open(_REPO_ROOT + "/frontend/src/pages/Security.jsx") as f:
             src = f.read()
         assert "StaffOtpLodgeSetting" in src or "require_staff_otp" in src
         assert "Premises OTP Login" in src or "OTP Login" in src
 
     def test_staff_management_has_otp_toggle(self):
-        with open("" + _REPO_ROOT + "/frontend/src/pages/StaffManagement.jsx") as f:
+        with open(_REPO_ROOT + "/frontend/src/pages/StaffManagement.jsx") as f:
             src = f.read()
         assert "require_login_otp" in src, "StaffManagement missing OTP toggle"
 
     def test_auto_migrate_has_otp_columns(self):
-        with open("" + _REPO_ROOT + "/backend/app/auto_migrate.py") as f:
+        with open(_REPO_ROOT + "/backend/app/auto_migrate.py") as f:
             src = f.read()
         assert "login_otp" in src
         assert "require_login_otp" in src
 
     def test_models_has_new_roles(self):
-        with open("" + _REPO_ROOT + "/backend/app/models.py") as f:
+        with open(_REPO_ROOT + "/backend/app/models.py") as f:
             src = f.read()
         assert "app_owner" in src
         assert "lodge_owner" in src
         assert "vendor" in src
 
     def test_auth_router_has_otp_endpoints(self):
-        with open("" + _REPO_ROOT + "/backend/app/routers/auth.py") as f:
+        with open(_REPO_ROOT + "/backend/app/routers/auth.py") as f:
             src = f.read()
         assert "/login/verify-otp" in src or "verify-otp" in src
         assert "_lodge_requires_otp" in src or "require_staff_otp" in src

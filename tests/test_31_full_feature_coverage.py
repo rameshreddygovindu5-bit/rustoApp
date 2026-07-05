@@ -20,6 +20,7 @@ Coverage additions:
 import pytest
 import json
 import os
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import sys
 from conftest import api_get, api_post, api_patch, api_delete
 
@@ -308,7 +309,7 @@ class TestPlanModuleGateLogic:
 
     @pytest.fixture(autouse=True)
     def import_gates(self):
-        sys.path.insert(0, "" + _REPO_ROOT + "/backend")
+        sys.path.insert(0, _REPO_ROOT + "/backend")
         from app.plan_module_gates import (
             get_allowed_modules, filter_to_plan, plan_allows_module,
             PLAN_MODULE_GATES, CORE_MODULES,

@@ -22,6 +22,7 @@ Classes:
 import pytest
 import sys
 import os
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import json
 import asyncio
 import re
@@ -31,8 +32,8 @@ import urllib.error
 from datetime import date, datetime, timedelta
 
 # ── path setup ────────────────────────────────────────────────────────────
-sys.path.insert(0, "" + _REPO_ROOT + "/backend")
-os.chdir("" + _REPO_ROOT + "/backend")
+sys.path.insert(0, _REPO_ROOT + "/backend")
+os.chdir(_REPO_ROOT + "/backend")
 
 from conftest import api_get, api_post, api_patch, api_delete
 

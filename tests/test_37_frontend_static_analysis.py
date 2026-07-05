@@ -10,10 +10,11 @@ Catches runtime crashes that backend API tests can't find:
   - Type mismatches in component data flow
 """
 import os, re, glob, ast as _ast, json
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import pytest
 
 SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "src")
-BACKEND = "" + _REPO_ROOT + "/backend/app"
+BACKEND = _REPO_ROOT + "/backend/app"
 
 
 def read(path):
@@ -35,7 +36,7 @@ class TestTailwindClasses:
     """All custom Tailwind classes used in JSX must be defined in the config."""
 
     def _get_defined_animations(self):
-        cfg = read("" + _REPO_ROOT + "/frontend/tailwind.config.js")
+        cfg = read(_REPO_ROOT + "/frontend/tailwind.config.js")
         anim_m = re.search(r'animation:\s*\{(.*?)\},\s*keyframes', cfg, re.DOTALL)
         if anim_m:
             return set(re.findall(r"'([\w-]+)':", anim_m.group(1)))
@@ -44,7 +45,7 @@ class TestTailwindClasses:
     def test_no_undefined_animate_classes(self):
         """All animate-X classes must be defined in tailwind.config.js or index.css."""
         defined = self._get_defined_animations()
-        css = read("" + _REPO_ROOT + "/frontend/src/index.css")
+        css = read(_REPO_ROOT + "/frontend/src/index.css")
         # Add animations defined directly in CSS
         css_defined = set(re.findall(r'\.animate-([\w-]+)\s*\{', css))
         all_defined = defined | css_defined | {

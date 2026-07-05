@@ -1,4 +1,5 @@
 import os
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 """
 TEST SUITE 32 — Enterprise RBAC + SMS Multi-Vendor + Full Automation
 =====================================================================
@@ -647,7 +648,7 @@ class TestSMSMultiVendor:
 
     def test_normalize_indian_phone(self):
         """Phone normalization must handle all Indian number formats."""
-        import sys; sys.path.insert(0, "" + _REPO_ROOT + "/backend")
+        import sys; sys.path.insert(0, _REPO_ROOT + "/backend")
         from app.services.sms_service import normalize_indian_phone
         # Valid formats
         assert normalize_indian_phone("9876543210")      == "+919876543210"
@@ -657,7 +658,7 @@ class TestSMSMultiVendor:
         assert normalize_indian_phone("98765 43210")     == "+919876543210"
 
     def test_normalize_invalid_phones_raise(self):
-        import sys; sys.path.insert(0, "" + _REPO_ROOT + "/backend")
+        import sys; sys.path.insert(0, _REPO_ROOT + "/backend")
         from app.services.sms_service import normalize_indian_phone
         invalid = ["1234567890", "+12025551234", "000000", "", "abc"]
         for p in invalid:
@@ -831,7 +832,7 @@ class TestModulePermissionCrossValidation:
     def test_permission_keys_match_protected_endpoints(self, lodge_token):
         """Every permission key must correspond to at least one real endpoint."""
         # We verify by confirming the key exists in PERMISSION_CATALOG_V2
-        import sys; sys.path.insert(0, "" + _REPO_ROOT + "/backend")
+        import sys; sys.path.insert(0, _REPO_ROOT + "/backend")
         from app.permissions import PERMISSION_CATALOG_V2, PERMISSION_KEY_SET
         # Every key in catalog must be a valid string
         for p in PERMISSION_CATALOG_V2:
@@ -894,7 +895,7 @@ class TestFrontendRBACFiles:
         assert "staffAPI" in src or "api/staff" in src
 
     def test_plan_modules_js_is_synced_with_backend(self):
-        import sys; sys.path.insert(0, "" + _REPO_ROOT + "/backend")
+        import sys; sys.path.insert(0, _REPO_ROOT + "/backend")
         from app.plan_module_gates import PLAN_MODULE_GATES
         src = self._read("utils/planModules.js")
         # All backend plan keys must appear in the frontend file
