@@ -188,7 +188,7 @@ export default function AppPms() {
 
   return (
     <div className="pms-warm" style={{ minHeight: '100vh' }}>
-    <BrowserRouter basename="/pms" future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <PmsPortalProvider>
       <AuthProvider>
         <ModuleGateProvider>

@@ -95,6 +95,7 @@ services:
       - lms_uploads:/var/www/uploads:ro
     ports:
       - "80:80"
+      - "3001:3001"
       - "443:443"
     logging:
       driver: "json-file"

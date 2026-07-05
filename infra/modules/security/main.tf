@@ -30,6 +30,14 @@ resource "aws_security_group" "app" {
   }
 
   ingress {
+    description = "PMS staff portal"
+    from_port   = 3001
+    to_port     = 3001
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
     description = "SSH from admin CIDR"
     from_port   = 22
     to_port     = 22

@@ -40,13 +40,16 @@ resolve → test → validate → build → infra → database → deploy
   nginx, health-checks /api/health, auto-rolls-back on failure.
 
 ## Access (no domain needed)
-nginx uses the IP-only config by default:
-- Customer portal:  http://<APP_IP>/
-- PMS (staff):       http://<APP_IP>/pms
-- API:               http://<APP_IP>/api/
 
-For a real domain later, swap `nginx/conf.d/default.conf` for the saved
-`default.conf.domain-example` and run `scripts/enable-tls.sh`.
+Each portal runs on its own port so their assets never collide:
+
+- **Customer booking (guests):**  `http://<APP_IP>/`         (port 80)
+- **PMS / lodge staff login:**    `http://<APP_IP>:3001/`    (port 3001)
+- **API / health:**               `http://<APP_IP>/api/health`
+
+For a real domain later, you'd put pms + booking on subdomains and add TLS
+via scripts/enable-tls.sh.
+
 
 ## Recovery scripts (rarely needed)
 - scripts/force-reset.sh — clear TF state + orphans + DynamoDB digest
