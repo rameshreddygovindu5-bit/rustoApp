@@ -29,6 +29,61 @@
   min-height: 100vh;
 }
 
+/* ── Escape the .rusto-layout dark cascade ──────────────────────────
+   The app wrapper (.rusto-layout) forces `color:#fff !important` and a
+   dark background on every child. These pages are light (cream + dark
+   ink). We neutralise the wrapper's background here and, because the
+   forced white uses !important, re-assert each of our own colours with
+   !important so component classes win. Text with no explicit colour
+   falls back to dark ink rather than the inherited white. */
+.rb {
+  color: var(--rb-ink) !important;
+  background: var(--rb-cream) !important;
+  background-image: none !important;
+}
+/* Default: any element without its own colour rule inherits dark ink,
+   not the forced white. Low specificity so component classes below win. */
+.rusto-layout .rb :where(p, span, div, h1, h2, h3, h4, label, li, strong, em, small, a, button, td, th) {
+  color: var(--rb-ink);
+}
+/* Re-assert the palette's own text colours with !important so they beat
+   the wrapper's `color:#fff !important`. */
+.rb .rb-sub, .rb .rb-lodge-city, .rb .rb-searchtop-box em,
+.rb .rb-filter-row, .rb .rb-result-amenities span, .rb .rb-co-fact,
+.rb .rb-co-line, .rb .rb-book-line, .rb .rb-icon-btn,
+.rb .rb-room-perk { color: var(--rb-ink-2) !important; }
+.rb .rb-label, .rb .rb-lodge-signal, .rb .rb-lodge-price span,
+.rb .rb-room-price span, .rb .rb-book-price span, .rb .rb-book-note,
+.rb .rb-co-secure, .rb .rb-search-lbl, .rb .rb-quick-lbl,
+.rb .rb-confirm-ref { color: var(--rb-ink-3) !important; }
+.rb .rb-eyebrow { color: var(--rb-clay) !important; }
+.rb .rb-hero-title { color: #FDF6EF !important; }
+.rb .rb-hero-lead { color: #F0D6C4 !important; }
+.rb .rb-hero-eyebrow, .rb .rb-quick-lbl { color: #EBC4A8 !important; }
+.rb .rb-trust-item, .rb .rb-detail-trust span { color: var(--rb-clay-dark) !important; }
+.rb .rb-btn-primary { color: #fff !important; }
+.rb .rb-badge-green { color: var(--rb-green) !important; }
+.rb .rb-badge-clay { color: var(--rb-clay-dark) !important; }
+.rb .rb-badge-rating { color: var(--rb-ink) !important; }
+.rb .rb-chip-active { color: #fff !important; }
+.rb .rb-room-left { color: var(--rb-green) !important; }
+.rb .rb-amenity { color: var(--rb-ink-2) !important; }
+.rb .rb-btn-ghost { color: var(--rb-clay-dark) !important; }
+.rb .rb-filter-clear, .rb .rb-search-ico { color: var(--rb-clay) !important; }
+.rb .rb-room-hint { color: var(--rb-clay-dark) !important; }
+.rb .rb-room-pick { color: var(--rb-clay) !important; }
+.rb .rb-room-pick.on { color: #fff !important; }
+.rb .rb-confirm-check { color: var(--rb-green) !important; }
+.rb .rb-filter-title, .rb .rb-section-title, .rb .rb-results-title,
+.rb .rb-detail-title, .rb .rb-h2, .rb .rb-lodge-name, .rb .rb-room-name,
+.rb .rb-co-title { color: var(--rb-ink) !important; }
+.rb input, .rb select, .rb textarea {
+  color: var(--rb-ink) !important;
+  background-color: var(--rb-white) !important;
+}
+.rb .rb-search-input { background: transparent !important; }
+.rb input::placeholder, .rb textarea::placeholder { color: var(--rb-ink-3) !important; }
+
 .rb * { box-sizing: border-box; }
 
 /* ── Layout helpers ─────────────────────────────────────────────── */
