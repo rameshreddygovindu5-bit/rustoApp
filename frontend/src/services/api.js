@@ -151,6 +151,8 @@ export const checkinsAPI = {
   checkout:     (id, d) => axiosInst.put(`/checkins/${id}/checkout`, d),
   // v10.5 — Late Checkout: extend guest stay + add folio charge
   lateCheckout: (id, d) => axiosInst.put(`/checkins/${id}/late-checkout`, d),
+  // Guest ID verification: {verified: bool, notes: str}
+  verify:       (id, d) => axiosInst.patch(`/checkins/${id}/verify`, d),
 };
 
 export const alertsAPI = {
@@ -169,6 +171,11 @@ export const reportsAPI = {
   // v2.1: industry-standard PMS KPIs and forward occupancy projection.
   kpis:      params  => axiosInst.get("/reports/kpis", { params }),
   forecast:  params  => axiosInst.get("/reports/forecast", { params }),
+  // Outstanding dues (overdue active stays) for the Reports page.
+  outstanding: ()    => axiosInst.get("/reports/outstanding"),
+  // Dashboard concierge / shift notes — persisted server-side per lodge.
+  conciergeNotes:     ()    => axiosInst.get("/reports/concierge-notes"),
+  saveConciergeNotes: notes => axiosInst.put("/reports/concierge-notes", { notes }),
 };
 
 export const settingsAPI = {

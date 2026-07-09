@@ -80,7 +80,7 @@ function timeAgo(iso) {
   return `${Math.floor(diff / 86400)}d ago`
 }
 
-export default function ActivityFeed({ limit = 20 }) {
+export default function ActivityFeed({ limit = 20, title = 'Recent Activity' }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -105,7 +105,7 @@ export default function ActivityFeed({ limit = 20 }) {
     <div className="bg-white rounded-xl shadow-sm">
       <div className="px-4 py-3 border-b border-ink-100 flex items-center gap-2">
         <Activity size={16} className="text-gold"/>
-        <h3 className="font-semibold text-navy text-sm">Recent Activity</h3>
+        <h3 className="font-semibold text-navy text-sm">{title}</h3>
       </div>
       <div className="max-h-[420px] overflow-y-auto">
         {loading ? (

@@ -78,6 +78,7 @@ class AlertEvent(str, enum.Enum):
     daily_summary = "daily_summary"
     booking = "booking"
     booking_cancelled = "booking_cancelled"
+    late_checkout = "late_checkout"
 
 
 class AlertStatus(str, enum.Enum):
@@ -292,6 +293,21 @@ class Checkin(Base):
     status = Column(String(20), default="active")
     special_notes = Column(Text)
     sms_alert_preference = Column(String(3), default="yes")
+    # ── Guest digital signature + house-rules declaration ──────────────
+    # `signature_path` is a PNG saved under the uploads dir (same pattern
+    # as Customer.id_proof_path). Captured on the check-in review step.
+    signature_path = Column(String(255))
+    signature_captured_by = Column(String(50))     # staff username
+    signature_captured_at = Column(DateTime)
+    declaration_accepted = Column(Boolean, default=False)
+    # ── Guest ID verification (staff checked the physical ID) ──────────
+    id_verified = Column(Boolean, default=False)
+    verified_by = Column(String(50))               # staff username
+    verified_at = Column(DateTime)
+    verification_notes = Column(Text)
+    # ── Stay metadata (guest-register compliance) ───────────────────────
+    purpose_of_visit = Column(String(50))          # Pilgrimage/Tourism/...
+    vehicle_number = Column(String(20))
     checked_in_by = Column(Integer, ForeignKey("users.user_id"))
     checked_out_by = Column(Integer, ForeignKey("users.user_id"))
     created_at = Column(DateTime, default=func.now())

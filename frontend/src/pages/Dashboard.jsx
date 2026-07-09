@@ -13,9 +13,10 @@ import {
   BedDouble, Users, AlertTriangle, TrendingUp, Clock,
   CheckCircle2, ArrowRight, LayoutGrid, LogIn, LogOut,
   RefreshCw, Banknote, Percent, Calendar, NotebookPen, Save,
-  WifiOff,
+  WifiOff, Wrench, Ban, Building2, IndianRupee, Timer,
 } from "lucide-react";
-import { reportsAPI, bookingsAPI } from "../services/api";
+import { reportsAPI, bookingsAPI, roomsAPI } from "../services/api";
+import ActivityFeed from "../components/Dashboard/ActivityFeed";
 import { useSettings } from "../context/SettingsContext";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
@@ -92,12 +93,14 @@ function RevenueKpiCard({ revenue, breakdown, onNavigate }) {
   const [expanded, setExpanded] = useState(false);
   const [hov, setHov] = useState(false);
   const modes = [
-    { key:"cash",          label:"Cash",          icon:"💵" },
-    { key:"upi",           label:"UPI",           icon:"📱" },
-    { key:"card",          label:"Card",          icon:"💳" },
-    { key:"bank_transfer", label:"Bank Transfer", icon:"🏦" },
-    { key:"online",        label:"Online",        icon:"🌐" },
-    { key:"other",         label:"Other",         icon:"💰" },
+    { key:"cash",    label:"Cash",            icon:"💵" },
+    { key:"card",    label:"Card",            icon:"💳" },
+    { key:"upi",     label:"UPI/QR",          icon:"📱" },
+    { key:"phonepe", label:"PhonePe",         icon:"🟣" },
+    { key:"gpay",    label:"GPay",            icon:"🔵" },
+    { key:"paytm",   label:"Paytm",           icon:"🩵" },
+    { key:"online",  label:"Online Transfer", icon:"🌐" },
+    { key:"other",   label:"Other",           icon:"💰" },
   ];
   const hasBreakdown = breakdown && Object.values(breakdown).some(v => v > 0);
   return (
@@ -170,19 +173,88 @@ function QuickBtn({ icon: Icon, label, to, primary = false }) {
   );
 }
 
+// ── Room status colours (mirrors Rooms.jsx STATUS_CONFIG semantics) ──
+const ROOM_STATUS_COLORS = {
+  available:    { dot:"#22C55E", label:"Available" },
+  occupied:     { dot:"#EF4444", label:"Occupied" },
+  checkout_due: { dot:"#F97316", label:"Checkout Due" },
+  maintenance:  { dot:"#8B8B8B", label:"Maintenance" },
+  blocked:      { dot:"#6B7280", label:"Blocked" },
+};
+
+// ── Health strip (compact ops vitals at the top of the page) ─────────
+function HealthStrip({ kpis }) {
+  const available   = kpis.available_rooms   || 0;
+  const overdue     = kpis.overdue_count     || 0;
+  const blocked     = kpis.blocked_rooms ?? kpis.blocked_count ?? 0;
+  const maintenance = kpis.maintenance_rooms ?? kpis.maintenance_count ?? 0;
+  const revPerRoom  = kpis.revenue_per_occupied_room || 0;
+  const rushReady   = kpis.pilgrim_rush_ready ?? (available >= 3 && maintenance === 0);
+  const rushReason  = kpis.pilgrim_rush_reason ||
+    (rushReady ? `${available} rooms free` : "check availability/maintenance");
+  // amber when close (some rooms free), red when literally nothing free
+  const rushColor = rushReady ? WN.sage : (available > 0 ? WN.amber : WN.terra);
+
+  const items = [
+    { icon: BedDouble,   label: "Available",       value: available,        color: available > 0 ? WN.sage : WN.terra },
+    { icon: Timer,       label: "Overdue",         value: overdue,          color: overdue > 0 ? WN.terra : WN.sage },
+    { icon: Ban,         label: "Blocked",         value: blocked,          color: blocked > 0 ? WN.amber : WN.suede },
+    { icon: IndianRupee, label: "Rev / occ. room", value: inr(revPerRoom),  color: WN.suede },
+  ];
+
+  return (
+    <div style={{
+      display:"flex", flexWrap:"wrap", alignItems:"stretch", gap:10,
+      padding:"10px 14px", background:WN.paper, border:`1px solid ${WN.sand}`,
+      borderRadius:12, boxShadow:"0 1px 4px rgba(58,39,24,.06)",
+    }}>
+      {items.map(it => (
+        <div key={it.label} style={{ display:"flex", alignItems:"center", gap:8, padding:"4px 10px", borderRight:`1px solid ${WN.parchment}` }}>
+          <it.icon size={14} style={{ color:it.color, flexShrink:0 }} />
+          <div>
+            <p style={{ fontSize:15, fontWeight:700, color:WN.espresso, lineHeight:1.1 }}>{it.value}</p>
+            <p style={{ fontSize:9, fontWeight:600, letterSpacing:".05em", textTransform:"uppercase", color:WN.burlap }}>{it.label}</p>
+          </div>
+        </div>
+      ))}
+      {/* Pilgrim Rush Ready indicator */}
+      <div title={rushReason} style={{
+        display:"flex", alignItems:"center", gap:8, padding:"4px 12px",
+        marginLeft:"auto", borderRadius:10,
+        background:`${rushColor}14`, border:`1px solid ${rushColor}40`,
+      }}>
+        <span style={{ position:"relative", display:"inline-flex", width:9, height:9 }}>
+          {rushReady && <span style={{ position:"absolute", inset:0, borderRadius:"50%", background:rushColor, opacity:.5, animation:"dashPing 1.6s ease-out infinite" }} />}
+          <span style={{ position:"relative", width:9, height:9, borderRadius:"50%", background:rushColor }} />
+        </span>
+        <div>
+          <p style={{ fontSize:11, fontWeight:700, color:rushColor, lineHeight:1.2 }}>
+            {rushReady ? "Pilgrim Rush Ready" : "Not Rush Ready"}
+          </p>
+          <p style={{ fontSize:9, color:WN.burlap, maxWidth:260, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{rushReason}</p>
+        </div>
+        <style>{`@keyframes dashPing{75%,100%{transform:scale(2.2);opacity:0}}`}</style>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Dashboard ────────────────────────────────────────────────────
 export default function Dashboard() {
   const navigate  = useNavigate();
   const { settings }   = useSettings();
-  const { user, roleLabel } = useAuth();
+  const { user, roleLabel, isAdmin } = useAuth();
   const [data,             setData]            = useState(null);
   const [loading,          setLoading]         = useState(true);
   const [refreshing,       setRefreshing]      = useState(false);
   const [error,            setError]           = useState(null);
   const [dueCheckouts,     setDueCheckouts]    = useState([]);
   const [upcomingArrivals, setUpcomingArrivals]= useState([]);
+  const [roomsList,        setRoomsList]       = useState([]);
   const [shiftNotes,       setShiftNotes]      = useState(() => localStorage.getItem("shiftNotes") || "");
   const [notesSaved,       setNotesSaved]      = useState(false);
+  const [notesSaving,      setNotesSaving]     = useState(false);
+  const [notesOffline,     setNotesOffline]    = useState(false);
 
   const fetchData = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true);
@@ -206,6 +278,12 @@ export default function Dashboard() {
         setUpcomingArrivals(aRes.data || []);
       } catch { setUpcomingArrivals([]); }
 
+      // Live room grid for the room-breakdown panel
+      try {
+        const rRes = await roomsAPI.list({});
+        setRoomsList(Array.isArray(rRes.data) ? rRes.data : []);
+      } catch { setRoomsList([]); }
+
     } catch (e) {
       const detail = e?.response?.data?.detail || e?.message || "Could not reach backend";
       setError(detail);
@@ -223,10 +301,47 @@ export default function Dashboard() {
     return () => { clearInterval(iv); window.removeEventListener("focus", onFocus); };
   }, [fetchData]);
 
-  const saveNotes = () => {
+  // Refetch when the AI agent mutates data (same pattern as Rooms/Bookings).
+  useEffect(() => {
+    const onAgentChange = () => fetchData();
+    window.addEventListener("lms:agent:data_changed", onAgentChange);
+    return () => window.removeEventListener("lms:agent:data_changed", onAgentChange);
+  }, [fetchData]);
+
+  // ── Concierge notes: server-persisted, localStorage as offline fallback ──
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await reportsAPI.conciergeNotes();
+        if (!cancelled && typeof res.data?.notes === "string") {
+          setShiftNotes(res.data.notes);
+          setNotesOffline(false);
+          localStorage.setItem("shiftNotes", res.data.notes);
+        }
+      } catch {
+        // Server unreachable — keep the localStorage copy already loaded.
+        if (!cancelled) setNotesOffline(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const saveNotes = async () => {
+    // Always keep the local copy so nothing is lost offline.
     localStorage.setItem("shiftNotes", shiftNotes);
-    setNotesSaved(true);
-    setTimeout(() => setNotesSaved(false), 2000);
+    setNotesSaving(true);
+    try {
+      await reportsAPI.saveConciergeNotes(shiftNotes);
+      setNotesOffline(false);
+      setNotesSaved(true);
+      setTimeout(() => setNotesSaved(false), 2000);
+    } catch {
+      setNotesOffline(true);
+      toast.warn("Saved locally only — server unreachable.");
+    } finally {
+      setNotesSaving(false);
+    }
   };
 
   const arrivalsByDate = useMemo(() => {
@@ -240,6 +355,19 @@ export default function Dashboard() {
     });
     return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5);
   }, [upcomingArrivals]);
+
+  // Rooms grouped by floor for the room-breakdown panel.
+  const roomsByFloor = useMemo(() => {
+    const map = new Map();
+    roomsList.forEach(r => {
+      const f = r.floor ?? 0;
+      if (!map.has(f)) map.set(f, []);
+      map.get(f).push(r);
+    });
+    return Array.from(map.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([floor, rooms]) => [floor, rooms.sort((a, b) => String(a.room_number).localeCompare(String(b.room_number), undefined, { numeric:true }))]);
+  }, [roomsList]);
 
   // ── Loading ──────────────────────────────────────────────────────────
   if (loading) return (
@@ -336,6 +464,9 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ── Health strip ─────────────────────────────────────────── */}
+      <HealthStrip kpis={kpis} />
+
       {/* ── Overdue alert ───────────────────────────────────────── */}
       {(kpis.overdue_count || 0) > 0 && (
         <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", background:`${WN.terra}0D`, border:`1px solid ${WN.terra}40`, borderRadius:12 }}>
@@ -346,35 +477,52 @@ export default function Dashboard() {
             </p>
             <p style={{ fontSize:11, color:WN.burlap, marginTop:2 }}>These guests should have checked out already.</p>
           </div>
-          <button onClick={() => navigate("/checkins")} style={{ background:"none", border:"none", cursor:"pointer", fontSize:11, fontWeight:700, color:WN.terra, display:"flex", alignItems:"center", gap:4 }}>
+          <button onClick={() => navigate("/checkins?tab=overdue")} style={{ background:"none", border:"none", cursor:"pointer", fontSize:11, fontWeight:700, color:WN.terra, display:"flex", alignItems:"center", gap:4 }}>
             View <ArrowRight size={11} />
           </button>
         </div>
       )}
 
-      {/* ── 6 KPI cards ─────────────────────────────────────────── */}
+      {/* ── 10 KPI cards (all deep-link pre-filtered) ───────────── */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12 }}>
+        <KpiCard icon={Timer}     label="Overdue"           value={kpis.overdue_count || 0}
+          sub="past expected checkout"
+          color={(kpis.overdue_count || 0) > 0 ? WN.terra : WN.sage}
+          alert={(kpis.overdue_count || 0) > 0}
+          onClick={() => navigate("/checkins?tab=overdue")} />
+        <KpiCard icon={LogOut}    label="Due Checkout Today" value={dueCheckouts.length}
+          sub="checking out today"
+          color={dueCheckouts.length > 0 ? WN.amber : WN.sage}
+          onClick={() => navigate("/checkins?tab=active")} />
+        <KpiCard icon={BedDouble} label="Available"         value={kpis.available_rooms || 0}
+          sub="ready for check-in"
+          color={WN.sage}
+          onClick={() => navigate("/rooms?filter=available")} />
+        <KpiCard icon={LogIn}     label="Occupied"          value={kpis.occupied_rooms || 0}
+          sub="guests in house"
+          color={WN.terra}
+          onClick={() => navigate("/rooms?filter=occupied")} />
+        <RevenueKpiCard revenue={kpis.today_revenue} breakdown={kpis.today_revenue_breakdown} onNavigate={() => navigate("/reports")} />
         <KpiCard icon={Percent}   label="Occupancy"         value={`${occ}%`}
           sub={`${kpis.occupied_rooms || 0} / ${totalR} rooms`}
           color={occ >= 80 ? WN.sage : occ >= 50 ? WN.suede : WN.terra}
           onClick={() => navigate("/reports")} />
-        <RevenueKpiCard revenue={kpis.today_revenue} breakdown={kpis.today_revenue_breakdown} onNavigate={() => navigate("/reports")} />
-        <KpiCard icon={LogIn}     label="Due Check-outs"    value={dueCheckouts.length}
-          sub="checking out today"
-          color={dueCheckouts.length > 0 ? WN.terra : WN.sage}
-          alert={dueCheckouts.length > 0}
-          onClick={() => navigate("/checkins")} />
-        <KpiCard icon={BedDouble} label="Available Rooms"   value={kpis.available_rooms || 0}
-          sub={`${kpis.maintenance_rooms || 0} in maintenance`}
-          color={WN.sage}
-          onClick={() => navigate("/rooms")} />
-        <KpiCard icon={Calendar}  label="Arrivals (7 days)" value={upcomingArrivals.length}
-          sub={`${arrivalsByDate.length} dates`}
-          color={WN.suede}
-          onClick={() => navigate("/bookings")} />
         <KpiCard icon={Users}     label="Total Guests"      value={(kpis.total_customers || 0).toLocaleString()}
+          sub="registered customers"
           color={WN.charcoal}
           onClick={() => navigate("/customers")} />
+        <KpiCard icon={Building2} label="Total Rooms"       value={kpis.total_rooms || 0}
+          sub="active inventory"
+          color={WN.suede}
+          onClick={() => navigate("/rooms")} />
+        <KpiCard icon={Ban}       label="Blocked"           value={kpis.blocked_rooms || 0}
+          sub="manually blocked"
+          color={(kpis.blocked_rooms || 0) > 0 ? WN.amber : WN.suede}
+          onClick={() => navigate("/rooms?filter=blocked")} />
+        <KpiCard icon={Wrench}    label="Maintenance"       value={kpis.maintenance_rooms || 0}
+          sub="under repair"
+          color={(kpis.maintenance_rooms || 0) > 0 ? WN.amber : WN.suede}
+          onClick={() => navigate("/rooms?filter=maintenance")} />
       </div>
 
       {/* ── Online booking alert ─────────────────────────────────── */}
@@ -479,9 +627,108 @@ export default function Dashboard() {
                       </p>
                       <p style={{ fontSize:11, color:WN.burlap }}>{row.rooms} room{row.rooms > 1 ? "s" : ""}</p>
                     </div>
-                    <button onClick={() => navigate(`/bookings?from=${row.date}&to=${row.date}`)}
+                    <button onClick={() => navigate(`/bookings?date=${row.date}`)}
                       style={{ background:"none", border:"none", cursor:"pointer", fontSize:11, color:WN.burlap, display:"flex", alignItems:"center", gap:4 }}>
                       View <ArrowRight size={10} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Room breakdown + Today's departures ─────────────────── */}
+      <div style={{ display:"grid", gridTemplateColumns:"2fr minmax(280px,1fr)", gap:20 }}>
+
+        {/* Room breakdown — every room, live status, grouped by floor */}
+        <div style={card}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+            <h2 style={{ fontFamily:"'Cormorant Garamond',Georgia,serif", fontSize:16, fontWeight:600, color:WN.espresso, display:"flex", alignItems:"center", gap:8, margin:0 }}>
+              <LayoutGrid size={15} style={{ color:WN.suede }} /> Room Breakdown
+            </h2>
+            <button onClick={() => navigate("/rooms")} style={{ background:"none", border:"none", cursor:"pointer", fontSize:11, fontWeight:700, color:WN.suede, display:"flex", alignItems:"center", gap:4 }}>
+              Manage rooms <ArrowRight size={11} />
+            </button>
+          </div>
+          {/* Legend */}
+          <div style={{ display:"flex", flexWrap:"wrap", gap:12, marginBottom:12 }}>
+            {Object.entries(ROOM_STATUS_COLORS).map(([k, c]) => (
+              <span key={k} style={{ display:"flex", alignItems:"center", gap:5, fontSize:10, color:WN.charcoal }}>
+                <span style={{ width:8, height:8, borderRadius:"50%", background:c.dot }} /> {c.label}
+              </span>
+            ))}
+          </div>
+          {roomsByFloor.length === 0 ? (
+            <p style={{ fontSize:12, color:WN.burlap, textAlign:"center", padding:"24px 0" }}>No rooms configured yet</p>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              {roomsByFloor.map(([floor, rooms]) => (
+                <div key={floor}>
+                  <p style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:WN.burlap, marginBottom:6 }}>
+                    Floor {floor} · {rooms.length} rooms
+                  </p>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                    {rooms.map(r => {
+                      const c = ROOM_STATUS_COLORS[r.status] || ROOM_STATUS_COLORS.available;
+                      return (
+                        <button
+                          key={r.room_id}
+                          onClick={() => navigate("/rooms")}
+                          title={`Room ${r.room_number} · ${c.label}${r.active_checkin?.customer_name ? " · " + r.active_checkin.customer_name : ""}`}
+                          style={{
+                            display:"flex", alignItems:"center", gap:6,
+                            padding:"4px 10px", borderRadius:8, cursor:"pointer",
+                            background:`${c.dot}14`, border:`1px solid ${c.dot}45`,
+                            fontSize:12, fontWeight:700, color:WN.espresso,
+                            fontFamily:"'Jost',sans-serif",
+                          }}>
+                          <span style={{ width:7, height:7, borderRadius:"50%", background:c.dot, flexShrink:0 }} />
+                          {r.room_number}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Today's departures */}
+        <div style={card}>
+          <h2 style={{ fontFamily:"'Cormorant Garamond',Georgia,serif", fontSize:16, fontWeight:600, color:WN.espresso, marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
+            <LogOut size={15} style={{ color:WN.suede }} /> Today's Departures
+          </h2>
+          {dueCheckouts.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"32px 0", color:WN.burlap }}>
+              <CheckCircle2 size={26} style={{ margin:"0 auto 8px", opacity:.4 }} />
+              <p style={{ fontSize:12 }}>No checkouts due today</p>
+            </div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:8, maxHeight:320, overflowY:"auto" }}>
+              {dueCheckouts.map(c => {
+                const guest = c.customer
+                  ? `${c.customer.first_name || ""} ${c.customer.last_name || ""}`.trim()
+                  : (c.customer_name || "Guest");
+                const expTime = c.expected_checkout
+                  ? new Date(c.expected_checkout).toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit" })
+                  : "—";
+                return (
+                  <div key={c.checkin_id} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 10px", borderRadius:10, background:WN.parchment, border:`1px solid ${WN.travert}` }}>
+                    <div style={{ width:38, textAlign:"center", flexShrink:0, borderRadius:8, padding:"5px 2px", background:WN.paper, border:`1px solid ${WN.sand}` }}>
+                      <p style={{ fontSize:13, fontWeight:700, color:WN.espresso, lineHeight:1 }}>{c.room_number}</p>
+                      <p style={{ fontSize:8, color:WN.burlap, textTransform:"uppercase", letterSpacing:".05em", marginTop:2 }}>Room</p>
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <p style={{ fontSize:12, fontWeight:700, color:WN.espresso, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{guest}</p>
+                      <p style={{ fontSize:10, color:WN.burlap }}>by {expTime}</p>
+                    </div>
+                    <button
+                      onClick={() => navigate(`/checkins?tab=active&search=${encodeURIComponent(c.room_number || "")}`)}
+                      style={{ flexShrink:0, fontSize:10, fontWeight:700, color:WN.canvas, background:WN.espresso, border:"none", borderRadius:8, padding:"5px 10px", cursor:"pointer" }}>
+                      Checkout
                     </button>
                   </div>
                 );
@@ -556,8 +803,13 @@ export default function Dashboard() {
         <div style={{ ...card, display:"flex", flexDirection:"column" }}>
           <h2 style={{ fontFamily:"'Cormorant Garamond',Georgia,serif", fontSize:16, fontWeight:600, color:WN.espresso, marginBottom:6, display:"flex", alignItems:"center", gap:8 }}>
             <NotebookPen size={15} style={{ color:WN.suede }} /> Shift Notes
+            {notesOffline && (
+              <span title="Server unreachable — notes stored in this browser only" style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:9, fontWeight:700, letterSpacing:".05em", textTransform:"uppercase", color:WN.amber, background:`${WN.amber}14`, padding:"2px 8px", borderRadius:20, border:`1px solid ${WN.amber}40` }}>
+                <WifiOff size={9} /> offline
+              </span>
+            )}
           </h2>
-          <p style={{ fontSize:10, color:WN.burlap, marginBottom:10 }}>Handover notes for the next shift.</p>
+          <p style={{ fontSize:10, color:WN.burlap, marginBottom:10 }}>Handover notes for the next shift — shared with all staff.</p>
           <textarea
             value={shiftNotes}
             onChange={e => setShiftNotes(e.target.value)}
@@ -569,11 +821,15 @@ export default function Dashboard() {
           />
           <button
             onClick={saveNotes}
-            style={{ marginTop:10, display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"8px 16px", borderRadius:10, fontSize:12, fontWeight:600, fontFamily:"'Jost',sans-serif", cursor:"pointer", transition:"all .15s", background:notesSaved?`${WN.sage}14`:WN.espresso, color:notesSaved?WN.sage:WN.canvas, border:notesSaved?`1px solid ${WN.sage}40`:"none" }}>
+            disabled={notesSaving}
+            style={{ marginTop:10, display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"8px 16px", borderRadius:10, fontSize:12, fontWeight:600, fontFamily:"'Jost',sans-serif", cursor:notesSaving?"wait":"pointer", opacity:notesSaving?.7:1, transition:"all .15s", background:notesSaved?`${WN.sage}14`:WN.espresso, color:notesSaved?WN.sage:WN.canvas, border:notesSaved?`1px solid ${WN.sage}40`:"none" }}>
             {notesSaved ? <CheckCircle2 size={13} /> : <Save size={13} />}
-            {notesSaved ? "Saved!" : "Save Notes"}
+            {notesSaving ? "Saving…" : notesSaved ? "Saved!" : "Save Notes"}
           </button>
         </div>
+
+        {/* Audit log — admin/owner only: who did what, when */}
+        {isAdmin && <ActivityFeed title="Audit Log" limit={15} />}
       </div>
     </div>
   );

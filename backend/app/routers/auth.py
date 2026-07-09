@@ -28,9 +28,10 @@ def _now():
 from typing import Optional
 from ..database import get_db
 from ..models import User, LoginAttempt
-from ..auth import verify_password, get_password_hash, create_access_token, get_current_user
+from ..auth import (verify_password, get_password_hash, create_access_token,
+                    get_current_user, ACCESS_TOKEN_EXPIRE_HOURS)
 from ..services.audit_service import log_audit
-import os, secrets, logging
+import os, secrets, logging, ipaddress
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -58,6 +59,105 @@ def _is_admin_or_super(u: User) -> bool:
 def _is_staff(u: User) -> bool:
     return _role(u) == "staff"
 
+# ── Lodge-configurable security settings ──────────────────────────────────
+
+def _get_lodge_setting(db: Session, key: str, default: str, lodge_id) -> str:
+    """Read a Setting for this lodge, falling back to `default` on any
+    error, missing row, or empty value. Safe for lodge_id=None."""
+    try:
+        from ..services.alert_service import get_setting
+        val = get_setting(db, key, default, lodge_id=lodge_id)
+        return val if val not in (None, "") else default
+    except Exception:
+        return default
+
+
+def _lockout_config(db: Session, lodge_id) -> tuple:
+    """(max_attempts, lockout_minutes) — from the lodge's Setting rows,
+    falling back to the env/module defaults on any error."""
+    max_attempts, lockout_minutes = MAX_ATTEMPTS, LOCKOUT_MINUTES
+    try:
+        v = int(_get_lodge_setting(db, "max_login_attempts", "", lodge_id) or 0)
+        if v > 0:
+            max_attempts = v
+    except Exception:
+        pass
+    try:
+        v = int(_get_lodge_setting(db, "lockout_duration_minutes", "", lodge_id) or 0)
+        if v > 0:
+            lockout_minutes = v
+    except Exception:
+        pass
+    return max_attempts, lockout_minutes
+
+
+def _session_expiry(db: Session, user: User) -> timedelta:
+    """Role-aware JWT lifetime: admin_session_hours for admin-type roles,
+    staff_session_hours for staff. Falls back to the global default."""
+    role = _role(user)
+    key = "staff_session_hours" if role == "staff" else "admin_session_hours"
+    hours = float(ACCESS_TOKEN_EXPIRE_HOURS)
+    try:
+        v = float(_get_lodge_setting(db, key, "", user.lodge_id) or 0)
+        if v > 0:
+            hours = v
+    except Exception:
+        pass
+    return timedelta(hours=hours)
+
+
+def _client_ip(request: Request) -> str:
+    """Client IP, honouring the first X-Forwarded-For entry when present
+    (we may sit behind a reverse proxy)."""
+    try:
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            first = xff.split(",")[0].strip()
+            if first:
+                return first
+    except Exception:
+        pass
+    return request.client.host if request.client else "unknown"
+
+
+def _remote_login_policy(db: Session, lodge_id, ip: str) -> tuple:
+    """Evaluate the remote-staff-login policy for this lodge and client IP.
+
+    Returns (is_remote, policy):
+      - trusted_network_cidrs empty / all-malformed → feature off →
+        (False, "allow").
+      - IP inside any trusted CIDR → (False, "allow").
+      - Otherwise → (True, remote_login_policy) where policy is one of
+        "allow" | "otp" | "block" (defaults to "allow" on bad values).
+    """
+    cidrs_raw = _get_lodge_setting(db, "trusted_network_cidrs", "", lodge_id) or ""
+    networks = []
+    for part in cidrs_raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(part, strict=False))
+        except ValueError:
+            continue  # ignore malformed entries
+    if not networks:
+        return False, "allow"  # feature off
+
+    try:
+        addr = ipaddress.ip_address(ip)
+        if any(addr in net for net in networks):
+            return False, "allow"
+    except ValueError:
+        # Unparseable client IP (e.g. "unknown") — treat as remote so the
+        # policy still applies rather than silently bypassing it.
+        pass
+
+    policy = (_get_lodge_setting(db, "remote_login_policy", "allow", lodge_id) or "allow").strip().lower()
+    if policy not in ("allow", "otp", "block"):
+        policy = "allow"
+    return True, policy
+
+
 # ── OTP helpers ────────────────────────────────────────────────────────────
 
 def _generate_otp() -> str:
@@ -75,13 +175,29 @@ def _lodge_requires_otp(db: Session, lodge_id: int) -> bool:
         return False
 
 
-def _send_otp_to_admin(db: Session, otp: str, lodge_id: int, staff_username: str) -> bool:
+def _send_otp_to_admin(db: Session, otp: str, lodge_id: int, staff_username: str,
+                       user_phone: Optional[str] = None) -> bool:
     """
-    Send the OTP via SMS to the lodge admin's configured phone.
+    Send the OTP via SMS. If the user has their own phone number on file we
+    send it there; otherwise we fall back to the lodge admin's configured
+    phone (legacy behaviour).
     Returns True if sent (or mock-sent), False on failure.
     """
     try:
         from ..services.alert_service import get_setting, send_sms, is_sms_enabled
+
+        # v10.6: prefer the staff member's own phone when set.
+        if user_phone and str(user_phone).strip():
+            try:
+                msg = (f"[Rusto] Your login OTP: {otp}\n"
+                       f"Valid for {OTP_TTL_MINUTES} min. Do NOT share.")
+                send_sms(db, str(user_phone).strip(), msg,
+                         lodge_id=lodge_id, event_type="custom")
+                return True
+            except Exception as e:
+                logger.error("OTP SMS to user's own phone failed (%s); "
+                             "falling back to admin phone", e)
+
         admin_phone = get_setting(db, "admin_phone", "", lodge_id=lodge_id)
         if not admin_phone:
             # Fallback: find the first admin user for this lodge and use their phone
@@ -134,7 +250,7 @@ class ChangePasswordRequest(BaseModel):
 
 @router.post("/login")
 def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
-    ip = request.client.host if request.client else "unknown"
+    ip = _client_ip(request)
 
     attempt = LoginAttempt(username=body.username, ip_address=ip)
     db.add(attempt)
@@ -147,11 +263,14 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=429,
             detail=f"Account locked until {user.locked_until.strftime('%H:%M:%S UTC')}")
 
+    # Configurable brute-force lockout (Setting table, falls back to defaults)
+    max_attempts, lockout_minutes = _lockout_config(db, user.lodge_id if user else None)
+
     if not user or not verify_password(body.password, user.password_hash):
         if user:
             user.failed_attempts = (user.failed_attempts or 0) + 1
-            if user.failed_attempts >= MAX_ATTEMPTS:
-                user.locked_until = _now() + timedelta(minutes=LOCKOUT_MINUTES)
+            if user.failed_attempts >= max_attempts:
+                user.locked_until = _now() + timedelta(minutes=lockout_minutes)
                 user.failed_attempts = 0
         attempt.success = False
         db.commit()
@@ -182,8 +301,8 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
             raise HTTPException(status_code=401, detail="totp_required")
         if not verify_totp(user.totp_secret, body.totp_code):
             user.failed_attempts = (user.failed_attempts or 0) + 1
-            if user.failed_attempts >= MAX_ATTEMPTS:
-                user.locked_until = _now() + timedelta(minutes=LOCKOUT_MINUTES)
+            if user.failed_attempts >= max_attempts:
+                user.locked_until = _now() + timedelta(minutes=lockout_minutes)
                 user.failed_attempts = 0
             db.commit()
             try:
@@ -194,16 +313,44 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
                 pass
             raise HTTPException(status_code=401, detail="Invalid authentication code")
 
+    role_val = _role(user)
+
+    # ── v10.6: Remote staff login security ───────────────────────────────
+    # If the lodge has trusted_network_cidrs configured and this staff
+    # member is logging in from outside those networks, apply the lodge's
+    # remote_login_policy: allow (default), otp (force OTP challenge) or
+    # block (403). Admins are unaffected.
+    remote_forces_otp = False
+    if role_val == "staff" and user.lodge_id is not None:
+        is_remote, remote_policy = _remote_login_policy(db, user.lodge_id, ip)
+        if is_remote and remote_policy == "block":
+            db.commit()
+            try:
+                log_audit(db, "auth.login_blocked",
+                          actor_user_id=user.user_id, actor_username=user.username,
+                          lodge_id=user.lodge_id,
+                          details={"reason": "remote_login_blocked", "ip": ip},
+                          ip_address=ip)
+            except Exception:
+                pass
+            raise HTTPException(
+                status_code=403,
+                detail=("Remote login is blocked by your lodge's security policy. "
+                        "Please log in from the lodge network or contact your admin."))
+        if is_remote and remote_policy == "otp":
+            remote_forces_otp = True
+
     # ── v10.0: Staff OTP check ────────────────────────────────────────────
     # Trigger OTP flow if:
     #   (a) role == staff  AND
-    #   (b) user.require_login_otp is True  OR  lodge setting require_staff_otp is true
-    role_val = _role(user)
+    #   (b) user.require_login_otp is True  OR  lodge setting require_staff_otp
+    #       is true  OR  remote login policy forces OTP (v10.6)
     needs_otp = (
         role_val == "staff"
         and user.lodge_id is not None
         and (
-            getattr(user, "require_login_otp", False)
+            remote_forces_otp
+            or getattr(user, "require_login_otp", False)
             or _lodge_requires_otp(db, user.lodge_id)
         )
     )
@@ -217,13 +364,18 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
 
         # Best-effort send; if SMS not configured, we fail-open (return otp_required
         # but hint that admin must communicate the OTP verbally / via WhatsApp).
-        sms_sent = _send_otp_to_admin(db, otp, user.lodge_id, user.username)
+        # v10.6: sent to the staff member's own phone when they have one on
+        # file; otherwise to the lodge admin's phone (legacy).
+        own_phone = bool(getattr(user, "phone", None) and str(user.phone).strip())
+        sms_sent = _send_otp_to_admin(db, otp, user.lodge_id, user.username,
+                                      user_phone=getattr(user, "phone", None))
 
         try:
             log_audit(db, "auth.otp_sent",
                       actor_user_id=user.user_id, actor_username=user.username,
                       lodge_id=user.lodge_id,
-                      details={"sms_sent": sms_sent, "ip": ip}, ip_address=ip)
+                      details={"sms_sent": sms_sent, "to_own_phone": own_phone,
+                               "ip": ip}, ip_address=ip)
         except Exception:
             pass
 
@@ -237,7 +389,8 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
             "otp_token": otp_token,
             "sms_sent": sms_sent,
             "message": (
-                "OTP sent to lodge admin's phone. Ask your admin for the code."
+                ("OTP sent to your registered phone." if own_phone else
+                 "OTP sent to lodge admin's phone. Ask your admin for the code.")
                 if sms_sent else
                 "OTP generated. SMS not configured — ask your admin for the code."
             ),
@@ -268,6 +421,11 @@ def verify_otp_login(request: Request, body: OtpVerifyRequest, db: Session = Dep
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Lockout check — a locked account can't finish the OTP flow either.
+    if user.locked_until and user.locked_until > _now():
+        raise HTTPException(status_code=429,
+            detail=f"Account locked until {user.locked_until.strftime('%H:%M:%S UTC')}")
 
     # Check attempts
     if (user.login_otp_attempts or 0) >= OTP_MAX_TRIES:
@@ -350,11 +508,13 @@ def _issue_token(user: User, ip: str, attempt, db: Session, via_otp: bool = Fals
     except Exception:
         pass
 
+    # v10.6: role-aware session lifetime (admin_session_hours /
+    # staff_session_hours from the lodge's settings; global default otherwise).
     token = create_access_token({
         "sub":      str(user.user_id),
         "role":     _role(user),
         "lodge_id": user.lodge_id,
-    })
+    }, expires_delta=_session_expiry(db, user))
     lodge_info = None
     if user.lodge:
         lodge_info = {
@@ -444,6 +604,8 @@ def list_users(current_user: User = Depends(get_current_user), db: Session = Dep
         "lodge_id":  u.lodge_id,
         "lodge_name": u.lodge.name if u.lodge else None,
         "require_login_otp": bool(getattr(u, "require_login_otp", False)),
+        "has_static_pin": bool(getattr(u, "static_login_pin", None)),
+        "totp_enabled": bool(getattr(u, "totp_enabled", False)),
     } for u in users]
 
 

@@ -81,10 +81,15 @@ class TestReportRevenue:
         r, s = api_get("/api/reports/revenue", token=lodge_token)
         assert s == 200
 
-    def test_revenue_is_list(self, lodge_token):
+    def test_revenue_shape(self, lodge_token):
         r, s = api_get("/api/reports/revenue", token=lodge_token)
         assert s == 200
-        assert isinstance(r, list)
+        # v3: object with day-by-day series + payment-method breakdown
+        assert isinstance(r, dict)
+        assert isinstance(r.get("series"), list)
+        assert isinstance(r.get("by_payment"), dict)
+        for bucket in ("cash", "card", "upi", "phonepe", "gpay", "paytm", "online"):
+            assert bucket in r["by_payment"]
 
 
 class TestReportKPIs:

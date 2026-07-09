@@ -60,6 +60,15 @@ export default function Agencies() {
     } catch (e) { toast.error('Failed to regenerate') }
   }
 
+  const regenerateWebhookSecret = async (id, name) => {
+    if (!window.confirm(`Regenerate webhook secret for ${name}?\nThe old webhook secret will stop working immediately — the partner must update their signature verification.`)) return
+    try {
+      const res = await agenciesAPI.regenerateWebhookSec(id)
+      setDetail(null)
+      setCredModal({ ...res.data, webhookRegenerated: true })
+    } catch (e) { toast.error('Failed to regenerate webhook secret') }
+  }
+
   if (!isAdmin) {
     return (
       <div className="card text-center py-12 animate-fade-in">
@@ -167,7 +176,9 @@ export default function Agencies() {
       {credModal && <CredentialsModal data={credModal} onClose={() => setCredModal(null)} />}
 
       {/* Detail modal */}
-      {detail && <DetailModal agencyId={detail.agency_id} agency={detail} onClose={() => setDetail(null)} />}
+      {detail && <DetailModal agencyId={detail.agency_id} agency={detail}
+                              onRegenerateWebhook={regenerateWebhookSecret}
+                              onClose={() => setDetail(null)} />}
     </div>
   )
 }
@@ -299,34 +310,45 @@ function CredentialsModal({ data, onClose }) {
           <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
           <div className="flex-1">
             <h2 className="text-lg font-display font-bold text-navy">
-              {data.regenerated ? 'New API Secret' : 'Save These Credentials Now'}
+              {data.webhookRegenerated ? 'New Webhook Secret'
+                : data.regenerated ? 'New API Secret'
+                : 'Save These Credentials Now'}
             </h2>
             <p className="text-sm text-amber-800 mt-1">
-              The <strong>API Secret</strong> cannot be retrieved again — only regenerated.
-              Send these to the partner over a secure channel.
+              {data.webhookRegenerated
+                ? <>The <strong>Webhook Secret</strong> cannot be retrieved again — only regenerated.
+                    Send it to the partner over a secure channel so they can verify webhook signatures.</>
+                : <>The <strong>API Secret</strong> cannot be retrieved again — only regenerated.
+                    Send these to the partner over a secure channel.</>}
             </p>
           </div>
         </div>
         <div className="p-6 space-y-4">
-          <CredField label="API Key (X-API-Key header)" value={data.api_key}
-                     onCopy={() => copy(data.api_key, 'API Key')} />
-          <CredField label="API Secret (X-API-Secret header)" value={data.api_secret}
-                     onCopy={() => copy(data.api_secret, 'API Secret')} sensitive />
+          {data.api_key && (
+            <CredField label="API Key (X-API-Key header)" value={data.api_key}
+                       onCopy={() => copy(data.api_key, 'API Key')} />
+          )}
+          {data.api_secret && (
+            <CredField label="API Secret (X-API-Secret header)" value={data.api_secret}
+                       onCopy={() => copy(data.api_secret, 'API Secret')} sensitive />
+          )}
           {data.webhook_secret && (
             <CredField label="Webhook Secret (HMAC-SHA256 for signature verification)"
                        value={data.webhook_secret}
                        onCopy={() => copy(data.webhook_secret, 'Webhook Secret')} sensitive />
           )}
 
-          <div className="bg-ink-50 p-4 rounded-lg text-xs">
-            <p className="font-semibold text-navy mb-2">Quick start for partner:</p>
-            <pre className="font-mono text-[11px] text-ink-700 whitespace-pre-wrap">
+          {data.api_secret && (
+            <div className="bg-ink-50 p-4 rounded-lg text-xs">
+              <p className="font-semibold text-navy mb-2">Quick start for partner:</p>
+              <pre className="font-mono text-[11px] text-ink-700 whitespace-pre-wrap">
 {`curl ${window.location.origin}/api/partner/v1/me \\
   -H "X-API-Key: ${data.api_key}" \\
   -H "X-API-Secret: ${data.api_secret || '<the secret you just copied>'}"
 `}
-            </pre>
-          </div>
+              </pre>
+            </div>
+          )}
         </div>
         <div className="p-6 border-t flex justify-end">
           <button onClick={onClose} className="btn-primary">I've saved them</button>
@@ -358,7 +380,7 @@ function CredField({ label, value, onCopy, sensitive = false }) {
 
 
 /* ════════════════════════════════════════════════════════════════════ */
-function DetailModal({ agencyId, agency, onClose }) {
+function DetailModal({ agencyId, agency, onClose, onRegenerateWebhook }) {
   const [tab, setTab] = useState('info')
   const [calls, setCalls] = useState([])
   const [bookings, setBookings] = useState([])
@@ -421,6 +443,17 @@ function DetailModal({ agencyId, agency, onClose }) {
               <KV label="Total Bookings" value={agency.total_bookings} />
               <KV label="Total Revenue" value={`₹${(agency.total_revenue || 0).toLocaleString('en-IN')}`} />
               <KV label="Last Used" value={agency.last_used_at ? new Date(agency.last_used_at).toLocaleString('en-IN') : 'Never'} />
+
+              <div className="pt-4 mt-4 border-t border-ink-100">
+                <button onClick={() => onRegenerateWebhook(agency.agency_id, agency.name)}
+                        className="text-xs text-amber-700 hover:underline flex items-center gap-1">
+                  <Webhook size={12} /> Regenerate Webhook Secret
+                </button>
+                <p className="text-[11px] text-ink-400 mt-1">
+                  Issues a new HMAC signing secret for webhook deliveries and shows it once.
+                  The old secret stops working immediately.
+                </p>
+              </div>
             </div>
           )}
 

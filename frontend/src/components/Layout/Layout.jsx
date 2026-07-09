@@ -33,6 +33,47 @@ const WN = {
   walnut:    '#231509',
 }
 
+// ── Live IST clock for the header ─────────────────────────────────────
+// e.g. "Wed, 8 Jul 2026 · 14:05:32 IST" — ticks every second.
+function LiveClock() {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const dateStr = now.toLocaleDateString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+  })
+  const timeStr = now.toLocaleTimeString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  })
+  return (
+    <span style={{
+      fontSize: 11, color: WN.burlap, fontWeight: 500,
+      fontFamily: "'Jost',sans-serif",
+      fontVariantNumeric: 'tabular-nums',
+      whiteSpace: 'nowrap',
+    }}>
+      {dateStr} · {timeStr} IST
+    </span>
+  )
+}
+
+// ── Staff permission gating for menu items ────────────────────────────
+// Maps a route to the permission key a staff member needs to see it.
+// Keys mirror backend/app/permissions.py PERMISSION_CATALOG_V2
+// (note: reports uses "reports.view", not "reports.read").
+const ROUTE_PERMISSIONS = {
+  '/checkins':  'checkins.read',
+  '/rooms':     'rooms.read',
+  '/customers': 'customers.read',
+  '/bookings':  'bookings.read',
+  '/alerts':    'alerts.read',
+  '/reports':   'reports.view',
+}
+
 const menuGroups = [
   {
     id: 'frontDesk', label: 'Front Desk', icon: Calendar,
@@ -294,6 +335,13 @@ export default function Layout() {
               if (item.superAdminOnly && !isSuperAdmin) return false
               if (item.adminOnly && !isAdmin) return false
               if (enabledModules && item.to && !isRouteEnabled(enabledModules, item.to)) return false
+              // Staff permission gating: hide items the staff member lacks
+              // the matching *.read permission for. Admins/super-admins
+              // always see everything (and we never hide while the gate
+              // context is still loading, to avoid a menu flash).
+              const requiredPerm = ROUTE_PERMISSIONS[item.to]
+              if (requiredPerm && gate.ready && !isAdmin && !isSuperAdmin &&
+                  !gate.hasPermission(requiredPerm)) return false
               return true
             })
             if (visibleItems.length === 0) return null
@@ -539,12 +587,7 @@ export default function Layout() {
           <div style={{ flex: 1 }} />
           <PortalSwitcher />
           <NotificationsBell isSuperAdmin={isSuperAdmin} />
-          <span style={{
-            fontSize: 11, color: WN.burlap, fontWeight: 500,
-            fontFamily: "'Jost',sans-serif",
-          }}>
-            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
-          </span>
+          <LiveClock />
         </header>
 
         {/* Page content */}

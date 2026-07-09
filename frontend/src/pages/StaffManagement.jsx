@@ -4,7 +4,7 @@ import { Users, UserPlus, RefreshCw, KeyRound, ShieldCheck, X,
          Copy, AlertCircle, Loader2, ChevronDown, ChevronRight,
          Eye, EyeOff } from "lucide-react";
 import { toast } from "react-toastify";
-import { staffAPI } from "../services/api";
+import { staffAPI, authAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 /**
@@ -41,7 +41,16 @@ export default function StaffManagement() {
         staffAPI.list({ include_inactive: showInactive }),
         catalog ? Promise.resolve({ data: catalog }) : staffAPI.permissionCatalog(),
       ]);
-      setStaff(list.data || []);
+      let rows = list.data || [];
+      // has_static_pin isn't exposed by the staff endpoint — merge it in
+      // from the auth users list so the 2FA mode selector shows the truth.
+      try {
+        const authUsers = await authAPI.listUsers();
+        const pinMap = {};
+        (authUsers.data || []).forEach(au => { pinMap[au.user_id] = !!au.has_static_pin; });
+        rows = rows.map(r => ({ ...r, has_static_pin: pinMap[r.user_id] || false }));
+      } catch { /* non-fatal: selector falls back to SMS OTP display */ }
+      setStaff(rows);
       if (!catalog) setCatalog(cat.data);
     } catch (e) {
       toast.error("Failed to load staff");
@@ -341,13 +350,20 @@ function CreateStaffModal({ catalog, onClose, onCreated }) {
 
 // ── Edit modal ────────────────────────────────────────────────────
 
+/** Derive the current 2FA mode from the user record. */
+function loginModeOf(u) {
+  if (!u.require_login_otp) return "password";
+  return u.has_static_pin ? "pin" : "sms";
+}
+
 function EditStaffModal({ u, catalog, currentUserId, onClose, onUpdated, onPasswordReset }) {
   const [form, setForm] = useState({
     full_name: u.full_name || "",
     email: u.email || "",
     phone: u.phone || "",
     is_active: u.is_active,
-    require_login_otp: u.require_login_otp || false,
+    login_mode: loginModeOf(u),          // "password" | "sms" | "pin"
+    static_pin: "",                       // new PIN when switching to / changing PIN mode
     permissions: new Set(u.permissions_explicit || u.permissions_effective),
     uses_defaults: u.uses_legacy_defaults,
   });
@@ -356,6 +372,15 @@ function EditStaffModal({ u, catalog, currentUserId, onClose, onUpdated, onPassw
   const isStaff = u.role === "staff";
 
   const save = async () => {
+    // PIN validation up-front so we don't half-save.
+    if (isStaff && !isSelf && form.login_mode === "pin") {
+      if (form.static_pin && !/^\d{4,8}$/.test(form.static_pin)) {
+        toast.error("PIN must be 4–8 digits"); return;
+      }
+      if (!form.static_pin && !u.has_static_pin) {
+        toast.error("Enter a 4–8 digit PIN for Static PIN mode"); return;
+      }
+    }
     setBusy(true);
     try {
       const patch = {
@@ -372,13 +397,22 @@ function EditStaffModal({ u, catalog, currentUserId, onClose, onUpdated, onPassw
         }
       }
       await staffAPI.update(u.user_id, patch);
-      // Handle OTP setting separately (goes to a different endpoint)
-      if (isStaff && typeof form.require_login_otp === 'boolean'
-          && form.require_login_otp !== (u.require_login_otp || false)) {
+      // Handle 2FA mode separately (different endpoints)
+      if (isStaff && !isSelf) {
         try {
-          await authAPI.setUserOtpSetting(u.user_id, form.require_login_otp);
+          const wantOtp = form.login_mode !== "password";
+          if (wantOtp !== !!u.require_login_otp) {
+            await authAPI.setUserOtpSetting(u.user_id, wantOtp);
+          }
+          if (form.login_mode === "pin") {
+            if (form.static_pin) await authAPI.setUserStaticPin(u.user_id, form.static_pin);
+          } else if (u.has_static_pin) {
+            // Password-only or SMS OTP mode → clear any stale static PIN
+            await authAPI.setUserStaticPin(u.user_id, null);
+          }
         } catch (otpErr) {
-          console.warn('OTP setting update failed:', otpErr);
+          console.warn('2FA mode update failed:', otpErr);
+          toast.warn(otpErr.response?.data?.detail || "Login security setting could not be updated");
         }
       }
       toast.success("Saved");
@@ -457,28 +491,55 @@ function EditStaffModal({ u, catalog, currentUserId, onClose, onUpdated, onPassw
             </div>
           </div>
 
-          {/* OTP Login requirement (staff only) */}
+          {/* Login security / 2FA mode (staff only) */}
           {isStaff && !isSelf && (
-            <div className="card bg-ink-50">
-              <div className="flex items-center justify-between">
+            <div className="card bg-ink-50 space-y-3">
+              <div>
+                <h3 className="font-semibold text-navy text-sm flex items-center gap-1.5">
+                  🔐 Login security
+                </h3>
+                <p className="text-2xs text-ink-500 mt-0.5">
+                  Second step required after the password on each login
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  ["password", "Password only", "No second step"],
+                  ["sms",      "SMS OTP",       "6-digit code sent by SMS"],
+                  ["pin",      "Static PIN",    "Fixed 4–8 digit PIN"],
+                ].map(([val, label, desc]) => (
+                  <button key={val} type="button"
+                          onClick={() => setForm(f => ({...f, login_mode: val}))}
+                          className={`p-2.5 rounded-xl border-2 text-left transition-all ${
+                            form.login_mode === val
+                              ? "border-gold bg-gold-50"
+                              : "border-ink-200 bg-white hover:border-ink-300"
+                          }`}>
+                    <div className="text-xs font-bold text-navy">{label}</div>
+                    <div className="text-2xs text-ink-500 mt-0.5">{desc}</div>
+                  </button>
+                ))}
+              </div>
+              {form.login_mode === "sms" && (
+                <p className="text-2xs text-ink-500">
+                  Code goes to the staff member's own phone when set above; otherwise to the lodge admin's phone.
+                </p>
+              )}
+              {form.login_mode === "pin" && (
                 <div>
-                  <h3 className="font-semibold text-navy text-sm flex items-center gap-1.5">
-                    🔐 Require OTP on login
-                  </h3>
-                  <p className="text-2xs text-ink-500 mt-0.5">
-                    Sends a 6-digit code to admin phone on each staff login — premises lock
+                  <label className="block text-2xs font-bold text-ink-600 mb-1">
+                    {u.has_static_pin ? "New PIN — leave blank to keep the current one" : "PIN (4–8 digits)"}
+                  </label>
+                  <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={8}
+                         value={form.static_pin}
+                         onChange={e => setForm(f => ({...f, static_pin: e.target.value.replace(/\D/g, "").slice(0, 8)}))}
+                         placeholder={u.has_static_pin ? "••••" : "e.g. 4321"}
+                         className="input-field font-mono tracking-widest"/>
+                  <p className="text-2xs text-ink-400 mt-1">
+                    Staff enters this PIN at the verification step instead of waiting for an SMS. Share it securely in person.
                   </p>
                 </div>
-                <button type="button"
-                        onClick={() => setForm(f => ({...f, require_login_otp: !f.require_login_otp}))}
-                        className={`relative w-11 h-6 rounded-full transition-colors ${
-                          form.require_login_otp ? 'bg-green-500' : 'bg-ink-300'
-                        }`}>
-                  <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                    form.require_login_otp ? 'translate-x-5' : 'translate-x-0.5'
-                  }`}/>
-                </button>
-              </div>
+              )}
             </div>
           )}
 

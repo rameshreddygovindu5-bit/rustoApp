@@ -193,6 +193,20 @@ def seed_initial_data():
                 ("late_checkout_charge", "200", "tariff", "Extra charge per hour for late checkout", False),
                 ("gst_enabled", "false", "tariff", "Enable GST on invoices", False),
                 ("gst_rate", "12", "tariff", "GST percentage", False),
+                ("gst_threshold", "1000", "tariff", "Nightly tariff above which GST applies (INR)", False),
+                ("collection_upi_id", "", "tariff", "Lodge UPI ID for digital collections", False),
+                ("collection_phonepe", "", "tariff", "PhonePe collection number", False),
+                ("collection_gpay", "", "tariff", "Google Pay collection number", False),
+                ("collection_paytm", "", "tariff", "Paytm collection number", False),
+
+                # Security — customer check-in
+                ("require_customer_signature", "false", "security", "Require guest digital signature at check-in", False),
+                ("guest_declaration_text",
+                 "I hereby declare that the details provided by me are true. I agree to abide by the lodge house rules: valid ID for every guest, no smoking inside rooms, visitors allowed only in the lobby, and checkout by the notified time. I accept that the lodge is not responsible for loss of personal valuables.",
+                 "security", "Guest declaration / house rules text shown at check-in", False),
+                # Security — remote staff login
+                ("trusted_network_cidrs", "", "security", "Comma-separated trusted lodge network CIDRs (e.g. 192.168.1.0/24)", False),
+                ("remote_login_policy", "allow", "security", "Policy for staff logins outside trusted network: allow | otp | block", False),
 
                 ("sms_enabled", "false", "alerts", "Master SMS alert toggle", False),
                 ("email_enabled", "false", "alerts", "Master email alert toggle", False),
@@ -210,6 +224,9 @@ def seed_initial_data():
 
                 ("session_timeout_min", "480", "system", "Session timeout in minutes", False),
                 ("max_login_attempts", "5", "system", "Max failed logins before lockout", False),
+                ("lockout_duration_minutes", "15", "system", "Minutes an account stays locked after too many failed logins", False),
+                ("admin_session_hours", "8", "system", "Admin JWT/session expiry in hours", False),
+                ("staff_session_hours", "8", "system", "Staff JWT/session expiry in hours", False),
                 ("backup_enabled", "true", "system", "Enable automatic daily DB backup", False),
 
                 # Partner / agency defaults

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Q
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime, date, timezone
-import os, shutil, re, json, uuid, math
+import os, shutil, re, json, uuid, math, base64
 
 def _utcnow():
     """Naive UTC for SQLite datetime columns."""
@@ -92,6 +92,19 @@ def checkin_to_dict(ch: Checkin):
         "status": ch.status,
         "special_notes": ch.special_notes,
         "sms_alert_preference": ch.sms_alert_preference or "yes",
+        # Guest signature + house-rules declaration
+        "signature_path": ch.signature_path,
+        "signature_captured_by": ch.signature_captured_by,
+        "signature_captured_at": ch.signature_captured_at.isoformat() if ch.signature_captured_at else None,
+        "declaration_accepted": bool(ch.declaration_accepted),
+        # Guest ID verification
+        "id_verified": bool(ch.id_verified),
+        "verified_by": ch.verified_by,
+        "verified_at": ch.verified_at.isoformat() if ch.verified_at else None,
+        "verification_notes": ch.verification_notes,
+        # Stay metadata
+        "purpose_of_visit": ch.purpose_of_visit,
+        "vehicle_number": ch.vehicle_number,
         "invoice_number": ch.invoice.invoice_number if ch.invoice else None,
         "created_at": ch.created_at.isoformat() if ch.created_at else None,
     }
@@ -254,6 +267,16 @@ async def create_checkin(
     special_notes: Optional[str] = Form(None),
     sms_alert_preference: str = Form("yes"),
     payment_mode: str = Form("cash"),
+    # ── Stay metadata (guest-register compliance) ─────────────────────────
+    purpose_of_visit: Optional[str] = Form(None),
+    vehicle_number: Optional[str] = Form(None),
+    # ── House-rules declaration + guest digital signature ─────────────────
+    # `declaration_accepted` MUST be "true" — the guest has to accept the
+    # house rules / declaration before check-in can proceed.
+    declaration_accepted: str = Form("false"),
+    # Base64 PNG data URL from the signature pad. Mandatory when the
+    # `require_customer_signature` setting is "true"; optional otherwise.
+    signature: Optional[str] = Form(None),
     # When a check-in is created from a confirmed booking, the frontend passes
     # the booking_id (to link the records) and the advance already collected
     # at reservation time (credited against the final bill at checkout).
@@ -269,9 +292,53 @@ async def create_checkin(
     if not re.match(r"^\d{10}$", phone):
         raise HTTPException(status_code=400, detail="Phone must be exactly 10 digits")
 
+    # Guest count cap — a lodge room takes 1..6 people.
+    if members_count < 1 or members_count > 6:
+        raise HTTPException(status_code=400, detail="Guest count must be between 1 and 6")
+
+    # House-rules declaration is mandatory for every check-in.
+    if str(declaration_accepted).strip().lower() not in ("true", "1", "yes"):
+        raise HTTPException(
+            status_code=400,
+            detail="Guest must accept the house rules / declaration before check-in.",
+        )
+
+    # Form C compliance: foreign nationals MUST check in on a passport so a
+    # ForeignGuestRegistration (C-Form) can be filed with FRRO.
+    is_foreign_national = (nationality or "").strip().lower() not in ("indian", "india", "")
+    if is_foreign_national and id_type != "passport":
+        raise HTTPException(
+            status_code=400,
+            detail="Foreign nationals must check in with a Passport as ID proof "
+                   "(Form C / FRRO requirement).",
+        )
+
     # Validate ID number format
     if not validate_id_number(id_type, id_number):
         raise HTTPException(status_code=400, detail=f"Invalid {id_type.replace('_', ' ')} number format")
+
+    # Guest digital signature — mandatory if the lodge requires it.
+    require_signature = get_setting(
+        db, "require_customer_signature", "false", lodge_id=lodge_id
+    ).strip().lower() == "true"
+    if require_signature and not (signature or "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Guest signature is required for check-in (lodge policy).",
+        )
+
+    # Decode the signature early (fail fast, before any file/DB writes).
+    signature_bytes = None
+    if signature and signature.strip():
+        sig = signature.strip()
+        m = re.match(r"^data:image/(png|jpe?g);base64,(.+)$", sig, re.IGNORECASE | re.DOTALL)
+        b64_part = m.group(2) if m else sig
+        try:
+            signature_bytes = base64.b64decode(b64_part, validate=True)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Signature must be a base64 PNG data URL")
+        if len(signature_bytes) > 2 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Signature image must be under 2MB")
 
     rooms_payload = parse_rooms_payload(rooms, room_id, deposit_amount, tariff_per_night)
 
@@ -395,6 +462,19 @@ async def create_checkin(
     customer.id_number = id_number
     db.flush()
 
+    # ── Persist the guest signature (same uploads pattern as id_proofs) ───
+    signature_rel_path = None
+    if signature_bytes:
+        sig_fname = f"{customer.customer_id}_{uuid.uuid4().hex}.png"
+        sig_dir = os.path.join(UPLOAD_DIR, "signatures")
+        os.makedirs(sig_dir, exist_ok=True)
+        try:
+            with open(os.path.join(sig_dir, sig_fname), "wb") as f:
+                f.write(signature_bytes)
+            signature_rel_path = f"signatures/{sig_fname}"
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=f"Could not save signature: {e}")
+
     # ── Resolve & validate the linked booking, if this check-in came from one.
     linked_booking = None
     if booking_id:
@@ -446,6 +526,12 @@ async def create_checkin(
             status=CheckinStatus.active,
             special_notes=special_notes,
             sms_alert_preference=sms_alert_preference,
+            purpose_of_visit=(purpose_of_visit or None),
+            vehicle_number=(vehicle_number.strip().upper() if vehicle_number else None),
+            declaration_accepted=True,
+            signature_path=signature_rel_path,
+            signature_captured_by=(current_user.username if signature_rel_path else None),
+            signature_captured_at=(datetime.now() if signature_rel_path else None),
             checked_in_by=current_user.user_id,
         )
         db.add(ch)
@@ -487,10 +573,11 @@ async def create_checkin(
             # Audit failure must never block a real check-in
             pass
 
-    # India FRRO compliance: if the guest is on a passport, auto-create
-    # a foreign-guest registration row in `pending` status so the admin
-    # gets a reminder to file the C-Form within 24 hours.
-    if customer.id_type == "passport":
+    # India FRRO compliance: a foreign national (non-Indian nationality) OR
+    # any guest checking in on a passport gets a foreign-guest registration
+    # row in `pending` status so the admin gets a reminder to file the
+    # C-Form within 24 hours.
+    if customer.id_type == "passport" or is_foreign_national:
         try:
             from ..models import ForeignGuestRegistration, ForeignGuestStatus
             for ch, _ in created:
@@ -502,6 +589,7 @@ async def create_checkin(
                         lodge_id=lodge_id, customer_id=customer.customer_id,
                         checkin_id=ch.checkin_id,
                         passport_number=customer.id_number,
+                        nationality=customer.nationality,
                         status=ForeignGuestStatus.pending,
                     ))
             db.commit()
@@ -688,10 +776,16 @@ def process_checkout(checkin_id: int, body: CheckoutRequest,
     # GST calculation — on the subtotal AFTER promo/loyalty discounts so
     # tax is on the actual money changing hands.
     taxable = max(0, room_charges + additional - promo_discount - loyalty_discount)
-    gst_enabled = get_setting(db, "gst_enabled", "false").lower() == "true"
-    gst_rate = float(get_setting(db, "gst_rate", "12"))
+    gst_enabled = get_setting(db, "gst_enabled", "false", lodge_id=lodge_id).lower() == "true"
+    gst_rate = float(get_setting(db, "gst_rate", "12", lodge_id=lodge_id))
+    # Configurable GST threshold (₹): GST applies only when the nightly
+    # tariff exceeds this. Defaults to the statutory 1000 if unset/garbage.
+    try:
+        gst_threshold = float(get_setting(db, "gst_threshold", "1000", lodge_id=lodge_id))
+    except (TypeError, ValueError):
+        gst_threshold = 1000.0
     gst_amount = 0
-    if gst_enabled and float(checkin.tariff_per_night) > 1000:
+    if gst_enabled and float(checkin.tariff_per_night) > gst_threshold:
         gst_amount = taxable * gst_rate / 100
 
     # Advance collected at booking time is credited against the bill.
@@ -727,11 +821,22 @@ def process_checkout(checkin_id: int, body: CheckoutRequest,
         invoice.total_amount = total_amount
         invoice.payment_mode = body.payment_mode
     else:
+        # Daily-resetting sequence: NNNN counts this lodge's invoices issued
+        # TODAY (prefix match), not the all-time total. On collision (e.g.
+        # another lodge already grabbed the same number — invoice_number is
+        # globally unique — or a concurrent checkout) we increment until free.
         date_str = checkout_time.strftime("%Y%m%d")
-        invoice_count = (
-            db.query(Invoice).filter(Invoice.lodge_id == lodge_id).count() + 1
+        prefix = f"INV-{date_str}-"
+        seq = (
+            db.query(Invoice)
+              .filter(Invoice.lodge_id == lodge_id,
+                      Invoice.invoice_number.like(f"{prefix}%"))
+              .count() + 1
         )
-        invoice_number = f"INV-{date_str}-{invoice_count:04d}"
+        while db.query(Invoice).filter(
+                Invoice.invoice_number == f"{prefix}{seq:04d}").first():
+            seq += 1
+        invoice_number = f"{prefix}{seq:04d}"
         invoice = Invoice(
             lodge_id=lodge_id,
             invoice_number=invoice_number,
@@ -952,7 +1057,7 @@ def extend_checkout(checkin_id: int, body: LateCheckoutRequest,
             if body.late_checkout_charge:
                 msg += " Additional charge: Rs." + str(int(body.late_checkout_charge)) + "."
             send_sms(db, checkin.customer.phone, msg,
-                     checkin_id=checkin_id, lodge_id=lodge_id, event_type="custom")
+                     checkin_id=checkin_id, lodge_id=lodge_id, event_type="late_checkout")
     except Exception:
         pass
 
@@ -978,6 +1083,64 @@ def extend_checkout(checkin_id: int, body: LateCheckoutRequest,
         "charge_added": body.late_checkout_charge > 0,
         "message": "Checkout extended to " + new_checkout.strftime("%d %b %Y %I:%M %p"),
     }
+
+
+# ── Guest ID verification ────────────────────────────────────────────────
+
+
+class VerifyRequest(PM):
+    verified: bool = True
+    notes: Optional[str] = None
+
+
+@router.patch("/{checkin_id}/verify",
+              dependencies=[Depends(require_permission("checkins.write"))])
+def verify_guest_id(checkin_id: int, body: VerifyRequest,
+                    request: Request,
+                    db: Session = Depends(get_db),
+                    current_user=Depends(get_current_user),
+                    lodge_id: int = Depends(resolve_lodge_scope)):
+    """Mark the guest's ID as physically verified by staff (or clear the
+    verification). Records who verified, when, and optional notes."""
+    checkin = db.query(Checkin).filter(
+        Checkin.checkin_id == checkin_id,
+        Checkin.lodge_id == lodge_id,
+    ).first()
+    if not checkin:
+        raise HTTPException(status_code=404, detail="Check-in not found")
+
+    checkin.id_verified = bool(body.verified)
+    if body.verified:
+        checkin.verified_by = current_user.username
+        checkin.verified_at = datetime.now()
+    else:
+        checkin.verified_by = None
+        checkin.verified_at = None
+    checkin.verification_notes = (body.notes or "").strip() or None
+
+    db.commit()
+    db.refresh(checkin)
+
+    try:
+        log_audit(
+            db, "checkin.id_verified" if body.verified else "checkin.id_unverified",
+            actor_user_id=current_user.user_id,
+            actor_username=current_user.username,
+            entity_type="checkin", entity_id=checkin.checkin_id,
+            lodge_id=lodge_id,
+            details={
+                "verified": bool(body.verified),
+                "notes": checkin.verification_notes,
+                "customer_id": checkin.customer_id,
+                "room_number": checkin.room.room_number if checkin.room else None,
+            },
+            ip_address=request.client.host if request and request.client else None,
+        )
+    except Exception:
+        # Audit failure must never block the verification itself.
+        pass
+
+    return {"success": True, "checkin": checkin_to_dict(checkin)}
 
 
 @router.get("/room/{room_id}/active", dependencies=[Depends(require_permission("checkins.read"))])

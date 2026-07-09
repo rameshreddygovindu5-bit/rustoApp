@@ -12,6 +12,7 @@ from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime, date, timedelta, timezone
 from collections import defaultdict
 import subprocess, os, logging
+import pytz
 
 def _utcnow():
     """Naive UTC for SQLite datetime columns."""
@@ -20,7 +21,9 @@ def _utcnow():
     ).replace(tzinfo=None)
 
 logger = logging.getLogger(__name__)
-scheduler = BackgroundScheduler()
+# All cron jobs are defined in lodge-local time (IST). Pin the scheduler to
+# Asia/Kolkata so jobs fire at the intended hour regardless of the host TZ.
+scheduler = BackgroundScheduler(timezone=pytz.timezone("Asia/Kolkata"))
 
 
 def get_db_session():
@@ -324,6 +327,31 @@ def backup_database():
         backup_dir = "./backups"
         os.makedirs(backup_dir, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # SQLite deployments have no pg_dump — copy the DB file with the
+        # sqlite3 online-backup API (safe against a live database). Reuses
+        # the URL→path resolver from the backup router.
+        from ..routers.backup import _resolve_sqlite_path
+        sqlite_path = _resolve_sqlite_path()
+        if sqlite_path is not None:
+            import sqlite3
+            if not os.path.exists(sqlite_path):
+                logger.error(f"Backup failed: SQLite database not found at {sqlite_path}")
+                return
+            backup_file = f"{backup_dir}/backup_{timestamp}.db"
+            src = sqlite3.connect(sqlite_path)
+            try:
+                dst = sqlite3.connect(backup_file)
+                try:
+                    src.backup(dst)
+                finally:
+                    dst.close()
+            finally:
+                src.close()
+            logger.info(f"Database backup created: {backup_file}")
+            return
+
+        # Postgres (and anything else pg_dump understands): shell out as before.
         db_url = os.getenv("DATABASE_URL", "")
         backup_file = f"{backup_dir}/backup_{timestamp}.sql"
 

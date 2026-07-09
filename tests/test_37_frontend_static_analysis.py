@@ -284,7 +284,8 @@ class TestApiServiceCompleteness:
 
     def test_users_page_has_otp_controls(self):
         users = read(SRC + "/pages/Users.jsx")
-        assert "handleToggleOtp" in users, "Users missing OTP toggle handler"
+        # v3: binary OTP toggle replaced with 3-way 2FA mode selector
+        assert "handleSetMode" in users, "Users missing 2FA mode handler"
         assert "handleSetStaticPin" in users, "Users missing static PIN handler"
         assert "StaticPinModal" in users, "Users missing StaticPinModal component"
         assert "require_login_otp" in users, "Users missing require_login_otp field"

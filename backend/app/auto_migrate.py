@@ -39,6 +39,19 @@ _ADDITIVE_COLUMNS = {
     ],
     "checkins": [
         ("advance_paid",         "NUMERIC(10,2) DEFAULT 0"),
+        # Guest digital signature + house-rules declaration.
+        ("signature_path",        "VARCHAR(255)"),
+        ("signature_captured_by", "VARCHAR(50)"),
+        ("signature_captured_at", "DATETIME"),
+        ("declaration_accepted",  "BOOLEAN DEFAULT false"),
+        # Guest ID verification by staff.
+        ("id_verified",           "BOOLEAN DEFAULT false"),
+        ("verified_by",           "VARCHAR(50)"),
+        ("verified_at",           "DATETIME"),
+        ("verification_notes",    "TEXT"),
+        # Stay metadata (guest-register compliance).
+        ("purpose_of_visit",      "VARCHAR(50)"),
+        ("vehicle_number",        "VARCHAR(20)"),
     ],
     "invoices": [
         ("advance_adjusted",     "NUMERIC(10,2) DEFAULT 0"),

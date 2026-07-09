@@ -241,7 +241,8 @@ class TestDashboard:
     def test_revenue_breakdown_modes(self, admin_token):
         r, _ = api_get("/api/reports/dashboard", token=admin_token)
         bd = r["kpis"]["today_revenue_breakdown"]
-        for mode in ["cash", "upi", "card", "bank_transfer", "online", "other"]:
+        # v3 buckets: wallets split out, bank_transfer folded into online
+        for mode in ["cash", "card", "upi", "phonepe", "gpay", "paytm", "online", "other"]:
             assert mode in bd
 
     def test_activity_feed_present(self, admin_token):
@@ -333,6 +334,8 @@ class TestCheckin:
             "tariff_per_night":  str(room_for_checkin.get("base_tariff", 1000)),
             "payment_mode":      "upi",
             "deposit_amount":    "500",
+            # v3: guests must accept the house-rules declaration
+            "declaration_accepted": "true",
         }
         r, s = _form("/api/checkins", body, admin_token)
         assert s in (200, 201), f"Check-in failed: {s} {r}"
@@ -585,7 +588,10 @@ class TestAdminMonitoring:
     def test_reports_revenue(self, admin_token):
         r, s = api_get("/api/reports/revenue", token=admin_token)
         assert s == 200
-        assert isinstance(r, list)
+        # v3: object with day-by-day series + payment-method breakdown
+        assert isinstance(r, dict)
+        assert isinstance(r.get("series"), list)
+        assert isinstance(r.get("by_payment"), dict)
 
     def test_staff_can_view_reports(self, staff_token):
         r, s = api_get("/api/reports/dashboard", token=staff_token)

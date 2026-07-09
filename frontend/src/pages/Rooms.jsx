@@ -4,7 +4,7 @@ import { toast } from 'react-toastify'
 import { BedDouble, Wifi, Thermometer, Tv, RefreshCw, Filter } from 'lucide-react'
 import CheckinModal from '../components/checkins/CheckinModal'
 import RoomDetailModal from '../components/rooms/RoomDetailModal'
-import { useLocation } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import AddRoomModal from '../components/rooms/AddRoomModal'
 
 const STATUS_CONFIG = {
@@ -22,41 +22,48 @@ const ROOM_TYPE_ICONS = {
 export default function Rooms() {
   const [rooms, setRooms] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('all')
-  const [typeFilter, setTypeFilter] = useState('all')
-  const [floorFilter, setFloorFilter] = useState('all')
   const [checkinModal, setCheckinModal] = useState(null)  // room to checkin
   const [detailModal, setDetailModal] = useState(null)    // occupied room
   const [showAddModal, setShowAddModal] = useState(false)
-  const location = useLocation()
+  const [knownFloors, setKnownFloors] = useState([])
+
+  // Filters live in the URL (?filter=&type=&floor=) so views are shareable
+  // and KPI-card deep links (/rooms?filter=blocked etc.) just work.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filter = searchParams.get('filter') || 'all'
+  const typeFilter = searchParams.get('type') || 'all'
+  const floorFilter = searchParams.get('floor') || 'all'
+
+  const setUrlParam = useCallback((key, value) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (!value || value === 'all') next.delete(key)
+      else next.set(key, value)
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
 
   const fetchRooms = useCallback(async () => {
     setLoading(true)
     try {
       const params = {}
-      const urlParams = new URLSearchParams(location.search)
-      const urlFilter = urlParams.get('filter')
-      const urlType = urlParams.get('type')
-      
-      const activeFilter = urlFilter || filter
-      const activeType = urlType || typeFilter
-      
-      if (activeFilter !== 'all') params.status = activeFilter
-      if (activeType !== 'all') params.type = activeType
+      if (filter !== 'all') params.status = filter
+      if (typeFilter !== 'all') params.type = typeFilter
       if (floorFilter !== 'all') params.floor = floorFilter
-      
+
       const res = await roomsAPI.list(params)
       setRooms(res.data)
-      
-      // Update state to match URL
-      if (urlFilter) setFilter(urlFilter)
-      if (urlType) setTypeFilter(urlType)
+      // Remember every floor we've seen so the floor filter row stays
+      // complete even when the current result set is filtered down.
+      setKnownFloors(prev =>
+        [...new Set([...prev, ...res.data.map(r => r.floor)])].sort((a, b) => a - b)
+      )
     } catch {
       toast.error('Failed to load rooms')
     } finally {
       setLoading(false)
     }
-  }, [filter, typeFilter, floorFilter, location.search])
+  }, [filter, typeFilter, floorFilter])
 
   useEffect(() => {
     fetchRooms()
@@ -116,8 +123,8 @@ export default function Rooms() {
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
             <Filter size={14} className="text-ink-400 flex-shrink-0" />
             <div className="flex gap-2">
-              {['all', 'available', 'occupied', 'checkout_due', 'maintenance'].map(f => (
-                <button key={f} onClick={() => setFilter(f)}
+              {['all', 'available', 'occupied', 'checkout_due', 'maintenance', 'blocked'].map(f => (
+                <button key={f} onClick={() => setUrlParam('filter', f)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                     filter === f ? 'bg-navy text-white shadow-md' : 'bg-ink-100 text-ink-600 hover:bg-ink-200'
                   }`}>
@@ -129,7 +136,7 @@ export default function Rooms() {
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 border-t border-ink-100 pt-3">
              <div className="flex gap-2">
               {['all', 'deluxe_ac', 'ac', 'non_ac', 'house'].map(t => (
-                <button key={t} onClick={() => setTypeFilter(t)}
+                <button key={t} onClick={() => setUrlParam('type', t)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                     typeFilter === t ? 'bg-gold text-navy-dark shadow-md' : 'bg-ink-100 text-ink-600 hover:bg-ink-200'
                   }`}>
@@ -138,6 +145,21 @@ export default function Rooms() {
               ))}
             </div>
           </div>
+          {knownFloors.length > 1 && (
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 border-t border-ink-100 pt-3">
+              <div className="flex gap-2">
+                {['all', ...knownFloors].map(fl => (
+                  <button key={fl} onClick={() => setUrlParam('floor', String(fl))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                      floorFilter === String(fl) || (fl === 'all' && floorFilter === 'all')
+                        ? 'bg-navy text-white shadow-md' : 'bg-ink-100 text-ink-600 hover:bg-ink-200'
+                    }`}>
+                    {fl === 'all' ? 'All Floors' : `Floor ${fl}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
