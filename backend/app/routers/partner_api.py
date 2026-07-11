@@ -27,6 +27,7 @@ Rate limiting & quotas honored from agency config (daily_booking_limit, etc.).
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, field_validator, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime, date, timedelta, timezone
@@ -375,63 +376,88 @@ def create_booking(body: CreateBookingRequest, request: Request,
 
     # Customer (find/create by phone, within this lodge — same phone may
     # be a different guest at a different lodge).
-    customer = (db.query(Customer)
-                .filter(Customer.phone == body.guest.phone,
-                        Customer.lodge_id == agency.lodge_id)
-                .first())
-    if not customer:
-        # We don't yet have full ID validation here — agency may not collect Aadhar.
-        # We create a minimal record; upon physical check-in staff will complete it.
-        customer = Customer(
-            lodge_id=agency.lodge_id,
-            first_name=body.guest.name.split(" ")[0][:50],
-            last_name=" ".join(body.guest.name.split(" ")[1:])[:50] or "Guest",
-            phone=body.guest.phone,
-            email=body.guest.email,
-            id_type=IDType(body.guest.id_type) if body.guest.id_type in [t.value for t in IDType] else IDType.aadhar,
-            id_number=body.guest.id_number or "PENDING",
-        )
-        db.add(customer)
-        db.flush()
-    elif customer.blacklisted:
+    existing_customer = (db.query(Customer)
+                         .filter(Customer.phone == body.guest.phone,
+                                 Customer.lodge_id == agency.lodge_id)
+                         .first())
+    if existing_customer and existing_customer.blacklisted:
         log_agency_response(request, db, 403, "Guest blacklisted")
         raise HTTPException(status_code=403, detail="Guest is blacklisted")
+
+    def _get_or_create_customer() -> Customer:
+        c = (db.query(Customer)
+             .filter(Customer.phone == body.guest.phone,
+                     Customer.lodge_id == agency.lodge_id)
+             .first())
+        if not c:
+            # We don't yet have full ID validation here — agency may not collect Aadhar.
+            # We create a minimal record; upon physical check-in staff will complete it.
+            c = Customer(
+                lodge_id=agency.lodge_id,
+                first_name=body.guest.name.split(" ")[0][:50],
+                last_name=" ".join(body.guest.name.split(" ")[1:])[:50] or "Guest",
+                phone=body.guest.phone,
+                email=body.guest.email,
+                id_type=IDType(body.guest.id_type) if body.guest.id_type in [t.value for t in IDType] else IDType.aadhar,
+                id_number=body.guest.id_number or "PENDING",
+            )
+            db.add(c)
+            db.flush()
+        return c
 
     # Per-lodge booking ref. Pull the lodge code so prefix matches the
     # manual / agent flows ("UDU-..." vs "RK-...").
     from ..models import Lodge as _Lodge
     lodge_row = db.query(_Lodge).filter(_Lodge.lodge_id == agency.lodge_id).first()
-    booking_ref = _next_booking_ref(db, lodge_id=agency.lodge_id,
-                                     lodge_code=(lodge_row.code if lodge_row else "udu"))
+    lodge_code = lodge_row.code if lodge_row else "udu"
 
-    booking = Booking(
-        lodge_id=agency.lodge_id,
-        booking_ref=booking_ref,
-        source=BookingSource.agency,
-        agency_id=agency.agency_id,
-        agency_booking_ref=body.agency_booking_ref,
-        customer_id=customer.customer_id,
-        guest_name=body.guest.name,
-        guest_phone=body.guest.phone,
-        guest_email=body.guest.email,
-        room_id=chosen_room.room_id,
-        room_type_requested=RoomType(body.room_type),
-        checkin_date=body.checkin_date,
-        checkout_date=body.checkout_date,
-        nights=nights,
-        adults=body.adults,
-        children=body.children,
-        tariff_per_night=Decimal(str(nightly)),
-        total_amount=Decimal(str(total)),
-        commission_amount=Decimal(str(commission)),
-        payment_status=body.payment_status,
-        status=BookingStatus.confirmed,
-        special_requests=body.special_requests,
-    )
-    db.add(booking)
-    agency.total_bookings = (agency.total_bookings or 0) + 1
-    agency.total_revenue = (agency.total_revenue or 0) + Decimal(str(total))
-    db.commit()
+    # Ref generation reads max-sequence then inserts, so two concurrent
+    # creates can race onto the same ref. On the unique-constraint clash,
+    # rollback (which also undoes the customer flush and agency counters),
+    # regenerate from the now-committed max, and retry.
+    booking = None
+    for attempt in range(5):
+        customer = _get_or_create_customer()
+        booking_ref = _next_booking_ref(db, lodge_id=agency.lodge_id,
+                                         lodge_code=lodge_code)
+        booking = Booking(
+            lodge_id=agency.lodge_id,
+            booking_ref=booking_ref,
+            source=BookingSource.agency,
+            agency_id=agency.agency_id,
+            agency_booking_ref=body.agency_booking_ref,
+            customer_id=customer.customer_id,
+            guest_name=body.guest.name,
+            guest_phone=body.guest.phone,
+            guest_email=body.guest.email,
+            room_id=chosen_room.room_id,
+            room_type_requested=RoomType(body.room_type),
+            checkin_date=body.checkin_date,
+            checkout_date=body.checkout_date,
+            nights=nights,
+            adults=body.adults,
+            children=body.children,
+            tariff_per_night=Decimal(str(nightly)),
+            total_amount=Decimal(str(total)),
+            commission_amount=Decimal(str(commission)),
+            payment_status=body.payment_status,
+            status=BookingStatus.confirmed,
+            special_requests=body.special_requests,
+        )
+        db.add(booking)
+        agency.total_bookings = (agency.total_bookings or 0) + 1
+        agency.total_revenue = (agency.total_revenue or 0) + Decimal(str(total))
+        try:
+            db.commit()
+            break
+        except IntegrityError as e:
+            db.rollback()
+            if "booking_ref" not in str(getattr(e, "orig", e)):
+                raise
+            if attempt == 4:
+                log_agency_response(request, db, 409, "Booking ref allocation conflict")
+                raise HTTPException(status_code=409,
+                                    detail="Could not allocate a unique booking reference; please retry")
     db.refresh(booking)
 
     log_audit(db, "booking.created",

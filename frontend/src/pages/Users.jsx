@@ -42,22 +42,41 @@ export default function Users() {
     }
   };
 
-  const handleToggleOtp = async (user) => {
-    const newVal = !user.require_login_otp;
+  // Derive the current 2FA mode from the user record.
+  const loginModeOf = (u) =>
+    !u.require_login_otp ? "password" : (u.has_static_pin ? "pin" : "sms");
+
+  const handleSetMode = async (user, mode) => {
+    if (mode === loginModeOf(user)) return;
+    if (mode === "pin") {
+      // Needs a PIN — open the modal; PIN save enables OTP mode too.
+      setPinModal(user);
+      return;
+    }
     try {
-      await authAPI.setUserOtpSetting(user.user_id, newVal);
-      toast.success(newVal
-        ? `OTP login ENABLED for ${user.username}. Admin phone receives OTP on each staff login.`
-        : `OTP login disabled for ${user.username}.`);
+      const wantOtp = mode === "sms";
+      if (wantOtp !== !!user.require_login_otp) {
+        await authAPI.setUserOtpSetting(user.user_id, wantOtp);
+      }
+      if (user.has_static_pin) {
+        await authAPI.setUserStaticPin(user.user_id, null); // clear stale PIN
+      }
+      toast.success(mode === "sms"
+        ? `SMS OTP enabled for ${user.username}. A code is sent on each login (to their phone if set, else admin phone).`
+        : `${user.username} now logs in with password only.`);
       fetchUsers();
     } catch (err) {
-      toast.error(err?.response?.data?.detail || "Failed to update OTP setting");
+      toast.error(err?.response?.data?.detail || "Failed to update login security");
     }
   };
 
   const handleSetStaticPin = async (user, pin) => {
     try {
       await authAPI.setUserStaticPin(user.user_id, pin || null);
+      if (pin && !user.require_login_otp) {
+        // Static PIN only takes effect when the OTP challenge is required.
+        await authAPI.setUserOtpSetting(user.user_id, true);
+      }
       toast.success(pin
         ? `Static PIN set for ${user.username}. They can use this PIN instead of SMS OTP.`
         : `Static PIN cleared for ${user.username}.`);
@@ -182,27 +201,29 @@ export default function Users() {
                     <td className="px-4 py-4">
                       {u.role === 'staff' ? (
                         <div className="flex flex-col gap-1">
-                          <button
-                            onClick={() => handleToggleOtp(u)}
-                            title={u.require_login_otp
-                              ? "OTP required — click to disable"
-                              : "Click to require OTP on each login"}
-                            className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg transition-all justify-center ${
-                              u.require_login_otp
-                                ? "text-green-700 bg-green-50 hover:bg-green-100 ring-1 ring-green-200"
-                                : "text-ink-400 hover:bg-ink-100 ring-1 ring-ink-200"
+                          <select
+                            value={loginModeOf(u)}
+                            onChange={e => handleSetMode(u, e.target.value)}
+                            title="Second factor required after password at each login"
+                            className={`text-xs font-semibold px-2 py-1.5 rounded-lg border focus:outline-none focus:border-gold cursor-pointer ${
+                              loginModeOf(u) === 'password'
+                                ? 'text-ink-500 border-ink-200 bg-white'
+                                : loginModeOf(u) === 'sms'
+                                  ? 'text-green-700 border-green-200 bg-green-50'
+                                  : 'text-amber-700 border-amber-200 bg-amber-50'
                             }`}
                           >
-                            <span className={`w-1.5 h-1.5 rounded-full ${u.require_login_otp ? 'bg-green-500 animate-pulse' : 'bg-ink-300'}`}/>
-                            {u.require_login_otp ? "OTP: ON" : "OTP: OFF"}
-                          </button>
-                          {u.require_login_otp && (
+                            <option value="password">Password only</option>
+                            <option value="sms">SMS OTP</option>
+                            <option value="pin">Static PIN</option>
+                          </select>
+                          {loginModeOf(u) === 'pin' && (
                             <button
                               onClick={() => setPinModal(u)}
-                              title="Set a static PIN the staff can use instead of SMS OTP"
+                              title="Change or clear the static PIN"
                               className="flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded-lg ring-1 ring-amber-200 justify-center"
                             >
-                              <Key size={9}/> Set PIN
+                              <Key size={9}/> Change PIN
                             </button>
                           )}
                         </div>

@@ -37,6 +37,7 @@ from pydantic import BaseModel, Field
 from ..database import get_db
 from ..models import (CustomerBooking, RustoCustomer, Payment, Lodge, Setting,
                        CustomerBookingStatus, PaymentStatus)
+from ..net_utils import get_client_ip
 from ..rusto_auth import get_current_customer
 from ..routers.rusto_public import _available_inventory, _room_type_label
 from ..services.audit_service import log_audit
@@ -79,6 +80,8 @@ def _booking_to_dict(b: CustomerBooking, db: Session,
         "tariff_per_night": float(b.tariff_per_night),
         "subtotal": float(b.subtotal),
         "gst_amount": float(b.gst_amount),
+        "promo_code": getattr(b, "promo_code", None),
+        "promo_discount": float(getattr(b, "promo_discount", 0) or 0),
         "total_amount": float(b.total_amount),
         "contact_name": b.contact_name,
         "contact_phone": b.contact_phone,
@@ -109,6 +112,11 @@ def _booking_to_dict(b: CustomerBooking, db: Session,
                 "display_name": hotel_name_setting or lodge.name,
                 "city": lodge.public_city, "state": lodge.public_state,
                 "address": lodge.address, "phone": lodge.phone,
+                "checkin_time": getattr(lodge, "checkin_time", None),
+                "checkout_time": getattr(lodge, "checkout_time", None),
+                "cancellation_policy": getattr(lodge, "cancellation_policy", None),
+                "cancellation_hours": getattr(lodge, "cancellation_hours", None),
+                "instant_confirm": bool(getattr(lodge, "instant_confirm", False)),
                 "logo_url": None,  # Could add later
             }
     if include_payment:
@@ -213,6 +221,142 @@ def _razorpay_verify_signature(order_id: str, payment_id: str, signature: str) -
     return hmac.compare_digest(expected, signature)
 
 
+def _razorpay_order_reusable(order_id: str, amount_paise: int) -> bool:
+    """Can we hand this order back to the checkout instead of creating a
+    fresh one? Mock orders are always reusable. Live orders are checked
+    against the Razorpay API — status must still be payable and the
+    amount must match what we intend to charge now."""
+    if not order_id:
+        return False
+    if not RAZORPAY_LIVE:
+        return True
+    try:
+        import requests
+        r = requests.get(f"https://api.razorpay.com/v1/orders/{order_id}",
+                         auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET), timeout=10)
+        if r.status_code >= 400:
+            return False
+        data = r.json()
+        return (data.get("status") in ("created", "attempted")
+                and int(data.get("amount", -1)) == amount_paise)
+    except Exception:
+        return False
+
+
+def _razorpay_refund(payment: Payment) -> dict:
+    """Best-effort Razorpay refund for a captured payment. Returns
+    {attempted, ok, refund_id, detail}. Never raises."""
+    out = {"attempted": False, "ok": False, "refund_id": None, "detail": None}
+    if not payment or not payment.razorpay_payment_id:
+        out["detail"] = "no gateway payment id"
+        return out
+    out["attempted"] = True
+    if not RAZORPAY_LIVE:
+        # Mock mode — pretend the refund went through so the flow is
+        # exercisable end-to-end in dev/tests.
+        out["ok"] = True
+        out["refund_id"] = f"rfnd_mock_{secrets.token_hex(6)}"
+        return out
+    try:
+        import requests
+        r = requests.post(
+            f"https://api.razorpay.com/v1/payments/{payment.razorpay_payment_id}/refund",
+            auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET),
+            json={"amount": int(Decimal(str(payment.amount)) * 100)},
+            timeout=20,
+        )
+        if r.status_code >= 400:
+            out["detail"] = r.text[:300]
+            return out
+        data = r.json()
+        out["ok"] = True
+        out["refund_id"] = data.get("id")
+        return out
+    except Exception as e:
+        out["detail"] = str(e)[:300]
+        return out
+
+
+def _razorpay_checkout_payload(order_id: str, amount_paise: int, booking_ref: str,
+                                lodge_name: str, customer: RustoCustomer,
+                                is_mock: bool) -> dict:
+    """The dict the frontend feeds straight into Razorpay Checkout."""
+    return {
+        "key_id": RAZORPAY_KEY_ID,
+        "order_id": order_id,
+        "amount": amount_paise,
+        "currency": "INR",
+        "name": "Rusto",
+        "description": f"Booking {booking_ref} at {lodge_name}",
+        "prefill": {
+            "name": customer.full_name,
+            "email": customer.email or "",
+            "contact": customer.phone,
+        },
+        "is_mock": is_mock,
+    }
+
+
+# ── Availability re-check helpers (TOCTOU protection) ───────────────
+
+def _type_holds(db: Session, lodge_id: int, room_type: str,
+                 from_d: date, to_d: date) -> int:
+    """Sum of customer-booking room holds for one room type overlapping
+    a date window. Mirrors the status set _available_inventory uses."""
+    from sqlalchemy import func as sf
+    n = (db.query(sf.coalesce(sf.sum(CustomerBooking.rooms_count), 0))
+         .filter(CustomerBooking.lodge_id == lodge_id,
+                 CustomerBooking.room_type == room_type,
+                 CustomerBooking.status.in_([
+                     CustomerBookingStatus.payment_pending.value,
+                     CustomerBookingStatus.confirmed.value,
+                     CustomerBookingStatus.checked_in.value,
+                 ]),
+                 CustomerBooking.checkin_date < to_d,
+                 CustomerBooking.checkout_date > from_d)
+         .scalar())
+    return int(n or 0)
+
+
+def _free_physical_rooms(db: Session, lodge_id: int, room_type: str,
+                          from_d: date, to_d: date) -> int:
+    """Physical rooms of a type not taken by checkins / PMS bookings /
+    blocking maintenance for the window. Same overlap semantics as
+    rusto_public._available_inventory (which clamps at zero, so it can't
+    be used to *detect* oversell — this can)."""
+    from sqlalchemy import or_
+    from ..models import (Room, Checkin, Booking, BookingStatus,
+                           MaintenanceTicket, MaintenanceStatus)
+    rooms = (db.query(Room)
+             .filter(Room.lodge_id == lodge_id,
+                     Room.room_type == room_type,
+                     Room.status != "blocked").all())
+    free = 0
+    for r in rooms:
+        busy = (db.query(Checkin.checkin_id)
+                .filter(Checkin.room_id == r.room_id,
+                        Checkin.status == "active",
+                        or_(Checkin.expected_checkout == None,   # noqa: E711
+                            Checkin.expected_checkout > from_d),
+                        Checkin.checkin_datetime < to_d).first())
+        if not busy:
+            busy = (db.query(Booking.booking_id)
+                    .filter(Booking.room_id == r.room_id,
+                            Booking.status.in_([BookingStatus.pending,
+                                                 BookingStatus.confirmed]),
+                            Booking.checkin_date < to_d,
+                            Booking.checkout_date > from_d).first())
+        if not busy:
+            busy = (db.query(MaintenanceTicket.ticket_id)
+                    .filter(MaintenanceTicket.room_id == r.room_id,
+                            MaintenanceTicket.blocks_room_availability == True,  # noqa: E712
+                            MaintenanceTicket.status.in_([MaintenanceStatus.open,
+                                                           MaintenanceStatus.in_progress])).first())
+        if not busy:
+            free += 1
+    return free
+
+
 # ── Endpoints ───────────────────────────────────────────────────────
 
 class CreateBookingBody(BaseModel):
@@ -292,6 +436,11 @@ def create_booking(body: CreateBookingBody, request: Request,
             status_code=409,
             detail=f"Only {avail.get(body.room_type, 0)} {_room_type_label(body.room_type)} room(s) available for these dates. Try a different date or room type.",
         )
+    # Snapshot the unclamped capacity for the post-insert re-check below.
+    # avail is >= rooms_count >= 1 here, so it wasn't clamped and
+    # free_physical = avail + holds is exact.
+    _holds_before = _type_holds(db, lodge.lodge_id, body.room_type, from_d, to_d)
+    _free_physical = avail.get(body.room_type, 0) + _holds_before
 
     # Pricing.
     tariff, subtotal, gst, total = _calculate_pricing(
@@ -322,6 +471,12 @@ def create_booking(body: CreateBookingBody, request: Request,
     else:
         raise HTTPException(status_code=500, detail="Could not allocate booking ref; please retry")
 
+    # ROOT-CAUSE pricing fix: persist the DISCOUNTED total on the booking
+    # so Payment, receipt, admin SMS, PMS sync and loyalty points all agree
+    # with what Razorpay actually charges. Invariant everywhere:
+    #   total_amount = subtotal + gst_amount - promo_discount
+    final_total = max(Decimal("0"), total - promo_discount).quantize(Decimal("0.01"))
+
     booking = CustomerBooking(
         booking_ref=ref,
         customer_id=customer.customer_id,
@@ -330,7 +485,8 @@ def create_booking(body: CreateBookingBody, request: Request,
         rooms_count=body.rooms_count,
         checkin_date=from_d, checkout_date=to_d, nights=nights,
         adults=body.adults, children=body.children,
-        tariff_per_night=tariff, subtotal=subtotal, gst_amount=gst, total_amount=total,
+        tariff_per_night=tariff, subtotal=subtotal, gst_amount=gst,
+        total_amount=final_total,
         contact_name=(body.contact_name or customer.full_name).strip(),
         contact_phone=(body.contact_phone or customer.phone).strip(),
         contact_email=(body.contact_email or customer.email or "").strip() or None,
@@ -342,14 +498,19 @@ def create_booking(body: CreateBookingBody, request: Request,
     )
     db.add(booking); db.flush()      # need booking_id for the Payment
 
-    # Auto-confirm for lodges with instant_confirm=True (e.g. small lodges that trust direct bookings)
-    # These lodges don't require payment upfront through the platform.
-    lodge_obj = db.query(Lodge).filter(Lodge.lodge_id == lodge.lodge_id).first()
-    is_instant = bool(getattr(lodge_obj, "instant_confirm", False))
+    # Re-check availability immediately after insert, inside the same
+    # transaction, to shrink the check-then-insert TOCTOU window. Our own
+    # flushed row is included in the holds now, so a concurrent booking
+    # that slipped in shows up as holds exceeding physical capacity.
+    _holds_after = _type_holds(db, lodge.lodge_id, body.room_type, from_d, to_d)
+    if _free_physical - _holds_after < 0:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Sorry — the last {_room_type_label(body.room_type)} room(s) for these dates just sold out. Try a different date or room type.",
+        )
 
     # Razorpay expects amount in PAISE (1/100th of a rupee).
-
-    final_total = max(Decimal("0"), total - promo_discount)
     amount_paise = int(final_total * Decimal("100"))
     if amount_paise < 100:  # Razorpay minimum ₹1
         amount_paise = 100
@@ -364,7 +525,7 @@ def create_booking(body: CreateBookingBody, request: Request,
 
     payment = Payment(
         customer_booking_id=booking.booking_id,
-        amount=total, currency="INR", gateway="razorpay",
+        amount=final_total, currency="INR", gateway="razorpay",
         razorpay_order_id=order["id"],
         status=PaymentStatus.created.value,
     )
@@ -377,26 +538,15 @@ def create_booking(body: CreateBookingBody, request: Request,
                   entity_type="rusto_customer_booking", entity_id=booking.booking_id,
                   lodge_id=lodge.lodge_id,
                   details={"ref": ref, "room_type": body.room_type,
-                            "rooms": body.rooms_count, "amount": float(total)},
-                  ip_address=request.client.host if request.client else None)
+                            "rooms": body.rooms_count, "amount": float(final_total)},
+                  ip_address=get_client_ip(request))
     except Exception: pass
 
     return {
         "booking": _booking_to_dict(booking, db),
-        "razorpay": {
-            "key_id": RAZORPAY_KEY_ID,
-            "order_id": order["id"],
-            "amount": amount_paise,
-            "currency": "INR",
-            "name": "Rusto",
-            "description": f"Booking {ref} at {lodge.name}",
-            "prefill": {
-                "name": customer.full_name,
-                "email": customer.email or "",
-                "contact": customer.phone,
-            },
-            "is_mock": order.get("_mock", False),
-        },
+        "razorpay": _razorpay_checkout_payload(
+            order["id"], amount_paise, ref, lodge.name, customer,
+            order.get("_mock", False)),
     }
 
 
@@ -451,7 +601,7 @@ def verify_payment(booking_id: int, body: VerifyPaymentBody, request: Request,
                       lodge_id=b.lodge_id,
                       details={"booking_ref": b.booking_ref,
                                 "razorpay_payment_id": body.razorpay_payment_id},
-                      ip_address=request.client.host if request.client else None)
+                      ip_address=get_client_ip(request))
         except Exception: pass
         raise HTTPException(status_code=400, detail="Payment signature verification failed")
 
@@ -459,6 +609,47 @@ def verify_payment(booking_id: int, body: VerifyPaymentBody, request: Request,
     payment.razorpay_signature = body.razorpay_signature
     payment.status = PaymentStatus.paid.value
     payment.paid_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # ── Availability race guard ─────────────────────────────────────
+    # Between booking creation and payment completion, the room may have
+    # been genuinely lost (oversell from a concurrent booking, room
+    # blocked, walk-in checked in). Never silently confirm an oversell:
+    # fail the booking with a clear message and start the refund path.
+    try:
+        free_now = _free_physical_rooms(db, b.lodge_id, b.room_type,
+                                         b.checkin_date, b.checkout_date)
+        holds_now = _type_holds(db, b.lodge_id, b.room_type,
+                                 b.checkin_date, b.checkout_date)  # includes this booking
+        room_gone = (free_now - holds_now) < 0
+    except Exception:
+        logger.exception("Availability re-check failed — confirming anyway")
+        room_gone = False
+    if room_gone:
+        refund = _razorpay_refund(payment)
+        if refund["ok"]:
+            payment.status = PaymentStatus.refunded.value
+        b.status = CustomerBookingStatus.payment_failed.value
+        b.cancellation_reason = "Room no longer available at payment time (oversell guard)"
+        db.commit()
+        try:
+            log_audit(db, "rusto_booking.oversell_blocked",
+                      actor_user_id=None, actor_username=f"customer:{customer.phone}",
+                      entity_type="rusto_customer_booking", entity_id=b.booking_id,
+                      lodge_id=b.lodge_id,
+                      details={"ref": b.booking_ref,
+                                "razorpay_payment_id": body.razorpay_payment_id,
+                                "refund_attempted": refund["attempted"],
+                                "refund_ok": refund["ok"],
+                                "refund_id": refund.get("refund_id")},
+                      ip_address=get_client_ip(request))
+        except Exception: pass
+        raise HTTPException(
+            status_code=409,
+            detail=("We're sorry — this room sold out while your payment was "
+                    "processing. Your booking was not confirmed and your payment "
+                    + ("has been refunded." if refund["ok"]
+                       else "will be refunded — please contact support if it doesn't arrive in 5-7 days.")))
+
     b.status = CustomerBookingStatus.confirmed.value
 
     # v10.2 — Auto-create a PMS Booking so lodge admin sees it immediately
@@ -557,11 +748,23 @@ def verify_payment(booking_id: int, body: VerifyPaymentBody, request: Request,
     except Exception as _email_err:
         logger.warning("Customer confirmation email failed: %s", _email_err)
 
+    # Customer confirmation SMS (not just the admin one above) — best-effort,
+    # only when the lodge has SMS configured.
     try:
-        _wa_lodge = db.query(Lodge).filter(Lodge.lodge_id == b.lodge_id).first()
-        _send_customer_whatsapp(db, b, _wa_lodge, customer)
-    except Exception as _wa_err:
-        logger.warning("Customer WhatsApp notification failed: %s", _wa_err)
+        from ..services.alert_service import send_sms, is_sms_enabled, get_hotel_name
+        if is_sms_enabled(db, lodge_id=b.lodge_id) and b.contact_phone:
+            _hn = get_hotel_name(db, lodge_id=b.lodge_id)
+            _ci = b.checkin_date.strftime("%d %b %Y") if b.checkin_date else "?"
+            _co = b.checkout_date.strftime("%d %b %Y") if b.checkout_date else "?"
+            sms_msg = (
+                f"[Rusto] Booking Confirmed!\n"
+                f"Ref: {b.booking_ref}\n{_hn}\n"
+                f"{_ci} to {_co} | {b.rooms_count}x {_room_type_label(b.room_type)}\n"
+                f"Paid: Rs.{float(b.total_amount):,.0f}"
+            )
+            send_sms(db, b.contact_phone, sms_msg, lodge_id=b.lodge_id, event_type="booking")
+    except Exception as _sms_err:
+        logger.warning("Customer confirmation SMS failed (non-fatal): %s", _sms_err)
 
     try:
         log_audit(db, "rusto_booking.confirmed",
@@ -570,7 +773,7 @@ def verify_payment(booking_id: int, body: VerifyPaymentBody, request: Request,
                   lodge_id=b.lodge_id,
                   details={"ref": b.booking_ref, "amount": float(payment.amount),
                             "razorpay_payment_id": body.razorpay_payment_id},
-                  ip_address=request.client.host if request.client else None)
+                  ip_address=get_client_ip(request))
     except Exception: pass
 
     # v7.0 — fire-and-forget WhatsApp confirmation. Catches all exceptions
@@ -621,8 +824,13 @@ def apply_promo(booking_id: int, body: ApplyPromoBody, request: Request,
         b.promo_code = None
         b.promo_discount = Decimal("0")
 
-    # Calculate new final amount
-    final_total = max(Decimal("0"), b.total_amount - b.promo_discount)
+    # Recompute from the UNDISCOUNTED base (subtotal + GST) and persist the
+    # discounted total on the booking — so Payment / receipt / SMS / PMS
+    # sync / points all agree with what Razorpay charges. Never derive the
+    # discount from total_amount (that would compound on re-apply).
+    base_total = (Decimal(str(b.subtotal)) + Decimal(str(b.gst_amount))).quantize(Decimal("0.01"))
+    final_total = max(Decimal("0"), base_total - Decimal(str(b.promo_discount or 0))).quantize(Decimal("0.01"))
+    b.total_amount = final_total
     amount_paise = int(final_total * Decimal("100"))
     if amount_paise < 100:  # Razorpay minimum ₹1
         amount_paise = 100
@@ -659,22 +867,127 @@ def apply_promo(booking_id: int, body: ApplyPromoBody, request: Request,
 
     return {
         "booking": _booking_to_dict(b, db),
-        "razorpay": {
-            "key_id": RAZORPAY_KEY_ID,
-            "order_id": order["id"],
-            "amount": amount_paise,
-            "currency": "INR",
-            "name": "Rusto",
-            "description": f"Booking {b.booking_ref} at {lodge.name if lodge else 'Rusto'}",
-            "prefill": {
-                "name": customer.full_name,
-                "email": customer.email or "",
-                "contact": customer.phone,
-            },
-            "is_mock": order.get("_mock", False),
-        },
+        "razorpay": _razorpay_checkout_payload(
+            order["id"], amount_paise, b.booking_ref,
+            lodge.name if lodge else "Rusto", customer,
+            order.get("_mock", False)),
     }
 
+
+@router.post("/{booking_id}/payment-session")
+def payment_session(booking_id: int, request: Request,
+                     customer: RustoCustomer = Depends(get_current_customer),
+                     db: Session = Depends(get_db)):
+    """Return (or re-create) the Razorpay checkout session for an unpaid
+    booking. Lets the checkout page survive a refresh — the Razorpay
+    payload originally only travelled via router state, so a reload used
+    to dead-end with 'payment session expired'."""
+    b = (db.query(CustomerBooking)
+         .filter(CustomerBooking.booking_id == booking_id,
+                 CustomerBooking.customer_id == customer.customer_id).first())
+    if not b:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if b.status == CustomerBookingStatus.confirmed.value:
+        return {"already_confirmed": True, "booking": _booking_to_dict(b, db)}
+    if b.status not in (CustomerBookingStatus.payment_pending.value,
+                        CustomerBookingStatus.initiated.value):
+        raise HTTPException(status_code=400,
+                            detail=f"Cannot start payment for a {b.status} booking")
+
+    # Heal legacy rows where total_amount was stored undiscounted.
+    base_total = (Decimal(str(b.subtotal)) + Decimal(str(b.gst_amount))).quantize(Decimal("0.01"))
+    final_total = max(Decimal("0"), base_total - Decimal(str(b.promo_discount or 0))).quantize(Decimal("0.01"))
+    if Decimal(str(b.total_amount)) != final_total:
+        b.total_amount = final_total
+
+    amount_paise = int(final_total * Decimal("100"))
+    if amount_paise < 100:
+        amount_paise = 100
+
+    lodge = db.query(Lodge).filter(Lodge.lodge_id == b.lodge_id).first()
+
+    # Reuse the latest still-open Payment/order when it matches the amount.
+    latest = (db.query(Payment)
+              .filter(Payment.customer_booking_id == b.booking_id,
+                      Payment.status == PaymentStatus.created.value)
+              .order_by(Payment.created_at.desc()).first())
+    if (latest and Decimal(str(latest.amount)) == final_total
+            and _razorpay_order_reusable(latest.razorpay_order_id, amount_paise)):
+        order_id = latest.razorpay_order_id
+        is_mock = not RAZORPAY_LIVE
+        db.commit()
+    else:
+        try:
+            order = _razorpay_create_order(amount_paise, receipt=b.booking_ref)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.exception("Razorpay order recreate failed")
+            raise HTTPException(status_code=502, detail=f"Payment gateway error: {e}")
+        # Retire stale open payment rows, then record the fresh order.
+        db.query(Payment).filter(
+            Payment.customer_booking_id == b.booking_id,
+            Payment.status == PaymentStatus.created.value
+        ).update({"status": PaymentStatus.failed.value})
+        payment = Payment(
+            customer_booking_id=b.booking_id,
+            amount=final_total, currency="INR", gateway="razorpay",
+            razorpay_order_id=order["id"],
+            status=PaymentStatus.created.value,
+        )
+        db.add(payment); db.commit()
+        order_id = order["id"]
+        is_mock = order.get("_mock", False)
+
+    db.refresh(b)
+    return {
+        "booking": _booking_to_dict(b, db),
+        "razorpay": _razorpay_checkout_payload(
+            order_id, amount_paise, b.booking_ref,
+            lodge.name if lodge else "Rusto", customer, is_mock),
+    }
+
+
+class ContactPatch(BaseModel):
+    contact_name:  Optional[str] = Field(default=None, max_length=160)
+    contact_phone: Optional[str] = Field(default=None, max_length=20)
+    contact_email: Optional[str] = Field(default=None, max_length=160)
+
+
+@router.patch("/{booking_id}/contact")
+def update_booking_contact(booking_id: int, body: ContactPatch, request: Request,
+                            customer: RustoCustomer = Depends(get_current_customer),
+                            db: Session = Depends(get_db)):
+    """Update the contact snapshot on an unpaid booking (owner only).
+
+    The checkout page lets the guest correct name/phone/email before
+    paying; confirmations (email / SMS / WhatsApp) go to these fields,
+    so they must land on the BOOKING, not just the customer profile."""
+    b = (db.query(CustomerBooking)
+         .filter(CustomerBooking.booking_id == booking_id,
+                 CustomerBooking.customer_id == customer.customer_id).first())
+    if not b:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if b.status not in (CustomerBookingStatus.payment_pending.value,
+                        CustomerBookingStatus.initiated.value):
+        raise HTTPException(status_code=400,
+                            detail="Contact details can only be changed before payment")
+
+    if body.contact_name is not None:
+        name = body.contact_name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Name cannot be empty")
+        b.contact_name = name
+    if body.contact_phone is not None:
+        phone = body.contact_phone.strip()
+        if not phone:
+            raise HTTPException(status_code=400, detail="Phone cannot be empty")
+        b.contact_phone = phone
+    if body.contact_email is not None:
+        b.contact_email = body.contact_email.strip() or None
+
+    db.commit(); db.refresh(b)
+    return _booking_to_dict(b, db)
 
 
 class CancelBody(BaseModel):
@@ -682,14 +995,19 @@ class CancelBody(BaseModel):
 
 
 @router.post("/{booking_id}/cancel")
-def cancel_booking(booking_id: int, body: CancelBody,
+def cancel_booking(booking_id: int, body: CancelBody, request: Request,
                     customer: RustoCustomer = Depends(get_current_customer),
                     db: Session = Depends(get_db)):
     """RustoCustomer-side cancellation. Allowed only before checked_in.
-    Refund handling is OUT OF SCOPE for this round — we just mark the
-    booking cancelled and free up the inventory hold.
 
-    Future round: integrate Razorpay refunds via the /refunds API."""
+    If the booking was paid via Razorpay (captured payment) we attempt an
+    automatic refund via the Razorpay API when keys are configured —
+    best-effort: a gateway outage never blocks the cancellation itself.
+    The customer-visible outcome lands in `refund_status`:
+      "initiated" — auto-refund accepted by the gateway
+      "manual"    — auto-refund unavailable; contact the lodge
+      None        — nothing was paid, nothing to refund
+    """
     b = (db.query(CustomerBooking)
          .filter(CustomerBooking.booking_id == booking_id,
                  CustomerBooking.customer_id == customer.customer_id).first())
@@ -700,6 +1018,22 @@ def cancel_booking(booking_id: int, body: CancelBody,
                      CustomerBookingStatus.cancelled.value):
         raise HTTPException(status_code=400,
                             detail=f"Cannot cancel a {b.status} booking")
+
+    # Refund path for paid bookings.
+    refund_status = None
+    refund_info = {"attempted": False, "ok": False, "refund_id": None, "detail": None}
+    paid_payment = (db.query(Payment)
+                    .filter(Payment.customer_booking_id == b.booking_id,
+                            Payment.status == PaymentStatus.paid.value)
+                    .order_by(Payment.created_at.desc()).first())
+    if paid_payment:
+        refund_info = _razorpay_refund(paid_payment)
+        if refund_info["ok"]:
+            paid_payment.status = PaymentStatus.refunded.value
+            refund_status = "initiated"
+        else:
+            refund_status = "manual"
+
     b.status = CustomerBookingStatus.cancelled.value
     b.cancelled_at = datetime.now(timezone.utc).replace(tzinfo=None)
     b.cancellation_reason = (body.reason or "Cancelled by customer")[:2000]
@@ -709,9 +1043,16 @@ def cancel_booking(booking_id: int, body: CancelBody,
                   actor_user_id=None, actor_username=f"customer:{customer.phone}",
                   entity_type="rusto_customer_booking", entity_id=b.booking_id,
                   lodge_id=b.lodge_id,
-                  details={"ref": b.booking_ref, "reason": (body.reason or "")[:200]})
+                  details={"ref": b.booking_ref, "reason": (body.reason or "")[:200],
+                            "refund_status": refund_status,
+                            "refund_attempted": refund_info["attempted"],
+                            "refund_id": refund_info.get("refund_id"),
+                            "refund_detail": refund_info.get("detail")},
+                  ip_address=get_client_ip(request))
     except Exception: pass
-    return _booking_to_dict(b, db)
+    out = _booking_to_dict(b, db)
+    out["refund_status"] = refund_status
+    return out
 
 
 # ── Customer booking confirmation email ──────────────────────────────
@@ -725,7 +1066,11 @@ def _send_customer_confirmation_email(db, booking, customer) -> bool:
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
 
-    email_to = getattr(customer, "email", None)
+    # Prefer the booking's contact snapshot (the guest may have corrected
+    # it at checkout, or be booking on someone else's behalf) — fall back
+    # to the account email.
+    email_to = (getattr(booking, "contact_email", None)
+                or getattr(customer, "email", None))
     if not email_to:
         return False
 
@@ -748,6 +1093,20 @@ def _send_customer_confirmation_email(db, booking, customer) -> bool:
     ci  = booking.checkin_date.strftime("%d %b %Y") if booking.checkin_date else "—"
     co  = booking.checkout_date.strftime("%d %b %Y") if booking.checkout_date else "—"
     amt = f"₹{float(booking.total_amount):,.0f}" if booking.total_amount else "—"
+    lodge_address = (lodge.address if lodge else None) or "—"
+    lodge_phone   = (lodge.phone if lodge else None) or "—"
+    guests = (booking.adults or 0) + (booking.children or 0)
+    nights = booking.nights or "—"
+    discount_row = ""
+    if getattr(booking, "promo_discount", None) and float(booking.promo_discount) > 0:
+        discount_row = (
+            f'<tr><td style="padding:8px;background:#f9fafb;font-weight:600">Promo ({booking.promo_code or "applied"})</td>'
+            f'<td style="padding:8px;color:#166534">−₹{float(booking.promo_discount):,.0f}</td></tr>'
+        )
+    _policy = (getattr(lodge, "cancellation_policy", None) or "flexible").replace("_", " ")
+    _policy_hours = getattr(lodge, "cancellation_hours", None) or 24
+    policy_line = (f"Cancellation policy: {_policy}. Free cancellation up to "
+                   f"{_policy_hours} hours before check-in; see your booking page for details.")
 
     html = f"""
     <html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#1B2A4A">
@@ -756,9 +1115,12 @@ def _send_customer_confirmation_email(db, booking, customer) -> bool:
         <p style="color:#fff;margin:8px 0 0;font-size:14px">Your booking is confirmed! 🎉</p>
       </div>
       <div style="padding:24px;border:1px solid #e5e7eb;border-top:none">
-        <h2 style="color:#1B2A4A;font-size:20px;margin:0 0 16px">
+        <h2 style="color:#1B2A4A;font-size:20px;margin:0 0 4px">
           {hotel_name}
         </h2>
+        <p style="margin:0 0 16px;font-size:13px;color:#6b7280">
+          {lodge_address} · Phone: {lodge_phone}
+        </p>
         <table style="width:100%;border-collapse:collapse">
           <tr><td style="padding:8px;background:#f9fafb;font-weight:600">Booking Ref</td>
               <td style="padding:8px;font-family:monospace">{booking.booking_ref}</td></tr>
@@ -767,11 +1129,15 @@ def _send_customer_confirmation_email(db, booking, customer) -> bool:
           <tr><td style="padding:8px;background:#f9fafb;font-weight:600">Check-out</td>
               <td style="padding:8px">{co}</td></tr>
           <tr><td style="padding:8px;background:#f9fafb;font-weight:600">Room Type</td>
-              <td style="padding:8px">{booking.room_type_label or booking.room_type}</td></tr>
+              <td style="padding:8px">{_room_type_label(booking.room_type)} × {booking.rooms_count}</td></tr>
+          <tr><td style="padding:8px;background:#f9fafb;font-weight:600">Guests / Nights</td>
+              <td style="padding:8px">{guests} guest{"s" if guests != 1 else ""} · {nights} night{"s" if nights != 1 else ""}</td></tr>
+          {discount_row}
           <tr><td style="padding:8px;background:#f9fafb;font-weight:600">Total Paid</td>
               <td style="padding:8px;font-weight:700;color:#C9A84C">{amt}</td></tr>
         </table>
         {f'<p style="margin:16px 0 4px;font-size:13px;color:#6b7280">Special requests: <em>{booking.special_requests}</em></p>' if booking.special_requests else ""}
+        <p style="margin:16px 0 4px;font-size:12px;color:#6b7280">{policy_line}</p>
         <p style="margin:20px 0 8px;font-size:13px">
           Need help? Reply to this email or visit rusto.in/support.
         </p>
@@ -826,8 +1192,17 @@ def get_receipt(booking_id: int,
         Setting.lodge_id == b.lodge_id, Setting.setting_key == "hotel_address"
     ).first()
 
+    # Latest meaningful payment row (paid → refunded → whatever's newest)
+    pay = (db.query(Payment)
+           .filter(Payment.customer_booking_id == b.booking_id,
+                   Payment.status.in_([PaymentStatus.paid.value,
+                                        PaymentStatus.refunded.value]))
+           .order_by(Payment.created_at.desc()).first())
+
     return {
         "booking_ref":    b.booking_ref,
+        # Invoice-style reference — the booking ref doubles as invoice ref.
+        "invoice_ref":    b.booking_ref,
         "hotel_name":     (hn.setting_value if hn else None) or (lodge.name if lodge else ""),
         "hotel_address":  (addr_s.setting_value if addr_s else None) or (lodge.address if lodge else ""),
         "hotel_gstin":    gstin_s.setting_value if gstin_s else "",
@@ -839,8 +1214,8 @@ def get_receipt(booking_id: int,
         "checkin_date":   b.checkin_date.isoformat() if b.checkin_date else None,
         "checkout_date":  b.checkout_date.isoformat() if b.checkout_date else None,
         "nights":         b.nights,
-        "room_type":      getattr(b, "room_type_label", None) or b.room_type,
-                "rooms_count":    b.rooms_count,
+        "room_type":      _room_type_label(b.room_type),
+        "rooms_count":    b.rooms_count,
         "adults":         b.adults,
         "children":       b.children,
         "meal_plan":      getattr(b, "meal_plan", None),
@@ -848,67 +1223,17 @@ def get_receipt(booking_id: int,
         "tariff_per_night": float(b.tariff_per_night),
         "subtotal":         float(b.subtotal),
         "gst_amount":       float(b.gst_amount),
+        "promo_code":       getattr(b, "promo_code", None),
+        "promo_discount":   float(getattr(b, "promo_discount", 0) or 0),
+        # total_amount is the discounted amount actually charged.
         "total_amount":     float(b.total_amount),
-        "payment_method":   getattr(b, "payment_method", "Online"),
+        "amount_paid":      float(pay.amount) if pay else float(b.total_amount),
+        "payment_status":   pay.status if pay else None,
+        "payment_reference": pay.razorpay_payment_id if pay else None,
+        "payment_method":   (pay.method if pay and pay.method else "Online"),
         "status":           b.status,
         "created_at":       b.created_at.isoformat() if b.created_at else None,
     }
-
-
-def _send_customer_whatsapp(db, booking, lodge, customer) -> bool:
-    """Send WhatsApp booking confirmation if lodge has WhatsApp configured.
-
-    Uses the lodge's WhatsApp Business API credentials (stored in settings).
-    Falls back gracefully if not configured.
-    """
-    import os, requests
-
-    # Check if WhatsApp is configured (lodge setting)
-    from ..models import Setting
-    wa_token_s = db.query(Setting).filter(
-        Setting.lodge_id == booking.lodge_id,
-        Setting.setting_key == "wa_access_token",
-    ).first()
-    wa_phone_s = db.query(Setting).filter(
-        Setting.lodge_id == booking.lodge_id,
-        Setting.setting_key == "wa_phone_id",
-    ).first()
-
-    wa_token = wa_token_s.setting_value if wa_token_s else os.getenv("WA_ACCESS_TOKEN", "")
-    wa_phone = wa_phone_s.setting_value if wa_phone_s else os.getenv("WA_PHONE_ID", "")
-
-    if not wa_token or not wa_phone:
-        return False
-
-    to_phone = customer.phone
-    if not to_phone:
-        return False
-    # Normalize to E.164 (add +91 if Indian and doesn't start with +)
-    if not to_phone.startswith("+"):
-        to_phone = "+91" + to_phone.lstrip("0")
-
-    hotel_name = lodge.name if lodge else "The Property"
-    ci  = booking.checkin_date.strftime("%d %b %Y") if booking.checkin_date else "—"
-    ref = booking.booking_ref
-
-    url = f"https://graph.facebook.com/v19.0/{wa_phone}/messages"
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to_phone,
-        "type": "text",
-        "text": {
-            "body": (
-                f"✅ Booking Confirmed!\n\n"
-                f"🏨 {hotel_name}\n"
-                f"📅 Check-in: {ci}\n"
-                f"🔖 Ref: {ref}\n\n"
-                f"View your booking: https://rusto.in/account/bookings\n\n"
-                f"Have a wonderful stay! 🌟 — Rusto"
-            )
-        },
-    }
-    resp = requests.post(url, headers={"Authorization": f"Bearer {wa_token}"}, json=payload, timeout=8)
-    return resp.status_code == 200
 
 
 # ── v10.2: Bridge function — creates PMS Booking from confirmed CustomerBooking ──

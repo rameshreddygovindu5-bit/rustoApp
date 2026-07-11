@@ -28,6 +28,7 @@ const TABS = [
   { key: "overview",       label: "Overview",        icon: Globe },
   { key: "registrations",  label: "Registrations",   icon: ClipboardCheck },
   { key: "system",         label: "System Health",   icon: Database },
+  { key: "security",       label: "Security",        icon: ShieldCheck },
   { key: "notifications",  label: "Alerts",          icon: Bell },
 ];
 
@@ -58,12 +59,13 @@ export default function PlatformAnalytics() {
   const [sysHealth, setSysHealth]       = useState(null);
   const [notifs, setNotifs]             = useState([]);
   const [urgentCount, setUrgentCount]   = useState(0);
+  const [security, setSecurity]         = useState(null);
   const [loading, setLoading]           = useState(true);
 
   const refresh = useCallback(async (d = days) => {
     setLoading(true);
     try {
-      const [ov, tr, lg, cu, he, reg, sys, nf] = await Promise.all([
+      const [ov, tr, lg, cu, he, reg, sys, nf, sec] = await Promise.all([
         platformAnalyticsAPI.overview(d),
         platformAnalyticsAPI.trend(d),
         platformAnalyticsAPI.lodges(),
@@ -72,6 +74,7 @@ export default function PlatformAnalytics() {
         platformAnalyticsAPI.registrations(),
         platformAnalyticsAPI.systemHealth(),
         platformAnalyticsAPI.notifications(),
+        platformAnalyticsAPI.security().catch(() => null),
       ]);
       setOverview(ov.data);
       setTrend(tr.data.trend || []);
@@ -82,6 +85,7 @@ export default function PlatformAnalytics() {
       setSysHealth(sys.data);
       setNotifs(nf.data.notifications || []);
       setUrgentCount(nf.data.urgent_count || 0);
+      setSecurity(sec ? sec.data : null);
     } catch (e) {
       toast.error("Failed to load platform analytics");
     } finally {
@@ -496,6 +500,81 @@ export default function PlatformAnalytics() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── SECURITY TAB ── */}
+      {tab === "security" && (
+        security ? (
+          <div className="space-y-5">
+            {/* Login KPIs */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label:"Logins (24h)",        value:security.logins?.last_24h?.total ?? 0,  col:"text-navy",       bg:"bg-navy/5",     sub:`${security.logins?.last_24h?.staff ?? 0} staff · ${security.logins?.last_24h?.customer ?? 0} customers` },
+                { label:"Logins (7d)",         value:security.logins?.last_7d?.total ?? 0,   col:"text-blue-700",   bg:"bg-blue-50",    sub:`${security.logins?.last_7d?.staff ?? 0} staff · ${security.logins?.last_7d?.customer ?? 0} customers` },
+                { label:"Failed logins (24h)", value:security.failed_logins?.last_24h ?? 0,  col:(security.failed_logins?.last_24h ?? 0) > 0 ? "text-red-600" : "text-ink-400", bg:"bg-red-50", sub:`${security.failed_logins?.last_7d ?? 0} in 7 days` },
+                { label:"Distinct IPs (7d)",   value:security.distinct_ips_7d ?? 0,          col:"text-emerald-700",bg:"bg-emerald-50", sub:"unique source addresses" },
+              ].map((k,i) => (
+                <div key={i} className="card p-4 text-center">
+                  <p className={`font-display text-3xl font-bold ${k.col}`}>{k.value}</p>
+                  <p className="text-xs font-semibold text-ink-700 mt-1">{k.label}</p>
+                  <p className="text-2xs text-ink-400 mt-0.5">{k.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Suspicious signals */}
+            <div className="card">
+              <h2 className="font-display text-lg font-bold text-navy mb-1 flex items-center gap-2">
+                <AlertTriangle size={17} className="text-amber-500"/> Suspicious Signals
+              </h2>
+              <p className="text-xs text-ink-500 mb-3">IPs with 5+ failed logins in the last 7 days</p>
+              {(security.suspicious_ips || []).length === 0 ? (
+                <div className="text-center py-6">
+                  <CheckCircle2 size={28} className="mx-auto text-emerald-500 mb-2"/>
+                  <p className="text-sm text-emerald-700 font-medium">No brute-force patterns detected.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {security.suspicious_ips.map(s => (
+                    <div key={s.ip_address} className="flex items-center gap-3 p-3 rounded-xl border border-red-200 bg-red-50">
+                      <AlertTriangle size={16} className="text-red-500 shrink-0"/>
+                      <p className="flex-1 text-sm font-mono font-semibold text-red-900">{s.ip_address}</p>
+                      <span className="text-xs font-bold text-red-700">{s.failures} failures</span>
+                      <span className="text-2xs text-red-600">{s.usernames_tried} account{s.usernames_tried !== 1 ? "s" : ""} tried</span>
+                      <span className="text-2xs text-ink-500 hidden sm:block">
+                        last: {s.last_attempt ? new Date(s.last_attempt).toLocaleString("en-IN") : "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* IP tracking status + links */}
+            <div className="card p-4 flex items-center gap-3 flex-wrap">
+              <ShieldCheck size={20} className={security.ip_tracking?.enabled ? "text-emerald-500" : "text-ink-400"}/>
+              <div className="flex-1 min-w-52">
+                <p className="text-sm font-semibold text-navy">
+                  IP presence tracking is {security.ip_tracking?.enabled ? "ON" : "OFF"}
+                </p>
+                <p className="text-xs text-ink-500">
+                  {security.ip_tracking?.presence_rows ?? 0} presence record{(security.ip_tracking?.presence_rows ?? 0) !== 1 ? "s" : ""} collected
+                </p>
+              </div>
+              <a href="/ip-presence" className="text-xs font-semibold text-gold hover:underline flex items-center gap-1">
+                Open IP Presence <ChevronRight size={12}/>
+              </a>
+              <a href="/audit-console" className="text-xs font-semibold text-gold hover:underline flex items-center gap-1">
+                Open Audit Console <ChevronRight size={12}/>
+              </a>
+            </div>
+          </div>
+        ) : (
+          <div className="card text-center py-10">
+            <AlertCircle size={30} className="mx-auto text-ink-300 mb-2"/>
+            <p className="text-sm text-ink-500">Security data unavailable.</p>
+          </div>
+        )
       )}
 
       {/* ── NOTIFICATIONS TAB ── */}

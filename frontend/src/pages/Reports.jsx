@@ -1,10 +1,23 @@
 import { useState, useEffect } from "react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { Download, TrendingUp, TrendingDown, Users, BedDouble, IndianRupee, Calendar, RefreshCw, FileSpreadsheet } from "lucide-react";
+import { Download, TrendingUp, TrendingDown, Users, BedDouble, IndianRupee, Calendar, RefreshCw, FileSpreadsheet, LogOut, AlertTriangle, Wallet } from "lucide-react";
 import { api, gstAPI } from "../services/api";
 import { toast } from "react-toastify";
 
 const COLORS = ["#1B2A4A", "#C9A84C", "#10B981", "#EF4444", "#F59E0B", "#A855F7"];
+
+// Payment-mode buckets returned by /reports/revenue (order = display order)
+const PAYMENT_MODES = [
+  ["cash",    "Cash"],
+  ["card",    "Card"],
+  ["upi",     "UPI/QR"],
+  ["phonepe", "PhonePe"],
+  ["gpay",    "GPay"],
+  ["paytm",   "Paytm"],
+  ["online",  "Online Transfer"],
+  ["other",   "Other"],
+];
+const PAYMENT_COLORS = ["#10B981", "#1B2A4A", "#C9A84C", "#7C3AED", "#2563EB", "#0EA5E9", "#F59E0B", "#94A3B8"];
 
 export default function Reports() {
   const [period, setPeriod] = useState("month"); // daily, week, month, quarter, year, custom
@@ -15,6 +28,8 @@ export default function Reports() {
   const [summary, setSummary] = useState(null);
   const [occupancyData, setOccupancyData] = useState([]);
   const [revenueData, setRevenueData] = useState([]);
+  const [paymentData, setPaymentData] = useState([]);
+  const [outstanding, setOutstanding] = useState([]);
   const [roomTypeData, setRoomTypeData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -60,16 +75,32 @@ export default function Reports() {
     setLoading(true);
     try {
       const params = new URLSearchParams(dateRange);
-      const [summaryData, occupancy, revenue, roomTypes] = await Promise.all([
+      const [summaryData, occupancy, revenue, roomTypes, outstandingData] = await Promise.all([
         api.get(`/reports/summary?${params}`),
         api.get(`/reports/occupancy?${params}`),
         api.get(`/reports/revenue?${params}`),
         api.get(`/reports/room-types?${params}`),
+        api.get(`/reports/outstanding`).catch(() => []),
       ]);
       setSummary(summaryData);
       setOccupancyData(occupancy);
-      setRevenueData(revenue);
+      // /reports/revenue now returns {series, by_payment, ...}; tolerate
+      // the old array shape too.
+      const series = Array.isArray(revenue) ? revenue : (revenue?.series || []);
+      setRevenueData(series);
+      const byPayment = (!Array.isArray(revenue) && revenue?.by_payment) || {};
+      setPaymentData(
+        PAYMENT_MODES
+          .map(([key, label], i) => ({
+            key, label,
+            amount: byPayment[key]?.amount || 0,
+            count: byPayment[key]?.count || 0,
+            color: PAYMENT_COLORS[i % PAYMENT_COLORS.length],
+          }))
+          .filter(p => p.amount > 0)
+      );
       setRoomTypeData(roomTypes);
+      setOutstanding(Array.isArray(outstandingData) ? outstandingData : []);
     } catch {
       toast.error("Failed to load reports");
     } finally {
@@ -122,6 +153,9 @@ export default function Reports() {
 
   const formatCurrency = (v) =>
     v >= 100000 ? `₹${(v / 100000).toFixed(1)}L` : v >= 1000 ? `₹${(v / 1000).toFixed(1)}K` : `₹${v}`;
+
+  // Outstanding = estimated charges owed by guests overdue for checkout.
+  const outstandingTotal = outstanding.reduce((a, o) => a + (o.estimated_charges || 0), 0);
 
   // GSTR-1 export. We use the `from` date's year/month — the GSTR is a
   // monthly return so always-aligned-to-a-calendar-month makes sense.
@@ -228,7 +262,7 @@ export default function Reports() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
         <KPICard
           label="Total Revenue"
           value={summary ? formatCurrency(summary.total_revenue || 0) : "—"}
@@ -236,6 +270,14 @@ export default function Reports() {
           icon={<IndianRupee size={20} />}
           trend={summary?.revenue_trend}
           color="gold"
+          loading={loading}
+        />
+        <KPICard
+          label="Check-outs"
+          value={summary?.checkouts_count ?? "—"}
+          sub={`vs ${summary?.checkins_count || 0} check-ins`}
+          icon={<LogOut size={20} />}
+          color="blue"
           loading={loading}
         />
         <KPICard
@@ -261,6 +303,14 @@ export default function Reports() {
           sub={`Best: ${summary?.best_room_type || "—"}`}
           icon={<Calendar size={20} />}
           color="purple"
+          loading={loading}
+        />
+        <KPICard
+          label="Outstanding"
+          value={formatCurrency(outstandingTotal)}
+          sub={`${outstanding.length} overdue stay${outstanding.length !== 1 ? "s" : ""}`}
+          icon={<AlertTriangle size={20} />}
+          color={outstanding.length > 0 ? "red" : "green"}
           loading={loading}
         />
       </div>
@@ -382,6 +432,104 @@ export default function Reports() {
           )}
         </div>
       </div>
+
+      {/* Charts Row 3: Payment methods + Outstanding dues */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Payment-method breakdown for the selected period */}
+        <div className="bg-white rounded-2xl shadow-sm border border-ink-100 p-6 animate-slide-up">
+          <h3 className="font-semibold text-navy mb-4 flex items-center gap-2">
+            <Wallet size={16} className="text-gold" /> Payment Methods
+          </h3>
+          {loading ? (
+            <div className="h-48 bg-ink-50 rounded-xl animate-pulse" />
+          ) : paymentData.length === 0 ? (
+            <p className="text-sm text-ink-400 text-center py-12">No payments in this period</p>
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie data={paymentData} dataKey="amount" nameKey="label" cx="50%" cy="50%" outerRadius={70} labelLine={false}>
+                    {paymentData.map((p, i) => (
+                      <Cell key={i} fill={p.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v) => `₹${v.toLocaleString("en-IN")}`} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-1.5 mt-2">
+                {paymentData.map(p => (
+                  <div key={p.key} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: p.color }} />
+                      <span className="text-ink-700">{p.label}</span>
+                      <span className="text-[11px] text-ink-400">({p.count})</span>
+                    </div>
+                    <span className="font-medium text-ink-800">{formatCurrency(p.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Outstanding dues — overdue active stays */}
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-ink-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-navy flex items-center gap-2">
+              <AlertTriangle size={16} className="text-red-500" /> Outstanding
+            </h3>
+            {outstanding.length > 0 && (
+              <span className="text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1 rounded-lg">
+                {formatCurrency(outstandingTotal)} estimated
+              </span>
+            )}
+          </div>
+          {loading ? (
+            <div className="space-y-2">
+              {Array(3).fill(0).map((_, i) => <div key={i} className="h-10 bg-ink-100 rounded-xl animate-pulse" />)}
+            </div>
+          ) : outstanding.length === 0 ? (
+            <p className="text-sm text-ink-400 text-center py-12">No overdue checkouts — all clear.</p>
+          ) : (
+            <div className="overflow-x-auto -mx-6 px-6">
+              <table className="w-full text-sm min-w-[520px]">
+                <thead>
+                  <tr className="text-xs text-ink-500 uppercase tracking-wider border-b border-ink-100">
+                    <th className="text-left py-2">Guest</th>
+                    <th className="text-left py-2">Room</th>
+                    <th className="text-right py-2">Days Overdue</th>
+                    <th className="text-right py-2">Deposit</th>
+                    <th className="text-right py-2">Est. Charges</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-ink-100">
+                  {outstanding.map(o => (
+                    <tr key={o.checkin_id} className="hover:bg-ink-50">
+                      <td className="py-2.5 font-medium text-ink-800">
+                        {o.customer_name}
+                        {o.customer_phone && <span className="block text-[11px] text-ink-400 font-normal">{o.customer_phone}</span>}
+                      </td>
+                      <td className="py-2.5 text-ink-600">{o.room_number}</td>
+                      <td className="py-2.5 text-right">
+                        <span className={`font-semibold ${o.days_overdue > 1 ? "text-red-600" : "text-amber-600"}`}>
+                          {o.days_overdue}d
+                        </span>
+                      </td>
+                      <td className="py-2.5 text-right text-ink-600">₹{(o.deposit_amount || 0).toLocaleString("en-IN")}</td>
+                      <td className="py-2.5 text-right font-semibold text-red-600">₹{(o.estimated_charges || 0).toLocaleString("en-IN")}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-ink-200 font-semibold">
+                    <td className="py-2.5 text-navy" colSpan={3}>Total</td>
+                    <td className="py-2.5 text-right">₹{outstanding.reduce((a, o) => a + (o.deposit_amount || 0), 0).toLocaleString("en-IN")}</td>
+                    <td className="py-2.5 text-right text-red-700">₹{outstandingTotal.toLocaleString("en-IN")}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -392,6 +540,7 @@ function KPICard({ label, value, sub, icon, trend, color, loading }) {
     blue: { bg: "bg-blue-50", text: "text-blue-600" },
     green: { bg: "bg-green-50", text: "text-green-600" },
     purple: { bg: "bg-purple-50", text: "text-purple-600" },
+    red: { bg: "bg-red-50", text: "text-red-600" },
   };
   const c = colors[color] || colors.blue;
 

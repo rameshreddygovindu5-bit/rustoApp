@@ -151,6 +151,8 @@ export const checkinsAPI = {
   checkout:     (id, d) => axiosInst.put(`/checkins/${id}/checkout`, d),
   // v10.5 — Late Checkout: extend guest stay + add folio charge
   lateCheckout: (id, d) => axiosInst.put(`/checkins/${id}/late-checkout`, d),
+  // Guest ID verification: {verified: bool, notes: str}
+  verify:       (id, d) => axiosInst.patch(`/checkins/${id}/verify`, d),
 };
 
 export const alertsAPI = {
@@ -169,6 +171,11 @@ export const reportsAPI = {
   // v2.1: industry-standard PMS KPIs and forward occupancy projection.
   kpis:      params  => axiosInst.get("/reports/kpis", { params }),
   forecast:  params  => axiosInst.get("/reports/forecast", { params }),
+  // Outstanding dues (overdue active stays) for the Reports page.
+  outstanding: ()    => axiosInst.get("/reports/outstanding"),
+  // Dashboard concierge / shift notes — persisted server-side per lodge.
+  conciergeNotes:     ()    => axiosInst.get("/reports/concierge-notes"),
+  saveConciergeNotes: notes => axiosInst.put("/reports/concierge-notes", { notes }),
 };
 
 export const settingsAPI = {
@@ -212,6 +219,17 @@ export const auditAPI = {
   // Lightweight feed for the Dashboard widget. Available to all authenticated
   // users (the full /audit endpoint is admin-only).
   activity: (limit = 30) => axiosInst.get("/audit/activity", { params: { limit } }),
+  // v11.2 — super-admin cross-lodge audit trail + unified login history.
+  all:    p => axiosInst.get("/audit/all", { params: p }),
+  logins: p => axiosInst.get("/audit/logins", { params: p }),
+};
+
+// v11.2 — IP presence tracker (flag-gated; super-admin toggles the flag)
+export const ipPresenceAPI = {
+  list:    p    => axiosInst.get("/ip-presence", { params: p }),
+  summary: ()   => axiosInst.get("/ip-presence/summary"),
+  getFlag: ()   => axiosInst.get("/ip-presence/flag"),
+  setFlag: enabled => axiosInst.put("/ip-presence/flag", { enabled }),
 };
 
 // ── v2.4: 2FA + GST ────────────────────────────────────────────────────
@@ -610,6 +628,10 @@ export const rustoBookingsAPI = {
   cancel:  (id, body) => rustoAxios.post(`/rusto/bookings/${id}/cancel`, body),
   receipt: id         => rustoAxios.get(`/rusto/bookings/${id}/receipt`),
   applyPromo: (id, body) => rustoAxios.post(`/rusto/bookings/${id}/apply-promo`, body),
+  // Re-create/fetch the Razorpay session (survives a checkout-page refresh).
+  paymentSession: id => rustoAxios.post(`/rusto/bookings/${id}/payment-session`),
+  // Update the booking's contact snapshot (only while payment_pending).
+  updateContact: (id, body) => rustoAxios.patch(`/rusto/bookings/${id}/contact`, body),
 };
 
 /** Lodge-side listing management (uses staff axiosInst — admin auth + lodge scope). */
@@ -671,6 +693,8 @@ export const platformAnalyticsAPI = {
   registrations:    ()   => axiosInst.get("/platform/analytics/registrations"),
   systemHealth:     ()   => axiosInst.get("/platform/analytics/system-health"),
   notifications:    ()   => axiosInst.get("/platform/analytics/notifications"),
+  // v11.2 — login/security aggregates for the Security tab
+  security:         ()   => axiosInst.get("/platform/analytics/security"),
 };
 
 // Global Partner API management (super-admin)

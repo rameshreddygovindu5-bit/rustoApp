@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, Query, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, cast, Date
 from typing import Optional
 from datetime import date, datetime, timedelta
+from pydantic import BaseModel
 import io
 
 from ..database import get_db
@@ -11,6 +12,22 @@ from ..models import (Checkin, CheckinStatus, Invoice, Customer, Room,
 from ..auth import get_current_user, require_admin, resolve_lodge_scope
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
+
+# Canonical payment-mode buckets used by dashboards & reports.
+# Invoice.payment_mode may carry legacy values (bank_transfer, netbanking…)
+# — anything that is a bank/online transfer folds into "online",
+# anything unknown into "other".
+PAYMENT_BUCKETS = ["cash", "card", "upi", "phonepe", "gpay", "paytm", "online", "other"]
+_ONLINE_ALIASES = {"bank_transfer", "bank", "neft", "imps", "rtgs", "netbanking", "net_banking"}
+
+
+def payment_bucket(mode) -> str:
+    key = str(mode or "other").strip().lower()
+    if key in PAYMENT_BUCKETS:
+        return key
+    if key in _ONLINE_ALIASES:
+        return "online"
+    return "other"
 
 
 @router.get("/summary")
@@ -39,7 +56,13 @@ def get_summary_report(from_date: Optional[str] = None, to_date: Optional[str] =
         Checkin.lodge_id == lodge_id,
         Checkin.checkin_datetime >= from_dt, Checkin.checkin_datetime <= to_dt
     ).count()
-    
+
+    checkouts_count = db.query(Checkin).filter(
+        Checkin.lodge_id == lodge_id,
+        Checkin.status == CheckinStatus.checked_out,
+        Checkin.actual_checkout >= from_dt, Checkin.actual_checkout <= to_dt
+    ).count()
+
     total_guests = db.query(func.sum(Checkin.members_count)).filter(
         Checkin.lodge_id == lodge_id,
         Checkin.checkin_datetime >= from_dt, Checkin.checkin_datetime <= to_dt
@@ -107,6 +130,7 @@ def get_summary_report(from_date: Optional[str] = None, to_date: Optional[str] =
     return {
         "total_revenue": float(total_revenue),
         "checkins_count": checkins_count,
+        "checkouts_count": checkouts_count,
         "total_guests": int(total_guests),
         "new_customers": new_customers,
         "occupied_room_nights": int(room_nights),
@@ -203,11 +227,17 @@ def get_dashboard_data(db: Session = Depends(get_db),
         Checkin.expected_checkout.isnot(None)
     ).count()
 
-    recent_checkins = db.query(Checkin).filter(
+    # Eager-load customer + room — the activity loops below touch both on
+    # every row, which otherwise costs 2 extra lazy-load queries per checkin.
+    recent_checkins = db.query(Checkin).options(
+        joinedload(Checkin.customer), joinedload(Checkin.room)
+    ).filter(
         Checkin.lodge_id == lodge_id,
         cast(Checkin.checkin_datetime, Date) == today
     ).order_by(Checkin.checkin_datetime.desc()).limit(5).all()
-    recent_checkouts = db.query(Checkin).filter(
+    recent_checkouts = db.query(Checkin).options(
+        joinedload(Checkin.customer), joinedload(Checkin.room)
+    ).filter(
         Checkin.lodge_id == lodge_id,
         Checkin.status == CheckinStatus.checked_out,
         cast(Checkin.actual_checkout, Date) == today
@@ -279,12 +309,10 @@ def get_dashboard_data(db: Session = Depends(get_db),
         online_today   = 0
 
     # ── v10.5: Today's revenue breakdown by payment mode ────────────────
-    # Collect from BOTH Invoice (checkout) and Checkin.payment_mode sources
-    # so the breakdown is complete even if invoice wasn't created yet.
-    revenue_breakdown = {"cash": 0.0, "upi": 0.0, "card": 0.0,
-                         "bank_transfer": 0.0, "online": 0.0, "other": 0.0}
+    # Buckets: cash, card, upi, phonepe, gpay, paytm, online, other.
+    # Legacy modes (bank_transfer etc.) fold into "online" via payment_bucket.
+    revenue_breakdown = {b: 0.0 for b in PAYMENT_BUCKETS}
     try:
-        from sqlalchemy import case as sa_case
         mode_rows = (
             db.query(Invoice.payment_mode, func.sum(Invoice.total_amount))
             .filter(Invoice.lodge_id == lodge_id,
@@ -293,14 +321,27 @@ def get_dashboard_data(db: Session = Depends(get_db),
             .all()
         )
         for mode, amount in mode_rows:
-            amt = float(amount or 0)
-            key = (mode or "other").lower()
-            if key in revenue_breakdown:
-                revenue_breakdown[key] += amt
-            else:
-                revenue_breakdown["other"] += amt
+            revenue_breakdown[payment_bucket(mode)] += float(amount or 0)
     except Exception:
         pass
+
+    # ── Health strip metrics ─────────────────────────────────────────────
+    # Revenue per occupied room today — guard divide-by-zero.
+    revenue_per_occupied_room = (
+        round(float(today_revenue) / occupied_rooms, 2) if occupied_rooms > 0 else 0.0
+    )
+    # "Pilgrim Rush Ready" — can we absorb a sudden walk-in rush?
+    # Green when >= 3 rooms are free AND nothing is stuck in maintenance.
+    pilgrim_rush_ready = available_rooms >= 3 and maintenance_rooms == 0
+    if pilgrim_rush_ready:
+        pilgrim_rush_reason = f"{available_rooms} rooms free, none in maintenance"
+    else:
+        reasons = []
+        if available_rooms < 3:
+            reasons.append(f"only {available_rooms} room{'s' if available_rooms != 1 else ''} available (need 3+)")
+        if maintenance_rooms > 0:
+            reasons.append(f"{maintenance_rooms} room{'s' if maintenance_rooms != 1 else ''} in maintenance")
+        pilgrim_rush_reason = "; ".join(reasons) or "not ready"
 
     return {
         "kpis": {
@@ -317,6 +358,13 @@ def get_dashboard_data(db: Session = Depends(get_db),
             "occupancy_rate": round((occupied_rooms / total_rooms * 100) if total_rooms else 0, 1),
             "online_bookings_pending": online_pending,
             "online_arrivals_today":   online_today,
+            # Health-strip metrics (aliases kept explicit for the frontend)
+            "blocked_count": blocked_rooms,
+            "maintenance_count": maintenance_rooms,
+            "occupied_count": occupied_rooms,
+            "revenue_per_occupied_room": revenue_per_occupied_room,
+            "pilgrim_rush_ready": pilgrim_rush_ready,
+            "pilgrim_rush_reason": pilgrim_rush_reason,
         },
         "activity": activity[:10],
         "room_breakdown": chart_data,
@@ -379,12 +427,13 @@ def revenue_report(from_date: Optional[str] = None, to_date: Optional[str] = Non
     total_gst = sum(float(inv.gst_amount or 0) for inv in invoices)
     total_discount = sum(float(inv.discount or 0) for inv in invoices)
 
-    by_payment = {}
+    # Payment-method breakdown, normalised to the canonical buckets
+    # (cash, card, upi, phonepe, gpay, paytm, online, other).
+    by_payment = {b: {"count": 0, "amount": 0.0} for b in PAYMENT_BUCKETS}
     for inv in invoices:
-        pm = inv.payment_mode or "cash"
-        by_payment.setdefault(pm, {"count": 0, "amount": 0})
-        by_payment[pm]["count"] += 1
-        by_payment[pm]["amount"] += float(inv.total_amount)
+        bucket = payment_bucket(inv.payment_mode or "cash")
+        by_payment[bucket]["count"] += 1
+        by_payment[bucket]["amount"] += float(inv.total_amount)
 
     by_day = {}
     for inv in invoices:
@@ -392,7 +441,13 @@ def revenue_report(from_date: Optional[str] = None, to_date: Optional[str] = Non
         by_day.setdefault(day, 0)
         by_day[day] += float(inv.total_amount)
 
-    return [{"date": d, "revenue": v} for d, v in sorted(by_day.items())]
+    return {
+        "series": [{"date": d, "revenue": v} for d, v in sorted(by_day.items())],
+        "by_payment": by_payment,
+        "total_revenue": total_revenue,
+        "total_gst": total_gst,
+        "total_discount": total_discount,
+    }
 
 
 @router.get("/outstanding")
@@ -425,6 +480,52 @@ def outstanding_dues(db: Session = Depends(get_db),
             "estimated_charges": days_overdue * float(ch.tariff_per_night)
         })
     return result
+
+
+# ── Concierge / shift notes ──────────────────────────────────────────────
+# Persist the Dashboard "Shift Notes" pad server-side so handover notes
+# survive browser changes. Stored in the lodge-scoped Setting table.
+CONCIERGE_NOTES_KEY = "concierge_notes"
+
+
+class ConciergeNotesBody(BaseModel):
+    notes: str = ""
+
+
+@router.get("/concierge-notes")
+def get_concierge_notes(db: Session = Depends(get_db),
+                        current_user=Depends(get_current_user),
+                        lodge_id: int = Depends(resolve_lodge_scope)):
+    row = db.query(Setting).filter(
+        Setting.lodge_id == lodge_id,
+        Setting.setting_key == CONCIERGE_NOTES_KEY,
+    ).first()
+    return {"notes": row.setting_value if row else ""}
+
+
+@router.put("/concierge-notes")
+def save_concierge_notes(body: ConciergeNotesBody,
+                         db: Session = Depends(get_db),
+                         current_user=Depends(get_current_user),
+                         lodge_id: int = Depends(resolve_lodge_scope)):
+    """Any authenticated lodge user can update the shared shift notes."""
+    row = db.query(Setting).filter(
+        Setting.lodge_id == lodge_id,
+        Setting.setting_key == CONCIERGE_NOTES_KEY,
+    ).first()
+    if row is None:
+        row = Setting(
+            lodge_id=lodge_id,
+            setting_key=CONCIERGE_NOTES_KEY,
+            setting_value=body.notes or "",
+            setting_group="system",
+            description="Dashboard concierge/shift notes",
+        )
+        db.add(row)
+    else:
+        row.setting_value = body.notes or ""
+    db.commit()
+    return {"notes": row.setting_value}
 
 
 @router.get("/export")

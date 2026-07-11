@@ -6,8 +6,9 @@
  * window.__PORTAL__. We read it here synchronously — no fetch, no
  * loading state, no spinner, no flash. Ever.
  *
- * Background polling still runs every 15s so IP changes are picked up
- * and the localStorage cache stays fresh for next page load.
+ * Background polling still runs so IP changes are picked up and the
+ * localStorage cache stays fresh for next page load — every 15s until the
+ * first successful detection, then every 5 minutes.
  *
  * window.__PORTAL__ shape:
  *   { portal: "pms"|"customer", branding: {...}|null, clientIp: str }
@@ -15,7 +16,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 
 const BASE     = import.meta.env.VITE_API_BASE || ''
-const POLL_MS  = 15_000
+// Poll fast only until the first successful background detection; after that
+// slow WAY down. We can't stop entirely — the whole point of the background
+// poll is to notice network/IP changes (laptop moves off the lodge Wi-Fi) and
+// keep the localStorage cache fresh — but every 5 minutes is plenty for that,
+// vs. hammering /api/public/detect-portal every 15s forever.
+const POLL_MS_FAST    = 15_000        // until first successful detection
+const POLL_MS_SETTLED = 5 * 60_000   // after portal has been resolved once
 const CACHE_KEY = 'rusto_portal_cache'
 const CACHE_TTL = 5 * 60 * 1000
 
@@ -57,23 +64,40 @@ export function PortalProvider({ children }) {
       const res = await fetch('/api/public/detect-portal', {
         cache: 'no-store', headers: { Accept: 'application/json' },
       })
-      if (!res.ok) return
+      if (!res.ok) return false
       const data = await res.json()
       const p = data.portal    || 'customer'
       const b = data.branding  || null
       const i = data.client_ip || null
       setPortal(p); setBranding(b); setClientIp(i)
       _writeCache({ portal: p, branding: b, clientIp: i })
+      return true
     } catch {
       // Backend unreachable — keep existing state
+      return false
     }
   }, [])
 
   useEffect(() => {
+    // Self-scheduling timeout chain (instead of a fixed setInterval) so the
+    // cadence can change: fast (15s) while we've never had a successful
+    // detection, then settle to 5 minutes once the portal is resolved.
+    let cancelled = false
+    let timer = null
+    let settled = false
+
+    const schedule = (delay) => {
+      timer = setTimeout(async () => {
+        const ok = await detect()
+        if (cancelled) return
+        settled = settled || ok
+        schedule(settled ? POLL_MS_SETTLED : POLL_MS_FAST)
+      }, delay)
+    }
+
     // First background refresh after 5s (don't hammer on startup)
-    const t1 = setTimeout(detect, 5_000)
-    const id  = setInterval(detect, POLL_MS)
-    return () => { clearTimeout(t1); clearInterval(id) }
+    schedule(5_000)
+    return () => { cancelled = true; if (timer) clearTimeout(timer) }
   }, [detect])
 
   const effectivePortal   = override ?? portal

@@ -472,13 +472,16 @@ def trigger_checkout_alerts(db: Session, checkin: Checkin, invoice, customer: Cu
     lid = checkin.lodge_id
     hotel_name = get_hotel_name(db, lodge_id=lid)
 
-    # SMS
-    if is_sms_enabled(db, lodge_id=lid) and customer.phone:
+    # SMS — honour the stay's SMS preference (guest opted out at check-in),
+    # mirroring the gate in trigger_checkin_alerts.
+    sms_preference = (checkin.sms_alert_preference or "yes").lower()
+    if is_sms_enabled(db, lodge_id=lid) and sms_preference != "no" and customer.phone:
         msg = build_checkout_sms(hotel_name, customer.first_name, float(invoice.total_amount))
         send_sms(db, customer.phone, msg, checkin.checkin_id, customer.customer_id, "checkout",
                  lodge_id=lid)
     else:
-        _log_skipped(db, "sms", "checkout", customer.phone or "", "SMS disabled",
+        _log_skipped(db, "sms", "checkout", customer.phone or "",
+                     "SMS disabled or not requested",
                      checkin.checkin_id, customer.customer_id, lodge_id=lid)
 
     # Email with invoice

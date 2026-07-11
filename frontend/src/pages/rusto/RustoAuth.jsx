@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Eye, EyeOff, Phone, Lock, User, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Phone, Lock, User, Mail, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
 import { useCustomerAuth } from "../../context/CustomerAuthContext";
 import { useSettings } from "../../context/SettingsContext";
 import { RustoMark } from "../../components/RustoLogo/RustoLogo";
@@ -17,7 +17,7 @@ function AuthPage({ mode }) {
   const isSignup   = mode === "signup";
   const next       = params.get("next") || "/";
 
-  const [form, setForm]         = useState({phone:"", password:"", full_name:""});
+  const [form, setForm]         = useState({phone:"", password:"", full_name:"", email:""});
   const [showPwd, setShowPwd]   = useState(false);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
@@ -38,6 +38,8 @@ function AuthPage({ mode }) {
     if(isSignup && !form.full_name.trim()) e.full_name = "Your name is required";
     if(!form.phone.match(/^\d{10}$/)) e.phone = "Enter a valid 10-digit number";
     if(form.password.length < 8) e.password = "Must be at least 8 characters";
+    if(isSignup && form.email.trim() && !form.email.trim().match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/))
+      e.email = "Enter a valid email address";
     setFieldErr(e);
     return !Object.keys(e).length;
   };
@@ -47,7 +49,8 @@ function AuthPage({ mode }) {
     if(!validate()) return;
     setLoading(true);
     try {
-      if(isSignup) await signup({phone:form.phone, password:form.password, full_name:form.full_name});
+      if(isSignup) await signup({phone:form.phone, password:form.password, full_name:form.full_name,
+                                  email:form.email.trim() || undefined});
       else          await login({phone:form.phone, password:form.password});
       toast.success(isSignup ? "Account created! Welcome to Rusto." : "Welcome back!");
       navigate(next,{replace:true});
@@ -178,6 +181,21 @@ function AuthPage({ mode }) {
               </div>
             )}
 
+            {isSignup && (
+              <div style={{marginBottom:16}}>
+                <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--text-secondary,#334155)",marginBottom:6}}>
+                  Email <span style={{fontWeight:400,color:"var(--text-muted,#94A3B8)"}}>(optional — for booking confirmations)</span>
+                </label>
+                <div style={{position:"relative"}}>
+                  <Mail size={14} style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",color:"var(--text-muted,#94A3B8)"}}/>
+                  <input value={form.email} placeholder="name@email.com" type="email"
+                    onChange={e=>{setForm(p=>({...p,email:e.target.value}));setFieldErr(p=>({...p,email:""}));}}
+                    style={inp(fieldErr.email)}/>
+                </div>
+                {fieldErr.email&&<p style={{fontSize:12,color:"var(--brand-error,#991B1B)",marginTop:4}}>{fieldErr.email}</p>}
+              </div>
+            )}
+
             <div style={{marginBottom:16}}>
               <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--text-secondary,#334155)",marginBottom:6}}>Phone number</label>
               <div style={{position:"relative"}}>
@@ -230,7 +248,7 @@ function AuthPage({ mode }) {
 
           {/* Demo */}
           {!isSignup && (
-            <button onClick={()=>{setForm({phone:"9000000000",password:"Demo@1234",full_name:""});setError("");setFieldErr({});}}
+            <button onClick={()=>{setForm({phone:"9000000000",password:"Demo@1234",full_name:"",email:""});setError("");setFieldErr({});}}
               style={{width:"100%",marginTop:12,padding:"11px 16px",borderRadius:"var(--r-sm)",
                 border:"1.5px dashed var(--brand-cta-border,#BFDBFE)",background:"var(--brand-cta-bg,#EFF6FF)",
                 cursor:"pointer",display:"flex",alignItems:"center",gap:12,transition:"background .15s"}}

@@ -30,7 +30,7 @@ export default function RustoCheckout() {
   const { bookingId } = useParams();
   const loc = useLocation();
   const nav = useNavigate();
-  const { customer, updateProfile } = useCustomerAuth();
+  const { customer } = useCustomerAuth();
 
   const initial = loc.state;
   const [booking, setBooking]   = useState(initial?.booking || null);
@@ -57,6 +57,24 @@ export default function RustoCheckout() {
     return () => { cancelled = true; };
   }, [bookingId, initial]);
 
+  // The Razorpay session originally only travels via router state, so a
+  // page refresh used to dead-end with "payment session expired". Restore
+  // it from the backend whenever it's missing and the booking is unpaid.
+  useEffect(() => {
+    if (razorpay || !booking) return;
+    if (!["payment_pending", "initiated"].includes(booking.status)) return;
+    let cancelled = false;
+    rustoBookingsAPI.paymentSession(bookingId)
+      .then(r => {
+        if (cancelled) return;
+        if (r.data?.booking) setBooking(r.data.booking);
+        if (r.data?.razorpay) setRazorpay(r.data.razorpay);
+        if (r.data?.already_confirmed) setDone(true);
+      })
+      .catch(() => { /* handlePay retries; user gets a clear error there */ });
+    return () => { cancelled = true; };
+  }, [razorpay, booking, bookingId]);
+
   useEffect(() => {
     if (booking) setContact(c => ({
       full_name: c.full_name || booking.contact_name || "",
@@ -69,8 +87,16 @@ export default function RustoCheckout() {
     if (!contact.full_name.trim()) { toast.error("Name is required"); return; }
     if (!contact.phone.trim()) { toast.error("Phone is required"); return; }
     setSavingContact(true);
-    try { await updateProfile(contact); }
-    catch { /* non-blocking — contact also travels with the booking */ }
+    // Persist onto the BOOKING itself (not just the profile) so the
+    // confirmation email / SMS / WhatsApp reach the corrected details.
+    try {
+      const r = await rustoBookingsAPI.updateContact(bookingId, {
+        contact_name: contact.full_name.trim(),
+        contact_phone: contact.phone.trim(),
+        contact_email: contact.email.trim(),
+      });
+      if (r.data?.booking_id) setBooking(r.data);
+    } catch { /* non-blocking — the original snapshot stays on the booking */ }
     finally { setSavingContact(false); }
   };
 
@@ -89,16 +115,27 @@ export default function RustoCheckout() {
 
   const handlePay = async () => {
     await saveContact();
-    if (!razorpay) {
-      toast.error("Payment session expired. Please re-book from the lodge page.");
-      if (booking?.lodge?.code) nav(`/lodges/${booking.lodge.code}`);
+    let session = razorpay;
+    if (!session) {
+      // Session missing (e.g. refresh landed before the restore effect
+      // finished) — re-create it on demand instead of dead-ending.
+      try {
+        const r = await rustoBookingsAPI.paymentSession(bookingId);
+        if (r.data?.already_confirmed) { setBooking(r.data.booking); setDone(true); return; }
+        if (r.data?.booking) setBooking(r.data.booking);
+        session = r.data?.razorpay || null;
+        if (session) setRazorpay(session);
+      } catch { /* fall through to the error below */ }
+    }
+    if (!session) {
+      toast.error("Couldn't start the payment session. Please try again.");
       return;
     }
     setPaying(true);
     try {
-      if (razorpay.is_mock) {
+      if (session.is_mock) {
         const r = await rustoBookingsAPI.verifyPayment(bookingId, {
-          razorpay_order_id: razorpay.order_id,
+          razorpay_order_id: session.order_id,
           razorpay_payment_id: `pay_mock_${Date.now()}`,
           razorpay_signature: "mock_signature",
         });
@@ -109,10 +146,10 @@ export default function RustoCheckout() {
       }
       const Razorpay = await loadRazorpay();
       const rzp = new Razorpay({
-        key: razorpay.key_id, order_id: razorpay.order_id,
-        amount: razorpay.amount, currency: razorpay.currency,
-        name: razorpay.name, description: razorpay.description,
-        prefill: razorpay.prefill || { name: contact.full_name, contact: contact.phone, email: contact.email },
+        key: session.key_id, order_id: session.order_id,
+        amount: session.amount, currency: session.currency,
+        name: session.name, description: session.description,
+        prefill: session.prefill || { name: contact.full_name, contact: contact.phone, email: contact.email },
         theme: { color: "#B45A38" },
         handler: async (resp) => {
           try {
@@ -152,7 +189,15 @@ export default function RustoCheckout() {
   const nights = Math.round((new Date(booking.checkout_date) - new Date(booking.checkin_date)) / 864e5) || 1;
 
   // ── Confirmed ─────────────────────────────────────────
-  if (done || booking.status === "confirmed") return (
+  if (done || booking.status === "confirmed") {
+    const paidAmount = booking.payment && ["paid", "refunded"].includes(booking.payment.status)
+      ? booking.payment.amount : booking.total_amount;
+    const balanceDue = Math.max(0, Number(booking.total_amount || 0) - Number(paidAmount || 0));
+    const policy = booking.lodge?.cancellation_policy;
+    const policyLine = policy
+      ? `Cancellation policy: ${String(policy).replace(/_/g, " ")}${booking.lodge?.cancellation_hours ? ` — free cancellation up to ${booking.lodge.cancellation_hours}h before check-in` : ""}.`
+      : "Cancellation policy: contact the lodge or cancel from My Bookings before check-in.";
+    return (
     <div className="rb"><div className="rb-container-narrow" style={{ padding: "48px 20px" }}>
       <div className="rb-confirm rb-rise">
         <div className="rb-confirm-check"><CheckCircle2 size={48} /></div>
@@ -162,10 +207,19 @@ export default function RustoCheckout() {
 
         <div className="rb-confirm-details">
           <div className="rb-confirm-row"><MapPin size={16} /><span>{booking.lodge?.name}{booking.lodge?.public_city ? `, ${booking.lodge.public_city}` : ""}</span></div>
+          {booking.lodge?.address && (
+            <div className="rb-confirm-row"><span style={{ width: 16 }} /><span>{booking.lodge.address}{booking.lodge?.phone ? ` · ${booking.lodge.phone}` : ""}</span></div>
+          )}
           <div className="rb-confirm-row"><Calendar size={16} /><span>{booking.checkin_date} → {booking.checkout_date} · {nights} night{nights > 1 ? "s" : ""}</span></div>
-          <div className="rb-confirm-row"><Users size={16} /><span>{booking.rooms_count} room{booking.rooms_count > 1 ? "s" : ""} · {booking.adults} guest{booking.adults > 1 ? "s" : ""}</span></div>
+          <div className="rb-confirm-row"><Users size={16} /><span>{booking.room_type_label || booking.room_type} · {booking.rooms_count} room{booking.rooms_count > 1 ? "s" : ""} · {booking.adults} guest{booking.adults > 1 ? "s" : ""}</span></div>
         </div>
-        <div className="rb-confirm-total"><span>Paid</span><strong>{money(booking.total_amount)}</strong></div>
+        <div className="rb-confirm-total"><span>Paid</span><strong>{money(paidAmount)}</strong></div>
+        {balanceDue > 0 && (
+          <div className="rb-confirm-total" style={{ color: "var(--rb-clay, #B45A38)" }}>
+            <span>Balance due at lodge</span><strong>{money(balanceDue)}</strong>
+          </div>
+        )}
+        <p className="rb-sub" style={{ textAlign: "center", fontSize: 12, marginTop: 12 }}>{policyLine}</p>
 
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
           <button className="rb-btn rb-btn-ghost rb-btn-block" onClick={() => nav("/account/bookings")}>View my bookings</button>
@@ -173,12 +227,16 @@ export default function RustoCheckout() {
         </div>
       </div>
     </div></div>
-  );
+    );
+  }
 
   // ── Checkout ──────────────────────────────────────────
-  const subtotal = booking.subtotal || booking.total_amount;
-  const tax = booking.tax_amount || 0;
+  // Backend emits `gst_amount` (not `tax_amount`). Total is persisted
+  // server-side as subtotal + tax − discount, matching the Razorpay charge.
+  const subtotal = booking.subtotal ?? booking.total_amount;
+  const tax = booking.gst_amount ?? booking.tax_amount ?? 0;
   const discount = booking.promo_discount || 0;
+  const grandTotal = booking.total_amount ?? Math.max(0, Number(subtotal) + Number(tax) - Number(discount));
 
   return (
     <div className="rb"><div className="rb-container-narrow" style={{ padding: "24px 20px 60px" }}>
@@ -239,13 +297,13 @@ export default function RustoCheckout() {
 
             <div className="rb-co-lines">
               <div className="rb-co-line"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-              {discount > 0 && <div className="rb-co-line" style={{ color: "var(--rb-green)" }}><span>Discount</span><span>−{money(discount)}</span></div>}
-              {tax > 0 && <div className="rb-co-line"><span>Taxes & fees</span><span>{money(tax)}</span></div>}
-              <div className="rb-co-grand"><span>Total</span><span>{money(booking.total_amount)}</span></div>
+              {discount > 0 && <div className="rb-co-line" style={{ color: "var(--rb-green)" }}><span>Discount{booking.promo_code ? ` (${booking.promo_code})` : ""}</span><span>−{money(discount)}</span></div>}
+              {tax > 0 && <div className="rb-co-line"><span>Taxes & fees (GST)</span><span>{money(tax)}</span></div>}
+              <div className="rb-co-grand"><span>Total</span><span>{money(grandTotal)}</span></div>
             </div>
 
             <button className="rb-btn rb-btn-primary rb-btn-block rb-btn-lg" onClick={handlePay} disabled={paying} style={{ marginTop: 16, opacity: paying ? .7 : 1 }}>
-              {paying ? <><Loader2 size={18} className="rb-spin" /> Processing…</> : <><Lock size={16} /> Pay {money(booking.total_amount)}</>}
+              {paying ? <><Loader2 size={18} className="rb-spin" /> Processing…</> : <><Lock size={16} /> Pay {money(grandTotal)}</>}
             </button>
             <p className="rb-co-secure"><ShieldCheck size={13} /> Secure payment · Razorpay</p>
           </div>

@@ -95,12 +95,14 @@ TEMPLATES: Dict[str, Dict[str, Any]] = {
         "lang":          "en",
         "category":      "utility",
         "body_preview": ("Your Rusto booking {{booking_ref}} at {{lodge_name}} is "
-                         "CONFIRMED for {{checkin_date}}. Total paid ₹{{total}}. "
-                         "See you soon!"),
+                         "CONFIRMED. Check-in {{checkin_date}}, check-out "
+                         "{{checkout_date}}. {{room_type}} for {{guests}} guest(s). "
+                         "Total paid ₹{{total}}. See you soon!"),
         # Param order MUST match the {{1}}, {{2}}, ... placeholders in
         # the approved Meta template. We document that mapping here for
         # the lodge admin who's setting up templates on Meta's side.
-        "params":        ["booking_ref", "lodge_name", "checkin_date", "total"],
+        "params":        ["booking_ref", "lodge_name", "checkin_date",
+                          "checkout_date", "room_type", "guests", "total"],
     },
     "rusto_payment_pending": {
         "name":          "rusto_payment_pending",
@@ -399,10 +401,15 @@ def send_booking_confirmation(db: Session, booking: CustomerBooking) -> Optional
         return None
     customer = (db.query(RustoCustomer)
                   .filter(RustoCustomer.customer_id == booking.customer_id).first())
+    room_label = (booking.room_type or "").replace("_", " ").title()
+    if (booking.rooms_count or 1) > 1:
+        room_label = f"{booking.rooms_count}x {room_label}"
+    guests = (booking.adults or 0) + (booking.children or 0)
     return _send_template(
         db, lodge=lodge, customer=customer, to_phone=phone,
         template_key="rusto_booking_confirmed",
         params=[booking.booking_ref, lodge.name, booking.checkin_date,
+                booking.checkout_date, room_label, guests,
                 int(booking.total_amount)],
         reason=MessageReason.booking_confirmation,
         booking_id=booking.booking_id,

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Calendar, Users, Home, CheckCircle, AlertCircle, ChevronRight, Phone, Mail, ArrowLeft } from "lucide-react";
-import { publicBookingAPI } from "../services/api";
+import { Calendar, Users, Home, CheckCircle, AlertCircle, ChevronRight, Phone, Mail, ArrowLeft, Info, Zap } from "lucide-react";
+import { publicBookingAPI, rustoPublicAPI } from "../services/api";
 
 /**
  * Public direct-booking page — rendered OUTSIDE the authenticated Layout
@@ -35,10 +35,18 @@ export default function PublicBooking() {
     special_requests: "",
   });
 
+  // Is this lodge also published on the Rusto marketplace? If so we can
+  // offer the instant online-payment flow as an alternative to this
+  // request-based direct booking.
+  const [marketplaceLodge, setMarketplaceLodge] = useState(null);
+
   useEffect(() => {
     publicBookingAPI.lodgeInfo(lodge_code)
       .then(r => setLodge(r.data))
       .catch(() => setError("Lodge not found"));
+    rustoPublicAPI.lodge(lodge_code)
+      .then(r => setMarketplaceLodge(r.data?.lodge || r.data))
+      .catch(() => setMarketplaceLodge(null));   // not published — no link
   }, [lodge_code]);
 
   const checkAvail = async () => {
@@ -129,6 +137,26 @@ export default function PublicBooking() {
       </header>
 
       <main className="max-w-3xl mx-auto p-6 -mt-8">
+        {/* What this flow is — no online payment, lodge confirms directly */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4 text-sm text-blue-900">
+          <div className="flex items-start gap-2">
+            <Info size={16} className="mt-0.5 flex-shrink-0"/>
+            <div>
+              <p className="font-semibold">This is a booking request — no online payment.</p>
+              <p className="mt-0.5 text-blue-800">
+                The lodge will contact you on your phone number to confirm your stay.
+                You pay at the property.
+              </p>
+              {marketplaceLodge && (
+                <Link to={`/lodges/${lodge_code}`}
+                      className="inline-flex items-center gap-1.5 mt-2 font-semibold text-blue-700 hover:text-blue-900 underline">
+                  <Zap size={13}/> Prefer instant confirmation? Book &amp; pay online on the lodge's Rusto page
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Progress bar */}
         <div className="flex items-center gap-2 mb-6 text-xs">
           {["Dates","Details","Confirmed"].map((label, i) => {

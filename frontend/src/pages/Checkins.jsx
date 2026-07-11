@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Search, LogOut, Calendar, Clock, User, RefreshCw, Filter, Eye, AlertCircle, X, Download, Tag, Award, Receipt, Plus, Trash2 } from "lucide-react";
-import { api, promosAPI, loyaltyAPI, folioAPI } from "../services/api";
+import { Search, LogOut, Calendar, Clock, User, RefreshCw, Filter, Eye, AlertCircle, X, Download, Tag, Award, Receipt, Plus, Trash2, ShieldCheck } from "lucide-react";
+import { api, promosAPI, loyaltyAPI, folioAPI, checkinsAPI } from "../services/api";
 import { toast } from "react-toastify";
 import CheckinModal from "../components/checkins/CheckinModal";
+import LateCheckoutModal from "../components/checkins/LateCheckoutModal";
+import { PAYMENT_MODES, CollectionHint } from "../components/checkins/paymentOptions";
 import { formatDateTime } from "../utils/datetime";
 import GuestSearchInput from "../components/GuestSearchInput";
 
@@ -138,28 +140,8 @@ export default function Checkins() {
     }
   }, [location.search, showCheckinModal]);
 
-  const [showLateCheckout, setShowLateCheckout] = useState(false)
-  const [lateCheckoutForm, setLateCheckoutForm]   = useState({ new_checkout_time: '', late_checkout_charge: 0, notes: '' })
-  const [lateCheckoutLoading, setLateCheckoutLoading] = useState(false)
-
-  const handleLateCheckout = async () => {
-    if (!lateCheckoutForm.new_checkout_time) {
-      toast.error('Please select a new checkout time'); return
-    }
-    if (!checkin) { toast.error('No check-in selected'); return }
-    setLateCheckoutLoading(true)
-    try {
-      await api.put('/checkins/' + checkin.checkin_id + '/late-checkout', lateCheckoutForm)
-      toast.success('Checkout time extended successfully')
-      setShowLateCheckout(false)
-      setLateCheckoutForm({ new_checkout_time: '', late_checkout_charge: 0, notes: '' })
-      fetch(true)  // refresh list
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Failed to extend checkout')
-    } finally {
-      setLateCheckoutLoading(false)
-    }
-  }
+  // Late-checkout modal target — the check-in row being extended.
+  const [lateCheckoutTarget, setLateCheckoutTarget] = useState(null);
 
   const handleCheckout = async () => {
     if (!checkoutTarget) return;
@@ -239,14 +221,11 @@ export default function Checkins() {
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Late Checkout Modal */}
-      {showLateCheckout && checkin && (
+      {lateCheckoutTarget && (
         <LateCheckoutModal
-          checkin={checkin}
-          form={lateCheckoutForm}
-          setForm={setLateCheckoutForm}
-          onSave={handleLateCheckout}
-          onClose={() => setShowLateCheckout(false)}
-          loading={lateCheckoutLoading}
+          checkin={lateCheckoutTarget}
+          onClose={() => setLateCheckoutTarget(null)}
+          onSuccess={() => { setLateCheckoutTarget(null); fetchCheckins(); }}
         />
       )}
       {/* Header */}
@@ -335,6 +314,12 @@ export default function Checkins() {
                           <Receipt size={14}/>
                         </button>
                       )}
+                      {c.status === "active" && (
+                        <button onClick={() => setLateCheckoutTarget(c)} title="Extend / Late Checkout"
+                                className="p-2 text-navy border border-navy/20 bg-navy/5 rounded-lg">
+                          <Clock size={14}/>
+                        </button>
+                      )}
                       {c.status === "active" && <button onClick={() => setCheckoutTarget(c)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold flex items-center gap-1"><LogOut size={12} /> Checkout</button>}
                     </div>
                   </div>
@@ -378,6 +363,12 @@ export default function Checkins() {
                         <button onClick={() => setFolioFor(c)} title="Folio"
                                 className="p-1.5 text-gold hover:bg-gold/10 rounded-lg">
                           <Receipt size={14}/>
+                        </button>
+                      )}
+                      {c.status === "active" && (
+                        <button onClick={() => setLateCheckoutTarget(c)} title="Extend / Late Checkout"
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-navy/5 text-navy hover:bg-navy/10 rounded-lg text-xs font-medium">
+                          <Clock size={12}/> Extend
                         </button>
                       )}
                       {c.status === "active" && <button onClick={() => setCheckoutTarget(c)} className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-medium"><LogOut size={12} /> Checkout</button>}
@@ -484,10 +475,9 @@ export default function Checkins() {
                 <select className="w-full mt-1 px-3 py-2 border border-ink-200 rounded-xl text-sm focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
                         value={checkoutData.payment_mode}
                         onChange={e => setCheckoutData({ ...checkoutData, payment_mode: e.target.value })}>
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
-                  <option value="upi">UPI / PhonePe</option>
+                  {PAYMENT_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
+                <CollectionHint mode={checkoutData.payment_mode} />
               </div>
 
               {/* Folio shortcut — opens the folio drawer for this checkin
@@ -517,7 +507,7 @@ export default function Checkins() {
       )}
 
       {/* Detail Modal */}
-      {selectedCheckin && <CheckinDetailModal checkin={selectedCheckin} onClose={() => setSelectedCheckin(null)} />}
+      {selectedCheckin && <CheckinDetailModal checkin={selectedCheckin} onClose={() => setSelectedCheckin(null)} onChanged={fetchCheckins} />}
       
       {/* New Checkin Modal */}
       {showCheckinModal && <CheckinModal
@@ -540,21 +530,109 @@ function StatusBadge({ status, isOverdue }) {
   );
 }
 
-function CheckinDetailModal({ checkin, onClose }) {
+function CheckinDetailModal({ checkin: initialCheckin, onClose, onChanged }) {
+  // Keep a local copy so the verify action can update the view in place.
+  const [checkin, setCheckin] = useState(initialCheckin);
+  const [verifyNotes, setVerifyNotes] = useState(initialCheckin.verification_notes || "");
+  const [verifying, setVerifying] = useState(false);
+
+  // "Overdue" is a virtual status — those rows still have status === "active".
+  const canVerify = checkin.status === "active";
+
+  const handleVerify = async (verified) => {
+    setVerifying(true);
+    try {
+      const res = await checkinsAPI.verify(checkin.checkin_id, { verified, notes: verifyNotes });
+      setCheckin(res.data?.checkin || { ...checkin, id_verified: verified });
+      toast.success(verified ? "Guest ID marked as verified" : "Verification removed");
+      onChanged && onChanged();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to update verification");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="bg-navy text-white px-6 py-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold">Check-in Details</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-bold">Check-in Details</h3>
+            {checkin.id_verified && (
+              <span className="inline-flex items-center gap-1 bg-green-500/20 text-green-300 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full">
+                <ShieldCheck size={11} /> ID Verified
+              </span>
+            )}
+          </div>
           <button onClick={onClose} className="hover:text-white/70"><X size={18} /></button>
         </div>
-        <div className="p-6 grid grid-cols-2 gap-4">
-          <Info label="Guest" value={`${checkin.customer?.first_name} ${checkin.customer?.last_name}`} />
-          <Info label="Phone" value={checkin.customer?.phone} />
-          <Info label="Room" value={checkin.room_number} />
-          <Info label="Tariff" value={`₹${checkin.tariff_per_night}`} />
-          <Info label="Check-in" value={formatDateTime(checkin.checkin_datetime)} />
-          <Info label="Expected Out" value={checkin.expected_checkout ? formatDateTime(checkin.expected_checkout) : "Open"} />
+        <div className="p-6 space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <Info label="Guest" value={`${checkin.customer?.first_name} ${checkin.customer?.last_name}`} />
+            <Info label="Phone" value={checkin.customer?.phone} />
+            <Info label="Room" value={checkin.room_number} />
+            <Info label="Tariff" value={`₹${checkin.tariff_per_night}`} />
+            <Info label="Check-in" value={formatDateTime(checkin.checkin_datetime)} />
+            <Info label="Expected Out" value={checkin.expected_checkout ? formatDateTime(checkin.expected_checkout) : "Open"} />
+            <Info label="Guests" value={checkin.members_count} />
+            <Info label="Payment Mode" value={(checkin.payment_mode || "").replace("_", " ").toUpperCase()} />
+            <Info label="Purpose of Visit" value={checkin.purpose_of_visit} />
+            <Info label="Vehicle No." value={checkin.vehicle_number} />
+            <Info label="Declaration" value={checkin.declaration_accepted ? "Accepted" : "Not accepted"} />
+            {checkin.id_verified && (
+              <Info label="Verified By"
+                    value={`${checkin.verified_by || "—"}${checkin.verified_at ? ` · ${formatDateTime(checkin.verified_at)}` : ""}`} />
+            )}
+          </div>
+
+          {/* Guest signature */}
+          {checkin.signature_path && (
+            <div>
+              <p className="text-[10px] text-ink-400 uppercase font-bold mb-1.5">Guest Signature</p>
+              <img src={`/uploads/${checkin.signature_path}`} alt="Guest signature"
+                   className="w-full max-h-40 object-contain border border-ink-200 rounded-xl bg-white" />
+              <p className="text-[11px] text-ink-500 mt-1">
+                Captured by <span className="font-semibold">{checkin.signature_captured_by || "—"}</span>
+                {checkin.signature_captured_at ? ` on ${formatDateTime(checkin.signature_captured_at)}` : ""}
+              </p>
+            </div>
+          )}
+
+          {/* ID verification — for active / overdue stays */}
+          {canVerify && (
+            <div className={`rounded-xl border p-4 ${checkin.id_verified ? "bg-green-50 border-green-200" : "bg-ink-50 border-ink-100"}`}>
+              <p className="text-[10px] text-ink-400 uppercase font-bold mb-2 flex items-center gap-1">
+                <ShieldCheck size={12} /> Guest ID Verification
+              </p>
+              {checkin.id_verified ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-green-800 font-medium">
+                    ID verified by {checkin.verified_by || "staff"}
+                    {checkin.verified_at ? ` on ${formatDateTime(checkin.verified_at)}` : ""}.
+                  </p>
+                  {checkin.verification_notes && (
+                    <p className="text-xs text-ink-600">Notes: {checkin.verification_notes}</p>
+                  )}
+                  <button onClick={() => handleVerify(false)} disabled={verifying}
+                          className="text-xs text-red-600 hover:underline font-semibold disabled:opacity-50">
+                    Remove verification
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <input type="text" placeholder="Verification notes (optional)…"
+                         className="w-full px-3 py-2 border border-ink-200 rounded-xl text-sm focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
+                         value={verifyNotes}
+                         onChange={e => setVerifyNotes(e.target.value)} />
+                  <button onClick={() => handleVerify(true)} disabled={verifying}
+                          className="w-full py-2 bg-navy text-white rounded-xl text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2">
+                    <ShieldCheck size={14} /> {verifying ? "…" : "Verify ID"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

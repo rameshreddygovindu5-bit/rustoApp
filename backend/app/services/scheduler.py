@@ -12,6 +12,7 @@ from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime, date, timedelta, timezone
 from collections import defaultdict
 import subprocess, os, logging
+import pytz
 
 def _utcnow():
     """Naive UTC for SQLite datetime columns."""
@@ -20,7 +21,9 @@ def _utcnow():
     ).replace(tzinfo=None)
 
 logger = logging.getLogger(__name__)
-scheduler = BackgroundScheduler()
+# All cron jobs are defined in lodge-local time (IST). Pin the scheduler to
+# Asia/Kolkata so jobs fire at the intended hour regardless of the host TZ.
+scheduler = BackgroundScheduler(timezone=pytz.timezone("Asia/Kolkata"))
 
 
 def get_db_session():
@@ -324,6 +327,31 @@ def backup_database():
         backup_dir = "./backups"
         os.makedirs(backup_dir, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # SQLite deployments have no pg_dump — copy the DB file with the
+        # sqlite3 online-backup API (safe against a live database). Reuses
+        # the URL→path resolver from the backup router.
+        from ..routers.backup import _resolve_sqlite_path
+        sqlite_path = _resolve_sqlite_path()
+        if sqlite_path is not None:
+            import sqlite3
+            if not os.path.exists(sqlite_path):
+                logger.error(f"Backup failed: SQLite database not found at {sqlite_path}")
+                return
+            backup_file = f"{backup_dir}/backup_{timestamp}.db"
+            src = sqlite3.connect(sqlite_path)
+            try:
+                dst = sqlite3.connect(backup_file)
+                try:
+                    src.backup(dst)
+                finally:
+                    dst.close()
+            finally:
+                src.close()
+            logger.info(f"Database backup created: {backup_file}")
+            return
+
+        # Postgres (and anything else pg_dump understands): shell out as before.
         db_url = os.getenv("DATABASE_URL", "")
         backup_file = f"{backup_dir}/backup_{timestamp}.sql"
 
@@ -448,6 +476,61 @@ def _whatsapp_review_request_batch():
         db.close()
 
 
+def expire_stale_payment_pending_bookings():
+    """Every 10 min: release inventory held by abandoned checkouts.
+
+    A CustomerBooking sits in `payment_pending` while it holds room
+    inventory (see rusto_public._available_inventory). If the customer
+    abandons the Razorpay checkout, that hold would otherwise live
+    forever and block real bookings. Cancel anything stuck in
+    payment_pending for more than 30 minutes, mark its open Payment rows
+    failed, and audit-log the release.
+    """
+    db = get_db_session()
+    try:
+        from datetime import timedelta
+        from ..models import (CustomerBooking, CustomerBookingStatus,
+                               Payment, PaymentStatus)
+        from .audit_service import log_audit
+
+        cutoff = _utcnow() - timedelta(minutes=30)
+        stale = (db.query(CustomerBooking)
+                 .filter(CustomerBooking.status == CustomerBookingStatus.payment_pending.value,
+                         CustomerBooking.created_at < cutoff)
+                 .all())
+        if not stale:
+            return
+
+        for b in stale:
+            b.status = CustomerBookingStatus.cancelled.value
+            b.cancelled_at = _utcnow()
+            b.cancellation_reason = "payment_timeout"
+            db.query(Payment).filter(
+                Payment.customer_booking_id == b.booking_id,
+                Payment.status == PaymentStatus.created.value,
+            ).update({"status": PaymentStatus.failed.value})
+        db.commit()
+
+        for b in stale:
+            try:
+                log_audit(db, "rusto_booking.payment_timeout",
+                          actor_user_id=None, actor_username="system:scheduler",
+                          actor_type="system",
+                          entity_type="rusto_customer_booking",
+                          entity_id=b.booking_id, lodge_id=b.lodge_id,
+                          details={"ref": b.booking_ref,
+                                    "reason": "payment_timeout",
+                                    "stuck_since": b.created_at.isoformat() if b.created_at else None})
+            except Exception:
+                logger.exception("Audit log failed for payment_timeout booking %s", b.booking_id)
+
+        logger.info("Cancelled %d stale payment_pending booking(s) (payment_timeout)", len(stale))
+    except Exception as e:
+        logger.error(f"Stale payment_pending cleanup job failed: {e}")
+    finally:
+        db.close()
+
+
 def _billing_renewal_reminder_batch():
     """v8.0.1 — 3-day-before-charge billing reminder emails.
 
@@ -492,6 +575,10 @@ def start_scheduler():
     scheduler.add_job(send_daily_summary, CronTrigger(hour=9, minute=5), id="daily_summary")
     scheduler.add_job(retry_failed_alerts, CronTrigger(minute="*/15"), id="retry_alerts")
     scheduler.add_job(retry_pending_webhooks_job, CronTrigger(minute="*/5"), id="retry_webhooks")
+    # Release inventory held by abandoned online checkouts — bookings stuck
+    # in payment_pending for 30+ minutes are cancelled (payment_timeout).
+    scheduler.add_job(expire_stale_payment_pending_bookings, CronTrigger(minute="*/10"),
+                       id="expire_stale_payment_pending")
     scheduler.add_job(mark_no_shows, CronTrigger(hour=23, minute=0), id="mark_no_shows")
     scheduler.add_job(backup_database, CronTrigger(hour=2, minute=0), id="db_backup")
     # v2.6 — pre-arrival email batch (template-driven). Runs at 11 AM

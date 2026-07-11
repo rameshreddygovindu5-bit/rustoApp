@@ -10,6 +10,7 @@
  */
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { vendorChunks } from './vite.config.js'
 
 export default defineConfig({
   plugins: [react()],
@@ -23,6 +24,9 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: 'index-pms.html',
+      output: {
+        manualChunks: vendorChunks,
+      },
     },
   },
 

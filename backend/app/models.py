@@ -78,6 +78,7 @@ class AlertEvent(str, enum.Enum):
     daily_summary = "daily_summary"
     booking = "booking"
     booking_cancelled = "booking_cancelled"
+    late_checkout = "late_checkout"
 
 
 class AlertStatus(str, enum.Enum):
@@ -292,6 +293,21 @@ class Checkin(Base):
     status = Column(String(20), default="active")
     special_notes = Column(Text)
     sms_alert_preference = Column(String(3), default="yes")
+    # ── Guest digital signature + house-rules declaration ──────────────
+    # `signature_path` is a PNG saved under the uploads dir (same pattern
+    # as Customer.id_proof_path). Captured on the check-in review step.
+    signature_path = Column(String(255))
+    signature_captured_by = Column(String(50))     # staff username
+    signature_captured_at = Column(DateTime)
+    declaration_accepted = Column(Boolean, default=False)
+    # ── Guest ID verification (staff checked the physical ID) ──────────
+    id_verified = Column(Boolean, default=False)
+    verified_by = Column(String(50))               # staff username
+    verified_at = Column(DateTime)
+    verification_notes = Column(Text)
+    # ── Stay metadata (guest-register compliance) ───────────────────────
+    purpose_of_visit = Column(String(50))          # Pilgrimage/Tourism/...
+    vehicle_number = Column(String(20))
     checked_in_by = Column(Integer, ForeignKey("users.user_id"))
     checked_out_by = Column(Integer, ForeignKey("users.user_id"))
     created_at = Column(DateTime, default=func.now())
@@ -308,6 +324,8 @@ class Checkin(Base):
         Index("ix_checkins_customer", "customer_id"),
         Index("ix_checkins_room_status", "room_id", "status"),
         Index("ix_checkins_expected_checkout", "status", "expected_checkout"),
+        # Default list view filters lodge (+status) and sorts by newest.
+        Index("ix_checkins_lodge_dt", "lodge_id", "checkin_datetime"),
     )
 
 
@@ -398,6 +416,79 @@ class LoginAttempt(Base):
     ip_address = Column(String(45))
     success = Column(Boolean, default=False)
     attempted_at = Column(DateTime, default=func.now())
+
+
+class LoginEvent(Base):
+    """Unified login history for BOTH staff users and marketplace
+    customers — one row per successful or failed login, with the real
+    client IP and user agent. Powers the super-admin security console
+    and per-user session views."""
+    __tablename__ = "login_events"
+    __table_args__ = (
+        Index("ix_login_events_actor", "actor_type", "actor_id"),
+        Index("ix_login_events_time", "occurred_at"),
+        Index("ix_login_events_ip", "ip_address"),
+    )
+
+    event_id = Column(Integer, primary_key=True, autoincrement=True)
+    actor_type = Column(String(20), nullable=False)   # "user" | "customer"
+    actor_id = Column(Integer)                         # user_id / customer_id
+    username = Column(String(160))                     # username or phone
+    lodge_id = Column(Integer)                         # staff only; NULL for customers
+    success = Column(Boolean, default=True, nullable=False)
+    method = Column(String(30), default="password")    # password | otp | pin | totp | signup
+    ip_address = Column(String(45))
+    user_agent = Column(String(400))
+    occurred_at = Column(DateTime, default=func.now(), nullable=False)
+
+
+class IpPresence(Base):
+    """One row per (actor, IP address) — IP presence tracker. Records
+    when the actor was first and last seen from this IP and the
+    CUMULATIVE active time spent from it.
+
+    Time accounting: each authenticated request updates last_seen; if
+    the gap since the previous request is under the session-continuity
+    window the gap is added to total_seconds, otherwise the visit
+    counter increments and no idle time is added. Only active when the
+    `ip_tracking_enabled` platform setting is "yes"/"true" (default OFF)."""
+    __tablename__ = "ip_presence"
+    __table_args__ = (
+        Index("ix_ip_presence_unique", "actor_type", "actor_id", "ip_address", unique=True),
+        Index("ix_ip_presence_ip", "ip_address"),
+        Index("ix_ip_presence_last_seen", "last_seen"),
+    )
+
+    presence_id = Column(Integer, primary_key=True, autoincrement=True)
+    actor_type = Column(String(20), nullable=False)    # "user" | "customer"
+    actor_id = Column(Integer, nullable=False)
+    username = Column(String(160))                      # display convenience
+    lodge_id = Column(Integer)                          # staff only; NULL for customers
+    ip_address = Column(String(45), nullable=False)
+    first_seen = Column(DateTime, default=func.now(), nullable=False)
+    last_seen = Column(DateTime, default=func.now(), nullable=False)
+    total_seconds = Column(Integer, default=0, nullable=False)  # cumulative active time
+    visit_count = Column(Integer, default=1, nullable=False)    # distinct sessions
+    last_user_agent = Column(String(400))
+
+
+class CustomerOtp(Base):
+    """DB-backed one-time codes for the customer marketplace
+    (password reset, phone verification). Replaces the old in-memory
+    dict that broke on restart / multiple workers."""
+    __tablename__ = "customer_otps"
+    __table_args__ = (
+        Index("ix_customer_otps_phone", "phone", "purpose"),
+    )
+
+    otp_id = Column(Integer, primary_key=True, autoincrement=True)
+    phone = Column(String(20), nullable=False)
+    purpose = Column(String(30), default="password_reset", nullable=False)
+    code_hash = Column(String(255), nullable=False)     # never store plaintext
+    expires_at = Column(DateTime, nullable=False)
+    attempts = Column(Integer, default=0, nullable=False)
+    used = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -1871,6 +1962,7 @@ class RustoCustomer(Base):
     accepts_marketing = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     last_login_at = Column(DateTime)
+    last_login_ip = Column(String(45))
 
 
 class LodgePhoto(Base):

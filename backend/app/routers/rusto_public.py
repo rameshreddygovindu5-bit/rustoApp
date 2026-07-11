@@ -270,17 +270,45 @@ Response: {"city": "Jaipur", "amenities": "ac", "max_price": 2000, "min_rating":
 
 # ── Public lodge listing helpers ────────────────────────────────────
 
+# Sentinel: distinguishes "caller pre-fetched the cover (may be None)" from
+# "caller didn't pass one — query it here" so bulk callers can skip the
+# per-lodge photo query while single-lodge callers keep working unchanged.
+_UNSET = object()
+
+
+def _bulk_cover_photos(db: Session, lodge_ids: List[int]) -> dict:
+    """One query → {lodge_id: cover_photo_url} for the given lodges.
+    Cover = first photo by sort_order (photo_id tiebreak), matching what
+    _public_lodge_summary's per-lodge `.first()` query returns."""
+    if not lodge_ids:
+        return {}
+    rows = (db.query(LodgePhoto.lodge_id, LodgePhoto.url)
+              .filter(LodgePhoto.lodge_id.in_(lodge_ids))
+              .order_by(LodgePhoto.lodge_id,
+                        LodgePhoto.sort_order.asc(),
+                        LodgePhoto.photo_id.asc())
+              .all())
+    covers = {}
+    for lid, url in rows:
+        covers.setdefault(lid, url)   # keep the FIRST (lowest sort_order)
+    return covers
+
+
 def _public_lodge_summary(db: Session, l: Lodge,
-                           rating: Optional[dict] = None) -> dict:
+                           rating: Optional[dict] = None,
+                           cover_url=_UNSET) -> dict:
     """Lean shape used in search results — no per-room data.
 
     `rating` is an optional pre-computed (avg, count) dict for this lodge,
     so the search endpoint can bulk-fetch ratings for all lodges in one
-    query instead of N+1.
+    query instead of N+1. `cover_url` is likewise an optional pre-computed
+    cover photo URL (see _bulk_cover_photos) to avoid a per-lodge query.
     """
-    cover = (db.query(LodgePhoto)
-             .filter(LodgePhoto.lodge_id == l.lodge_id)
-             .order_by(LodgePhoto.sort_order.asc()).first())
+    if cover_url is _UNSET:
+        cover = (db.query(LodgePhoto)
+                 .filter(LodgePhoto.lodge_id == l.lodge_id)
+                 .order_by(LodgePhoto.sort_order.asc()).first())
+        cover_url = cover.url if cover else None
     return {
         "code": l.code,
         "name": l.name,
@@ -295,7 +323,7 @@ def _public_lodge_summary(db: Session, l: Lodge,
         "amenities": (l.amenities or "").split(",") if l.amenities else [],
         "starting_price": float(l.starting_price) if l.starting_price else None,
         "starting_tariff": float(l.starting_price) if l.starting_price else None,
-        "cover_photo": cover.url if cover else None,
+        "cover_photo": cover_url,
         # v12 — property metadata from settings
         "property_type":     getattr(l, "property_type", None),
         "property_category": getattr(l, "property_type", None),
@@ -349,6 +377,96 @@ def _room_type_label(rt: str) -> str:
     }.get(rt, rt.replace("_", " ").title())
 
 
+def _bulk_available_inventory(db: Session, lodge_ids: List[int],
+                               from_date: date, to_date: date) -> dict:
+    """Set-based availability for MANY lodges at once:
+        → {lodge_id: {room_type: available_count}}
+
+    Same semantics as the old per-lodge/per-room implementation
+    ("Available" = rooms of that type NOT held by an active checkin,
+    a pending/confirmed internal Booking, a blocking maintenance ticket,
+    minus per-type customer-booking holds; dates end-exclusive), but
+    computed in 5 grouped queries TOTAL instead of ~3 queries per ROOM
+    per lodge. Lodges with no (non-blocked) rooms are absent from the
+    result — callers should .get(lodge_id, {}).
+    """
+    if not lodge_ids:
+        return {}
+
+    rooms = (db.query(Room.room_id, Room.lodge_id, Room.room_type)
+             .filter(Room.lodge_id.in_(lodge_ids), Room.status != "blocked")
+             .all())
+    if not rooms:
+        return {}
+    room_ids = [r.room_id for r in rooms]
+
+    # Rooms held by any overlapping/blocking record. Three grouped queries
+    # replace the per-room _is_busy() fan-out.
+    busy_ids = set()
+    # 1) Active checkins overlapping the window.
+    #    Overlap test: stay_start < window_end AND stay_end > window_start.
+    busy_ids.update(rid for (rid,) in
+                    db.query(Checkin.room_id)
+                      .filter(Checkin.room_id.in_(room_ids),
+                              Checkin.status == "active",
+                              or_(Checkin.expected_checkout == None,
+                                  Checkin.expected_checkout > from_date),
+                              Checkin.checkin_datetime < to_date)
+                      .distinct().all())
+    # 2) Pending/confirmed internal Bookings overlapping.
+    busy_ids.update(rid for (rid,) in
+                    db.query(Booking.room_id)
+                      .filter(Booking.room_id.in_(room_ids),
+                              Booking.status.in_([BookingStatus.pending,
+                                                   BookingStatus.confirmed]),
+                              Booking.checkin_date < to_date,
+                              Booking.checkout_date > from_date)
+                      .distinct().all())
+    # 3) Blocking maintenance (date-independent, like the original).
+    busy_ids.update(rid for (rid,) in
+                    db.query(MaintenanceTicket.room_id)
+                      .filter(MaintenanceTicket.room_id.in_(room_ids),
+                              MaintenanceTicket.blocks_room_availability == True,
+                              MaintenanceTicket.status.in_([MaintenanceStatus.open,
+                                                             MaintenanceStatus.in_progress]))
+                      .distinct().all())
+
+    # Customer-side bookings hold capacity per room TYPE (not pinned to a
+    # specific room until the lodge assigns one at check-in). One grouped
+    # query across all lodges.
+    cb_rows = (db.query(CustomerBooking.lodge_id,
+                        CustomerBooking.room_type,
+                        func.sum(CustomerBooking.rooms_count))
+               .filter(CustomerBooking.lodge_id.in_(lodge_ids),
+                       CustomerBooking.status.in_([
+                           CustomerBookingStatus.payment_pending.value,
+                           CustomerBookingStatus.confirmed.value,
+                           CustomerBookingStatus.checked_in.value,
+                       ]),
+                       CustomerBooking.checkin_date < to_date,
+                       CustomerBooking.checkout_date > from_date)
+               .group_by(CustomerBooking.lodge_id,
+                         CustomerBooking.room_type).all())
+    cb_holds = {(lid, rt): int(n or 0) for lid, rt, n in cb_rows}
+
+    # Assemble: every (lodge, type) with at least one non-blocked room gets a
+    # key (even if the count ends up 0) — same as the old by_type behaviour.
+    result: dict = {}
+    for r in rooms:
+        rt_key = getattr(r.room_type, "value", str(r.room_type))
+        per_lodge = result.setdefault(r.lodge_id, {})
+        per_lodge.setdefault(rt_key, 0)
+        if r.room_id not in busy_ids:
+            per_lodge[rt_key] += 1
+
+    # Deduct customer-booking holds. If holds > physical, clamp to zero
+    # (oversold edge case — shouldn't happen but defensive).
+    for lid, per_lodge in result.items():
+        for rt_key in per_lodge:
+            per_lodge[rt_key] = max(0, per_lodge[rt_key] - cb_holds.get((lid, rt_key), 0))
+    return result
+
+
 def _available_inventory(db: Session, lodge_id: int,
                           from_date: date, to_date: date) -> dict:
     """Compute room-type → available count for a published lodge across
@@ -359,79 +477,10 @@ def _available_inventory(db: Session, lodge_id: int,
     Date semantics: end-exclusive (a stay 28 May → 30 May overlaps with
     a query 30 May → 1 Jun only if same start/end). Matches how the
     tape chart paints cells.
+
+    Thin single-lodge wrapper around _bulk_available_inventory.
     """
-    rooms = (db.query(Room)
-             .filter(Room.lodge_id == lodge_id, Room.status != "blocked")
-             .all())
-    if not rooms:
-        return {}
-
-    # Bucket rooms by type. RoomType enum value (string) is the key.
-    by_type = {}
-    for r in rooms:
-        key = getattr(r.room_type, "value", str(r.room_type))
-        by_type.setdefault(key, []).append(r)
-
-    # For each room, see if it overlaps with any conflicting record.
-    def _is_busy(room_id: int) -> bool:
-        # 1) Active checkin overlapping the window.
-        c_overlap = (db.query(Checkin.checkin_id)
-                     .filter(Checkin.room_id == room_id,
-                             Checkin.status == "active",
-                             # Overlap test: stay_start < window_end AND stay_end > window_start
-                             or_(Checkin.expected_checkout == None,
-                                 Checkin.expected_checkout > from_date),
-                             Checkin.checkin_datetime < to_date)
-                     .first())
-        if c_overlap:
-            return True
-        # 2) Confirmed internal Booking overlapping.
-        b_overlap = (db.query(Booking.booking_id)
-                     .filter(Booking.room_id == room_id,
-                             Booking.status.in_([BookingStatus.pending,
-                                                  BookingStatus.confirmed]),
-                             Booking.checkin_date < to_date,
-                             Booking.checkout_date > from_date)
-                     .first())
-        if b_overlap:
-            return True
-        # 3) Blocking maintenance.
-        m_overlap = (db.query(MaintenanceTicket.ticket_id)
-                     .filter(MaintenanceTicket.room_id == room_id,
-                             MaintenanceTicket.blocks_room_availability == True,
-                             MaintenanceTicket.status.in_([MaintenanceStatus.open,
-                                                            MaintenanceStatus.in_progress]))
-                     .first())
-        if m_overlap:
-            return True
-        return False
-
-    # Customer-side bookings hold capacity per room TYPE (not pinned to a
-    # specific room until the lodge assigns one at check-in). Count how
-    # many type-X bookings overlap so we deduct that from the type-X
-    # available pool.
-    cb_holds = {}
-    cb_rows = (db.query(CustomerBooking.room_type,
-                        func.sum(CustomerBooking.rooms_count))
-               .filter(CustomerBooking.lodge_id == lodge_id,
-                       CustomerBooking.status.in_([
-                           CustomerBookingStatus.payment_pending.value,
-                           CustomerBookingStatus.confirmed.value,
-                           CustomerBookingStatus.checked_in.value,
-                       ]),
-                       CustomerBooking.checkin_date < to_date,
-                       CustomerBooking.checkout_date > from_date)
-               .group_by(CustomerBooking.room_type).all())
-    for rt, n in cb_rows:
-        cb_holds[rt] = int(n or 0)
-
-    avail = {}
-    for rt, rooms_of_type in by_type.items():
-        free_physical = sum(1 for r in rooms_of_type if not _is_busy(r.room_id))
-        # Deduct customer-booking holds for this type. If holds > physical,
-        # clamp to zero (oversold edge case — shouldn't happen but defensive).
-        avail[rt] = max(0, free_physical - cb_holds.get(rt, 0))
-    return avail
+    return _bulk_available_inventory(db, [lodge_id], from_date, to_date).get(lodge_id, {})
 
 
 # ── Search ──────────────────────────────────────────────────────────
@@ -581,8 +630,15 @@ def search_lodges(
         if to_d <= from_d:
             raise HTTPException(status_code=400, detail="checkout must be after checkin")
 
-    # Bulk-load ratings in one query (avoids N+1 on the search results page).
-    ratings = _bulk_lodge_ratings(db, [l.lodge_id for l in candidates])
+    # Bulk-load ratings, cover photos and (if dates given) availability in a
+    # handful of grouped queries — previously this looped up to 400 lodges
+    # calling _public_lodge_summary + _available_inventory per lodge
+    # (~3 queries per ROOM).
+    candidate_ids = [l.lodge_id for l in candidates]
+    ratings = _bulk_lodge_ratings(db, candidate_ids)
+    covers = _bulk_cover_photos(db, candidate_ids)
+    avail_by_lodge = (_bulk_available_inventory(db, candidate_ids, from_d, to_d)
+                      if from_d and to_d else {})
 
     out = []
     for l in candidates:
@@ -593,9 +649,10 @@ def search_lodges(
             if not rating or rating["avg"] < min_rating:
                 continue
 
-        summary = _public_lodge_summary(db, l, rating)
+        summary = _public_lodge_summary(db, l, rating,
+                                        cover_url=covers.get(l.lodge_id))
         if from_d and to_d:
-            avail = _available_inventory(db, l.lodge_id, from_d, to_d)
+            avail = avail_by_lodge.get(l.lodge_id, {})
             total_available = sum(avail.values())
             if total_available < rooms:
                 continue           # filter out unavailable lodges
@@ -797,6 +854,10 @@ def lodge_availability(code: str,
                 "available": avail.get(rt, 0),
                 "tariff_per_night": rates.get(rt),
                 "estimated_total": (rates.get(rt) * nights) if rates.get(rt) else None,
+                # No breakfast/meal-plan flag exists on the Room/RatePlan
+                # models today, so this is always False for now. The field
+                # NAME is a contract with the booking-flow frontend — keep it.
+                "breakfast_included": False,
             }
             for rt in sorted(set(list(avail.keys()) + list(rates.keys())))
         ],

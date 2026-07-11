@@ -428,6 +428,89 @@ def system_health(
     }
 
 
+@router.get("/security")
+def security_overview(
+    db: Session = Depends(get_db),
+    user=Depends(_require_super_admin),
+):
+    """Login/security aggregates for the platform owner's Security tab.
+
+    - logins (successful) in last 24h / 7d, split staff vs customer
+    - failed logins in last 24h / 7d
+    - distinct source IPs (7d)
+    - suspicious signals: IPs with 5+ failed logins in the last 7 days
+    """
+    from ..models import LoginEvent, IpPresence, Setting
+    from datetime import timedelta
+
+    now = _utcnow()
+    since_24h = now - timedelta(hours=24)
+    since_7d  = now - timedelta(days=7)
+
+    def _count(actor_type=None, success=None, since=None):
+        q = db.query(func.count(LoginEvent.event_id))
+        if actor_type is not None:
+            q = q.filter(LoginEvent.actor_type == actor_type)
+        if success is not None:
+            q = q.filter(LoginEvent.success == success)
+        if since is not None:
+            q = q.filter(LoginEvent.occurred_at >= since)
+        return q.scalar() or 0
+
+    distinct_ips_7d = db.query(
+        func.count(distinct(LoginEvent.ip_address))
+    ).filter(LoginEvent.occurred_at >= since_7d,
+             LoginEvent.ip_address != None).scalar() or 0
+
+    # Suspicious: 5+ failed logins from one IP in the last 7 days.
+    sus_rows = (db.query(
+        LoginEvent.ip_address,
+        func.count(LoginEvent.event_id).label("failures"),
+        func.max(LoginEvent.occurred_at).label("last_attempt"),
+        func.count(distinct(LoginEvent.username)).label("usernames_tried"),
+    ).filter(LoginEvent.success == False,
+             LoginEvent.occurred_at >= since_7d,
+             LoginEvent.ip_address != None)
+     .group_by(LoginEvent.ip_address)
+     .having(func.count(LoginEvent.event_id) >= 5)
+     .order_by(func.count(LoginEvent.event_id).desc())
+     .limit(20).all())
+
+    ip_tracking_row = db.query(Setting).filter_by(
+        lodge_id=1, setting_key="ip_tracking_enabled").first()
+    ip_tracking = bool(ip_tracking_row and str(ip_tracking_row.setting_value)
+                       .strip().lower() in ("yes", "true", "1", "on"))
+    presence_rows = db.query(func.count(IpPresence.presence_id)).scalar() or 0
+
+    return {
+        "logins": {
+            "last_24h": {
+                "total":    _count(success=True, since=since_24h),
+                "staff":    _count("user", True, since_24h),
+                "customer": _count("customer", True, since_24h),
+            },
+            "last_7d": {
+                "total":    _count(success=True, since=since_7d),
+                "staff":    _count("user", True, since_7d),
+                "customer": _count("customer", True, since_7d),
+            },
+        },
+        "failed_logins": {
+            "last_24h": _count(success=False, since=since_24h),
+            "last_7d":  _count(success=False, since=since_7d),
+        },
+        "distinct_ips_7d": distinct_ips_7d,
+        "suspicious_ips": [{
+            "ip_address": r.ip_address,
+            "failures": r.failures,
+            "usernames_tried": r.usernames_tried,
+            "last_attempt": r.last_attempt.isoformat() if r.last_attempt else None,
+        } for r in sus_rows],
+        "ip_tracking": {"enabled": ip_tracking, "presence_rows": presence_rows},
+        "timestamp": now.isoformat(),
+    }
+
+
 @router.get("/notifications")
 def platform_notifications(
     db: Session = Depends(get_db),

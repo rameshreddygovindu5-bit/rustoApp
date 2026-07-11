@@ -15,6 +15,7 @@ import secrets, time, bcrypt, logging
 
 from .database import get_db
 from .models import Agency, AgencyApiCall, AgencyStatus
+from .net_utils import get_client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ def _log_call(db: Session, agency_id: int, request: Request,
             agency_id=agency_id,
             method=request.method,
             path=str(request.url.path),
-            ip_address=request.client.host if request.client else None,
+            ip_address=get_client_ip(request),
             status_code=status_code,
             response_ms=ms,
             error_message=error,

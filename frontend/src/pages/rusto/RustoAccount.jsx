@@ -43,26 +43,46 @@ function BookingCard({ b, onCancel, onReview, myReviews }) {
 
   const downloadReceipt = async () => {
     try {
+      // Server receipt is the source of truth — amounts match what was
+      // actually paid (discounted total), incl. GST + lodge GSTIN.
       const r = await rustoBookingsAPI.receipt(b.booking_id);
       const d = r.data;
+      const inr = n => `₹${Number(n||0).toLocaleString("en-IN")}`;
+      const discountRow = Number(d.promo_discount) > 0
+        ? `<tr><td>Discount${d.promo_code ? ` (${d.promo_code})` : ""}</td><td style="color:#166534">−${inr(d.promo_discount)}</td></tr>` : "";
+      const gstRow = Number(d.gst_amount) > 0
+        ? `<tr><td>GST</td><td>${inr(d.gst_amount)}</td></tr>` : "";
       const w = window.open("","_blank");
-      w.document.write(`<!DOCTYPE html><html><head><title>Receipt ${d.booking_ref}</title>
+      w.document.write(`<!DOCTYPE html><html><head><title>Invoice ${d.invoice_ref || d.booking_ref}</title>
         <style>*{box-sizing:border-box}body{font-family:system-ui,sans-serif;max-width:560px;margin:40px auto;padding:0 20px;color:#0F172A}
-        h1{font-size:20px;font-weight:700}table{width:100%;border-collapse:collapse;margin:16px 0}
-        td{padding:8px 0;border-bottom:1px solid var(--border-soft,#F1F5F9);font-size:14px}td:last-child{text-align:right;font-weight:600}
+        h1{font-size:20px;font-weight:700;margin-bottom:2px}table{width:100%;border-collapse:collapse;margin:16px 0}
+        td{padding:8px 0;border-bottom:1px solid #F1F5F9;font-size:14px}td:last-child{text-align:right;font-weight:600}
+        .muted{color:#64748B;font-size:13px;margin:2px 0}
         .ref{font-family:monospace;font-weight:700;color:#1E40AF}.total{font-size:18px;font-weight:800}</style></head><body>
-        <h1>${d.hotel_name || "Rusto"}</h1><p style="color:#64748B;font-size:13px">${d.hotel_address||""}</p>
-        <hr style="border:1px solid var(--border,#E2E8F0);margin:16px 0"/>
-        <p>Booking reference: <span class="ref">${d.booking_ref}</span></p>
+        <h1>${d.hotel_name || "Rusto"}</h1>
+        <p class="muted">${d.hotel_address||""}</p>
+        ${d.hotel_phone ? `<p class="muted">Phone: ${d.hotel_phone}</p>` : ""}
+        ${d.hotel_gstin ? `<p class="muted">GSTIN: ${d.hotel_gstin}</p>` : ""}
+        <hr style="border:1px solid #E2E8F0;margin:16px 0"/>
+        <p>Invoice / booking reference: <span class="ref">${d.invoice_ref || d.booking_ref}</span></p>
+        ${d.payment_reference ? `<p class="muted">Payment reference: ${d.payment_reference}</p>` : ""}
         <table>
           <tr><td>Guest</td><td>${d.guest_name||""}</td></tr>
           <tr><td>Check-in</td><td>${d.checkin_date}</td></tr>
           <tr><td>Check-out</td><td>${d.checkout_date}</td></tr>
-          <tr><td>Room type</td><td>${(d.room_type||"").replace(/_/g," ")}</td></tr>
+          <tr><td>Room type</td><td>${(d.room_type||"").replace(/_/g," ")} × ${d.rooms_count||1}</td></tr>
           <tr><td>Nights</td><td>${d.nights}</td></tr>
-          <tr><td>Subtotal</td><td>₹${Number(d.subtotal||0).toLocaleString("en-IN")}</td></tr>
-          <tr><td class="total">Total paid</td><td class="total">₹${Number(d.total_amount||0).toLocaleString("en-IN")}</td></tr>
-        </table></body></html>`);
+          <tr><td>Tariff / night</td><td>${inr(d.tariff_per_night)}</td></tr>
+          <tr><td>Subtotal</td><td>${inr(d.subtotal)}</td></tr>
+          ${gstRow}
+          ${discountRow}
+          <tr><td class="total">Total paid</td><td class="total">${inr(d.amount_paid ?? d.total_amount)}</td></tr>
+          <tr><td>Payment method</td><td>${d.payment_method||"Online"}${d.payment_status ? ` (${d.payment_status})` : ""}</td></tr>
+        </table>
+        <p class="muted">Booked via Rusto · ${d.created_at ? new Date(d.created_at).toLocaleDateString("en-IN") : ""}</p>
+        </body></html>`);
+      w.document.close();
+      w.print?.();
     } catch { toast.error("Could not load receipt"); }
   };
 
@@ -106,6 +126,18 @@ function BookingCard({ b, onCancel, onReview, myReviews }) {
           <span>Ref: <code style={{fontFamily:"monospace", color:"var(--text-secondary,#334155)", fontWeight:600}}>{b.booking_ref}</code></span>
           <span style={{textTransform:"capitalize"}}>{(b.room_type||"").replace(/_/g," ")} × {b.rooms_count||1}</span>
         </div>
+
+        {/* Refund visibility for cancelled paid bookings */}
+        {b.status === "cancelled" && b.payment && ["paid","refunded"].includes(b.payment.status) && (
+          <p style={{display:"flex", alignItems:"center", gap:6, fontSize:12, fontWeight:600, marginBottom:14,
+            color: (b.payment.status === "refunded" || b.refund_status === "initiated")
+              ? "var(--brand-success,#166534)" : "#92400E"}}>
+            <AlertCircle size={12}/>
+            {(b.payment.status === "refunded" || b.refund_status === "initiated")
+              ? "Refund initiated to your original payment method"
+              : "Contact the lodge for your refund"}
+          </p>
+        )}
 
         <div style={{display:"flex", flexWrap:"wrap", gap:8}}>
           {canReceipt && (
@@ -159,16 +191,16 @@ function BookingCard({ b, onCancel, onReview, myReviews }) {
               <div>
                 <p className="text-[8px] uppercase tracking-widest text-white/50">Guest Wi-Fi Network</p>
                 <p className="font-mono font-bold text-white mt-0.5">
-                  {(b.lodge?.name || "Rusto").replace(/\s+/g, '')}_Guest
+                  {b.lodge?.wifi_network || "Ask at reception"}
                 </p>
               </div>
               <div>
                 <p className="text-[8px] uppercase tracking-widest text-white/50">Password</p>
-                <p className="font-mono font-bold text-[#F59E0B] mt-0.5">REST_EVERYWHERE</p>
+                <p className="font-mono font-bold text-[#F59E0B] mt-0.5">{b.lodge?.wifi_password || "Ask at reception"}</p>
               </div>
               <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[8px] text-white/40">
                 <span>🔑 Ref: {b.booking_ref}</span>
-                <span>🕒 Check-in: 12:00 PM</span>
+                <span>🕒 Check-in: {b.lodge?.checkin_time || "Ask at reception"}</span>
               </div>
             </div>
           </div>
@@ -483,12 +515,20 @@ function BookingsTab() {
   }, []);
 
   const cancel = async b => {
-    if (!window.confirm(`Cancel booking ${b.booking_ref}?`)) return;
+    // Show the lodge's cancellation policy BEFORE the customer confirms.
+    const policy = b.lodge?.cancellation_policy;
+    const policyLine = policy
+      ? `Cancellation policy: ${String(policy).replace(/_/g," ")}${b.lodge?.cancellation_hours ? ` — free cancellation up to ${b.lodge.cancellation_hours} hours before check-in` : ""}.`
+      : "Cancellation policy: refunds for paid bookings go back to your original payment method; the lodge may apply charges for late cancellations.";
+    if (!window.confirm(`Cancel booking ${b.booking_ref}?\n\n${policyLine}\n\nThis cannot be undone.`)) return;
     try {
       const r = await rustoBookingsAPI.cancel(b.booking_id, { reason:"Cancelled by customer" });
-      setBookings(bs => bs.map(x => x.booking_id === b.booking_id
-        ? (r.data?.booking || {...x, status:"cancelled"}) : x));
-      toast.success("Booking cancelled");
+      const updated = r.data?.booking || r.data || { status:"cancelled" };
+      setBookings(bs => bs.map(x => x.booking_id === b.booking_id ? {...x, ...updated} : x));
+      const rs = r.data?.refund_status;
+      if (rs === "initiated")   toast.success("Booking cancelled — refund initiated to your payment method");
+      else if (rs === "manual") toast.info("Booking cancelled — please contact the lodge for your refund");
+      else                      toast.success("Booking cancelled");
     } catch (e) { toast.error(e.response?.data?.detail || "Could not cancel"); }
   };
 

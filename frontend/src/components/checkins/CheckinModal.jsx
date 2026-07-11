@@ -3,6 +3,8 @@ import { checkinsAPI, customersAPI, roomsAPI, bookingsAPI } from '../../services
 import { toast } from 'react-toastify'
 import { X, Upload, Star, Plus, Trash2, Edit2, Ban, ShieldCheck } from 'lucide-react'
 import { useSettings } from '../../context/SettingsContext'
+import SignaturePad from './SignaturePad'
+import { PAYMENT_MODES, CollectionHint } from './paymentOptions'
 import {
   formatDateTime,
   toDateTimeLocalInput,
@@ -11,6 +13,14 @@ import {
   nightsBetween,
   hoursBetween,
 } from '../../utils/datetime'
+
+const PURPOSE_OPTIONS = ['Pilgrimage', 'Tourism', 'Business', 'Family Function', 'Medical', 'Other']
+
+// Fallback shown when the lodge hasn't configured `guest_declaration_text`.
+const DEFAULT_DECLARATION =
+  'I hereby declare that the details furnished above are true and correct. ' +
+  'I agree to abide by the house rules of the lodge and accept responsibility ' +
+  'for any damage caused to the room or property during my stay.'
 
 const ID_TYPES = [
   { value: 'aadhar', label: 'Aadhar Card', placeholder: '12-digit number', pattern: /^\d{12}$/ },
@@ -70,10 +80,15 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
     nationality: 'Indian', gender: '',
     sms_alert_preference: 'yes',
     payment_mode: 'cash',
+    purpose_of_visit: '',
+    vehicle_number: '',
   })
 
   const [step, setStep] = useState('form')
   const [idFile, setIdFile] = useState(null)
+  // House-rules declaration + digital signature (captured on review step).
+  const [declarationAccepted, setDeclarationAccepted] = useState(false)
+  const [signature, setSignature] = useState(null)   // base64 PNG data URL
   const [loading, setLoading] = useState(false)
   const [searching, setSearching] = useState(false)
   const [suggestions, setSuggestions] = useState([])
@@ -284,6 +299,15 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
     });
   };
 
+  // ── Settings-driven behaviour ────────────────────────────────────────
+  const isForeignNational =
+    !['indian', 'india', ''].includes((form.nationality || '').trim().toLowerCase())
+  const requireSignature =
+    String(settings?.require_customer_signature || 'false').toLowerCase() === 'true'
+  const declarationText =
+    (settings?.guest_declaration_text || '').trim() || DEFAULT_DECLARATION
+  const canConfirm = declarationAccepted && (!requireSignature || !!signature)
+
   // ── Validation ───────────────────────────────────────────────────────
   const validate = () => {
     const errs = {}
@@ -291,6 +315,10 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
     if (!form.last_name  || form.last_name.length  < 2) errs.last_name  = 'Min 2 characters'
     if (!/^\d{10}$/.test(form.phone))                   errs.phone      = 'Must be 10 digits'
     if (!form.id_type)   errs.id_type   = 'Select ID type'
+    // Form C / FRRO: foreign nationals must check in on a passport.
+    if (isForeignNational && form.id_type !== 'passport') {
+      errs.id_type = 'Foreign nationals must use Passport as ID (Form C requirement)'
+    }
     if (!form.id_number) errs.id_number = 'ID number required'
     else {
       const def = ID_TYPES.find(t => t.value === form.id_type)
@@ -303,7 +331,9 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
              hoursBetween(form.checkin_datetime, form.expected_checkout) < 1) {
       errs.expected_checkout = 'Checkout must be at least 1 hour after check-in'
     }
-    if (form.members_count < 1) errs.members_count = 'At least 1 member'
+    if (form.members_count < 1 || form.members_count > 6) {
+      errs.members_count = 'Guests must be between 1 and 6'
+    }
 
     // Room rows
     if (!selectedRooms.length) {
@@ -341,6 +371,14 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
   }
 
   const processCheckin = async () => {
+    if (!declarationAccepted) {
+      toast.error('Guest must accept the house rules / declaration to proceed')
+      return
+    }
+    if (requireSignature && !signature) {
+      toast.error('Guest signature is required to complete check-in (lodge policy)')
+      return
+    }
     setLoading(true)
     try {
       const fd = new FormData()
@@ -372,6 +410,10 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
       }
 
       if (idFile) fd.append('id_proof', idFile)
+
+      // House-rules declaration + digital signature (base64 PNG data URL).
+      fd.append('declaration_accepted', declarationAccepted ? 'true' : 'false')
+      if (signature) fd.append('signature', signature)
 
       const res = await checkinsAPI.create(fd)
       const count = res?.data?.count ?? roomsPayload.length
@@ -588,6 +630,12 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
                     onChange={e => setForm({ ...form, id_type: e.target.value, id_number: '' })}>
                     {ID_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
+                  {errors.id_type && <p className="text-red-500 text-xs mt-1">{errors.id_type}</p>}
+                  {isForeignNational && form.id_type !== 'passport' && !errors.id_type && (
+                    <p className="text-amber-700 text-xs mt-1">
+                      Foreign national — Passport is required (Form C).
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="label">ID Number *</label>
@@ -763,19 +811,34 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
           {/* ── Members + Dates ──────────────────────────────────────── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">No. of Guests *</label>
-              <input type="number" min={1} max={20} className="input-field" value={form.members_count}
+              <label className="label">No. of Guests * <span className="text-ink-400 font-normal">(max 6)</span></label>
+              <input type="number" min={1} max={6}
+                className={`input-field ${errors.members_count ? 'border-red-400' : ''}`}
+                value={form.members_count}
                 onChange={e => setForm({ ...form, members_count: parseInt(e.target.value) || 1 })} />
+              {errors.members_count && <p className="text-red-500 text-xs mt-1">{errors.members_count}</p>}
             </div>
             <div>
               <label className="label">Payment Method *</label>
               <select className="input-field" value={form.payment_mode}
                 onChange={e => setForm({ ...form, payment_mode: e.target.value })}>
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-                <option value="upi">UPI / PhonePe</option>
-                <option value="online">Online Transfer</option>
+                {PAYMENT_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
+              <CollectionHint mode={form.payment_mode} />
+            </div>
+            <div>
+              <label className="label">Purpose of Visit</label>
+              <select className="input-field" value={form.purpose_of_visit}
+                onChange={e => setForm({ ...form, purpose_of_visit: e.target.value })}>
+                <option value="">Select…</option>
+                {PURPOSE_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Vehicle Number</label>
+              <input type="text" className="input-field uppercase" value={form.vehicle_number}
+                onChange={e => setForm({ ...form, vehicle_number: e.target.value.toUpperCase() })}
+                placeholder="e.g. AP09AB1234" maxLength={15} />
             </div>
             <div>
               <label className="label">Check-in Date &amp; Time *</label>
@@ -897,6 +960,18 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
                 <p className="text-xs text-ink-500">Estimated room charges</p>
                 <p className="text-sm font-semibold">₹{totalEstimate.toLocaleString('en-IN')}</p>
               </div>
+              {(form.purpose_of_visit || form.vehicle_number) && (
+                <>
+                  <div>
+                    <p className="text-xs text-ink-500">Purpose of Visit</p>
+                    <p className="text-sm font-semibold">{form.purpose_of_visit || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-ink-500">Vehicle Number</p>
+                    <p className="text-sm font-semibold">{form.vehicle_number || '—'}</p>
+                  </div>
+                </>
+              )}
               {linkedBooking && linkedBooking.advance_amount > 0 && (
                 <div className="col-span-2">
                   <p className="text-xs text-ink-500">Advance already paid (credited at checkout)</p>
@@ -909,16 +984,56 @@ export default function CheckinModal({ room, customer: initialCustomer, bookingP
             </div>
           </div>
 
+          {/* ── House-rules declaration + guest digital signature ────── */}
+          <div className="bg-ink-50 rounded-xl p-5 border border-ink-100 space-y-4">
+            <div>
+              <p className="text-xs text-ink-500 font-semibold uppercase tracking-wider mb-2">
+                Guest Declaration
+              </p>
+              <p className="text-sm text-ink-700 whitespace-pre-line bg-white border border-ink-200 rounded-lg p-3">
+                {declarationText}
+              </p>
+            </div>
+
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#1B2A4A]"
+                checked={declarationAccepted}
+                onChange={e => setDeclarationAccepted(e.target.checked)} />
+              <span className="text-sm text-navy font-medium">
+                I accept the house rules / declaration above *
+              </span>
+            </label>
+
+            <div>
+              <p className="text-xs text-ink-500 font-semibold uppercase tracking-wider mb-2">
+                Guest Signature {requireSignature
+                  ? <span className="text-red-500 normal-case">(required)</span>
+                  : <span className="text-ink-400 normal-case font-normal">(optional)</span>}
+              </p>
+              <SignaturePad onChange={setSignature} disabled={loading} />
+              {signature && (
+                <p className="text-[11px] text-green-700 mt-1">✓ Signature captured</p>
+              )}
+              {requireSignature && !signature && (
+                <p className="text-[11px] text-red-500 mt-1">
+                  Signature is required by lodge policy.
+                </p>
+              )}
+            </div>
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-3">
-            <button type="button" onClick={() => setStep('form')} disabled={loading} className="btn-outline flex-1">
+            <button type="button" disabled={loading} className="btn-outline flex-1"
+              onClick={() => { setStep('form'); setSignature(null) }}>
               ← Back to Edit
             </button>
             <button type="button" onClick={attemptClose} disabled={loading}
               className="btn-outline flex-1 text-red-600 border-red-200 hover:bg-red-50">
               Cancel
             </button>
-            <button type="button" onClick={processCheckin} disabled={loading}
-              className="btn-primary flex-[2] flex items-center justify-center gap-2">
+            <button type="button" onClick={processCheckin} disabled={loading || !canConfirm}
+              title={!canConfirm ? 'Accept the declaration (and sign, if required) to proceed' : undefined}
+              className="btn-primary flex-[2] flex items-center justify-center gap-2 disabled:opacity-50">
               {loading ? (
                 <>
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

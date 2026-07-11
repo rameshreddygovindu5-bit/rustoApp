@@ -4,7 +4,7 @@
  * Preserves booking path: rustoPublicAPI.lodge/.availability/.bundles,
  * rustoBookingsAPI.create → navigate(/checkout/:id, {state}).
  */
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { MapPin, Star, Heart, ChevronLeft, Bolt, Wifi, Car, Wind, Coffee,
          ShieldCheck, Check, Loader2, X, ChevronRight, Share2 } from "lucide-react";
@@ -18,7 +18,7 @@ const AMENITY_ICONS = { wifi: Wifi, parking: Car, ac: Wind, restaurant: Coffee }
 
 export default function RustoLodgeDetail() {
   const { code } = useParams();
-  const [params] = useSearchParams();
+  const [params, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { customer } = useCustomerAuth();
 
@@ -40,6 +40,26 @@ export default function RustoLodgeDetail() {
     rooms: +(params.get("rooms") || 1),
     guests: +(params.get("guests") || 2),
   });
+  // Room type picked before a login round-trip (?next=… through /signin)
+  // so the selection survives and the user can Reserve immediately.
+  const pendingRoomRef = useRef(params.get("room") || null);
+
+  // Keep dates / rooms / guests / picked room type mirrored into the URL
+  // query so the full selection survives the /signin ?next= round-trip.
+  useEffect(() => {
+    const p = new URLSearchParams();
+    if (form.from) p.set("from", form.from);
+    if (form.to) p.set("to", form.to);
+    if (form.rooms) p.set("rooms", String(form.rooms));
+    if (form.guests) p.set("guests", String(form.guests));
+    const roomType = picked?.type || pendingRoomRef.current;
+    if (roomType) p.set("room", roomType);
+    // Only navigate when something actually changed — guards against
+    // update loops (setSearchParams identity changes with the URL).
+    const current = new URLSearchParams(window.location.search).toString();
+    if (p.toString() !== current) setSearchParams(p, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.from, form.to, form.rooms, form.guests, picked]);
 
   useEffect(() => {
     setLoading(true);
@@ -71,7 +91,24 @@ export default function RustoLodgeDetail() {
   useEffect(() => {
     if (!validDates) { setAvailability(null); return; }
     rustoPublicAPI.availability(code, { from: form.from, to: form.to })
-      .then(r => { setAvailability(r.data); setPicked(null); })
+      .then(r => {
+        // The availability API prices rooms as `tariff_per_night` — map it
+        // once here so every render-side read of `price_per_night` works.
+        const data = r.data || {};
+        const rooms = (data.rooms || []).map(rt => ({
+          ...rt,
+          price_per_night: rt.price_per_night ?? rt.tariff_per_night ?? 0,
+        }));
+        setAvailability({ ...data, rooms });
+        // Restore (or keep) the picked room type — e.g. returning from the
+        // /signin round-trip with ?room=… in the URL.
+        setPicked(prev => {
+          const wanted = prev?.type || pendingRoomRef.current;
+          const match = wanted ? rooms.find(rt => rt.type === wanted) : null;
+          if (match) pendingRoomRef.current = null;
+          return match || null;
+        });
+      })
       .catch(() => setAvailability(null));
   }, [code, form.from, form.to, validDates]);
 
@@ -199,7 +236,7 @@ export default function RustoLodgeDetail() {
 
           {/* Trust row */}
           <div className="rb-detail-trust">
-            {(lodge.instant_confirm ?? true) && <span><Bolt size={15} /> Instant confirmation</span>}
+            {lodge.instant_confirm === true && <span><Bolt size={15} /> Instant confirmation</span>}
             <span><ShieldCheck size={15} /> Secure payment</span>
             {lodge.free_cancellation && <span><Check size={15} /> Free cancellation</span>}
           </div>

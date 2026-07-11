@@ -7,7 +7,7 @@
  *
  * Deploy this at pms.yourdomain.com
  */
-import React from 'react'
+import React, { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
@@ -27,52 +27,56 @@ injectPmsTheme()
 import Layout                         from './components/Layout/Layout'
 import Login                          from './pages/Login'
 
-import Dashboard          from './pages/Dashboard'
-import Rooms              from './pages/Rooms'
-import Customers          from './pages/Customers'
-import Checkins           from './pages/Checkins'
-import Bookings           from './pages/Bookings'
-import Agencies           from './pages/Agencies'
-import RatePlans          from './pages/RatePlans'
-import Housekeeping       from './pages/Housekeeping'
-import Expenses           from './pages/Expenses'
-import Shifts             from './pages/Shifts'
-import Maintenance        from './pages/Maintenance'
-import Inventory          from './pages/Inventory'
-import Feedback           from './pages/Feedback'
-import FeedbackSubmit     from './pages/FeedbackSubmit'
-import Promos             from './pages/Promos'
-import Loyalty            from './pages/Loyalty'
-import ForeignGuests      from './pages/ForeignGuests'
-import Campaigns          from './pages/Campaigns'
-import Reports            from './pages/Reports'
-import Alerts             from './pages/Alerts'
-import Emails             from './pages/Emails'
-import WhatsAppAdmin      from './pages/WhatsAppAdmin'
-import Support            from './pages/Support'
-import RustoListingAdmin  from './pages/RustoListingAdmin'
-import RustoReviewsAdmin  from './pages/RustoReviewsAdmin'
-import LocalBundlesAdmin  from './pages/LocalBundlesAdmin'
-import LodgeAnalytics     from './pages/LodgeAnalytics'
-import Billing            from './pages/Billing'
-import StaffManagement    from './pages/StaffManagement'
-import StaffModuleAssignment from './pages/StaffModuleAssignment'
-import PlanModules        from './pages/PlanModules'
-import Users              from './pages/Users'
-import Settings           from './pages/Settings'
-import Security           from './pages/Security'
-import Import             from './pages/Import'
-import Backup             from './pages/Backup'
-import TapeChart          from './pages/TapeChart'
-import NightAudit         from './pages/NightAudit'
-import GroupBookings      from './pages/GroupBookings'
-import OtaReservations    from './pages/OtaReservations'
-import Lodges             from './pages/Lodges'
-import Registrations      from './pages/Registrations'
-import GlobalApiKeys      from './pages/GlobalApiKeys'
-import BillingAdmin       from './pages/BillingAdmin'
-import PlatformAnalytics  from './pages/PlatformAnalytics'
-import PublicBooking      from './pages/PublicBooking'
+// Route-level code splitting — pages load on demand so the login screen
+// ships only a small entry chunk (mirrors App.jsx).
+const Dashboard          = lazy(() => import('./pages/Dashboard'))
+const Rooms              = lazy(() => import('./pages/Rooms'))
+const Customers          = lazy(() => import('./pages/Customers'))
+const Checkins           = lazy(() => import('./pages/Checkins'))
+const Bookings           = lazy(() => import('./pages/Bookings'))
+const Agencies           = lazy(() => import('./pages/Agencies'))
+const RatePlans          = lazy(() => import('./pages/RatePlans'))
+const Housekeeping       = lazy(() => import('./pages/Housekeeping'))
+const Expenses           = lazy(() => import('./pages/Expenses'))
+const Shifts             = lazy(() => import('./pages/Shifts'))
+const Maintenance        = lazy(() => import('./pages/Maintenance'))
+const Inventory          = lazy(() => import('./pages/Inventory'))
+const Feedback           = lazy(() => import('./pages/Feedback'))
+const FeedbackSubmit     = lazy(() => import('./pages/FeedbackSubmit'))
+const Promos             = lazy(() => import('./pages/Promos'))
+const Loyalty            = lazy(() => import('./pages/Loyalty'))
+const ForeignGuests      = lazy(() => import('./pages/ForeignGuests'))
+const Campaigns          = lazy(() => import('./pages/Campaigns'))
+const Reports            = lazy(() => import('./pages/Reports'))
+const Alerts             = lazy(() => import('./pages/Alerts'))
+const Emails             = lazy(() => import('./pages/Emails'))
+const WhatsAppAdmin      = lazy(() => import('./pages/WhatsAppAdmin'))
+const Support            = lazy(() => import('./pages/Support'))
+const RustoListingAdmin  = lazy(() => import('./pages/RustoListingAdmin'))
+const RustoReviewsAdmin  = lazy(() => import('./pages/RustoReviewsAdmin'))
+const LocalBundlesAdmin  = lazy(() => import('./pages/LocalBundlesAdmin'))
+const LodgeAnalytics     = lazy(() => import('./pages/LodgeAnalytics'))
+const Billing            = lazy(() => import('./pages/Billing'))
+const StaffManagement    = lazy(() => import('./pages/StaffManagement'))
+const StaffModuleAssignment = lazy(() => import('./pages/StaffModuleAssignment'))
+const PlanModules        = lazy(() => import('./pages/PlanModules'))
+const Users              = lazy(() => import('./pages/Users'))
+const Settings           = lazy(() => import('./pages/Settings'))
+const Security           = lazy(() => import('./pages/Security'))
+const Import             = lazy(() => import('./pages/Import'))
+const Backup             = lazy(() => import('./pages/Backup'))
+const TapeChart          = lazy(() => import('./pages/TapeChart'))
+const NightAudit         = lazy(() => import('./pages/NightAudit'))
+const GroupBookings      = lazy(() => import('./pages/GroupBookings'))
+const OtaReservations    = lazy(() => import('./pages/OtaReservations'))
+const Lodges             = lazy(() => import('./pages/Lodges'))
+const Registrations      = lazy(() => import('./pages/Registrations'))
+const GlobalApiKeys      = lazy(() => import('./pages/GlobalApiKeys'))
+const BillingAdmin       = lazy(() => import('./pages/BillingAdmin'))
+const PlatformAnalytics  = lazy(() => import('./pages/PlatformAnalytics'))
+const PublicBooking      = lazy(() => import('./pages/PublicBooking'))
+const AuditConsole       = lazy(() => import('./pages/AuditConsole'))
+const IpPresence         = lazy(() => import('./pages/IpPresence'))
 
 // ── Guards ────────────────────────────────────────────────────────────────
 function ProtectedRoute({ children, adminOnly = false, superAdminOnly = false }) {
@@ -114,6 +118,7 @@ function Loader() {
 function PmsRoutes() {
   const { user } = useAuth()
   return (
+    <Suspense fallback={<Loader />}>
     <Routes>
       {/* Auth */}
       <Route path="/login"  element={user ? <Navigate to="/dashboard" replace/> : <Login />} />
@@ -164,6 +169,8 @@ function PmsRoutes() {
         <Route path="/security"           element={<Security />} />
         <Route path="/import"             element={<ProtectedRoute adminOnly><Import /></ProtectedRoute>} />
         <Route path="/backup"             element={<ProtectedRoute adminOnly><Backup /></ProtectedRoute>} />
+        <Route path="/audit-console"      element={<ProtectedRoute adminOnly><AuditConsole /></ProtectedRoute>} />
+        <Route path="/ip-presence"        element={<ProtectedRoute adminOnly><IpPresence /></ProtectedRoute>} />
         {/* Super-admin */}
         <Route path="/lodges"             element={<ProtectedRoute superAdminOnly><Lodges /></ProtectedRoute>} />
         <Route path="/registrations"      element={<ProtectedRoute superAdminOnly><Registrations /></ProtectedRoute>} />
@@ -176,6 +183,7 @@ function PmsRoutes() {
       <Route path="/"  element={<Navigate to="/login" replace />} />
       <Route path="*"  element={<Navigate to="/login" replace />} />
     </Routes>
+    </Suspense>
   )
 }
 

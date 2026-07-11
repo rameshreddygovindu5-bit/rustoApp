@@ -4,6 +4,7 @@ Internal bookings router. Staff/admin manage all bookings (walk-in + agency).
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime, date, timezone
@@ -186,46 +187,66 @@ def staff_create_booking(body: StaffBookingCreate, request: Request,
     from ..models import Lodge
     lodge = db.query(Lodge).filter(Lodge.lodge_id == lodge_id).first()
     code_prefix = (lodge.code[:3].upper() if lodge and lodge.code else "UDM")
-    today = _utcnow()
-    prefix = f"{code_prefix}-{today.strftime('%Y%m')}-"
-    last = (db.query(Booking)
-            .filter(Booking.lodge_id == lodge_id,
-                    Booking.booking_ref.like(prefix + "%"))
-            .order_by(Booking.booking_id.desc()).first())
-    seq = 1
-    if last:
-        try:
-            seq = int(last.booking_ref.split("-")[-1]) + 1
-        except Exception:
-            seq = (last.booking_id or 0) + 1
-    booking_ref = f"{prefix}{seq:04d}"
 
-    b = Booking(
-        lodge_id=lodge_id,
-        booking_ref=booking_ref,
-        source=BookingSource.direct,
-        guest_name=body.guest_name,
-        guest_phone=body.guest_phone,
-        guest_email=body.guest_email,
-        room_type_requested=RoomType(body.room_type),
-        rooms_count=rooms_count,
-        checkin_date=body.checkin_date,
-        checkout_date=body.checkout_date,
-        nights=nights,
-        adults=body.adults, children=body.children,
-        tariff_per_night=body.tariff_per_night,
-        total_amount=total,
-        advance_amount=advance,
-        advance_payment_mode=body.advance_payment_mode or "cash",
-        payment_status=("partial" if 0 < advance < total
-                        else "paid" if advance >= total and total > 0
-                        else body.payment_status),
-        status=BookingStatus.confirmed,
-        special_requests=body.special_requests,
-        created_by_user_id=current_user.user_id,
-    )
-    db.add(b)
-    db.commit()
+    def _next_ref() -> str:
+        today = _utcnow()
+        prefix = f"{code_prefix}-{today.strftime('%Y%m')}-"
+        last = (db.query(Booking)
+                .filter(Booking.lodge_id == lodge_id,
+                        Booking.booking_ref.like(prefix + "%"))
+                .order_by(Booking.booking_id.desc()).first())
+        seq = 1
+        if last:
+            try:
+                seq = int(last.booking_ref.split("-")[-1]) + 1
+            except Exception:
+                seq = (last.booking_id or 0) + 1
+        return f"{prefix}{seq:04d}"
+
+    # Ref generation reads max-sequence then inserts, so two concurrent
+    # creates can race onto the same ref. On the unique-constraint clash,
+    # rollback, regenerate from the (now committed) max, and retry.
+    b = None
+    booking_ref = None
+    for attempt in range(5):
+        booking_ref = _next_ref()
+        b = Booking(
+            lodge_id=lodge_id,
+            booking_ref=booking_ref,
+            source=BookingSource.direct,
+            guest_name=body.guest_name,
+            guest_phone=body.guest_phone,
+            guest_email=body.guest_email,
+            room_type_requested=RoomType(body.room_type),
+            rooms_count=rooms_count,
+            checkin_date=body.checkin_date,
+            checkout_date=body.checkout_date,
+            nights=nights,
+            adults=body.adults, children=body.children,
+            tariff_per_night=body.tariff_per_night,
+            total_amount=total,
+            advance_amount=advance,
+            advance_payment_mode=body.advance_payment_mode or "cash",
+            payment_status=("partial" if 0 < advance < total
+                            else "paid" if advance >= total and total > 0
+                            else body.payment_status),
+            status=BookingStatus.confirmed,
+            special_requests=body.special_requests,
+            created_by_user_id=current_user.user_id,
+        )
+        db.add(b)
+        try:
+            db.commit()
+            break
+        except IntegrityError as e:
+            db.rollback()
+            if "booking_ref" not in str(getattr(e, "orig", e)):
+                raise
+            if attempt == 4:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Could not allocate a unique booking reference; please retry.")
+            logger.warning(f"booking_ref collision on {booking_ref}, retrying ({attempt + 1}/5)")
     db.refresh(b)
 
     log_audit(db, "booking.created",

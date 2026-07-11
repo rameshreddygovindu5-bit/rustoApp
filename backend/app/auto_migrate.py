@@ -37,8 +37,24 @@ _ADDITIVE_COLUMNS = {
         ("advance_amount",       "NUMERIC(10,2) DEFAULT 0"),
         ("advance_payment_mode", "VARCHAR(20) DEFAULT 'cash'"),
     ],
+    "rusto_customers": [
+        ("last_login_ip",        "VARCHAR(45)"),
+    ],
     "checkins": [
         ("advance_paid",         "NUMERIC(10,2) DEFAULT 0"),
+        # Guest digital signature + house-rules declaration.
+        ("signature_path",        "VARCHAR(255)"),
+        ("signature_captured_by", "VARCHAR(50)"),
+        ("signature_captured_at", "DATETIME"),
+        ("declaration_accepted",  "BOOLEAN DEFAULT false"),
+        # Guest ID verification by staff.
+        ("id_verified",           "BOOLEAN DEFAULT false"),
+        ("verified_by",           "VARCHAR(50)"),
+        ("verified_at",           "DATETIME"),
+        ("verification_notes",    "TEXT"),
+        # Stay metadata (guest-register compliance).
+        ("purpose_of_visit",      "VARCHAR(50)"),
+        ("vehicle_number",        "VARCHAR(20)"),
     ],
     "invoices": [
         ("advance_adjusted",     "NUMERIC(10,2) DEFAULT 0"),
@@ -167,6 +183,8 @@ _NEW_TABLE_DDLS = [
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""",
     "CREATE INDEX IF NOT EXISTS ix_rusto_ledger_member ON rusto_points_ledger(membership_id)",
+    # Speeds up the default check-ins list (filter lodge, sort newest first).
+    "CREATE INDEX IF NOT EXISTS ix_checkins_lodge_dt ON checkins(lodge_id, checkin_datetime)",
     """CREATE TABLE IF NOT EXISTS rusto_room_photos (
         id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
         lodge_id INTEGER NOT NULL REFERENCES lodges(lodge_id),

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import Optional
 from ..database import get_db
 from ..models import Room, RoomStatus, Checkin, CheckinStatus, Customer
@@ -11,13 +11,41 @@ from datetime import date, datetime
 router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 
 
-def room_to_dict(r: Room, include_active_checkin: bool = True):
-    active_checkin = None
+# Sentinel so callers can pass active_checkin=None ("I looked it up in bulk,
+# this room has no active check-in") and we can still tell that apart from
+# "caller didn't pass anything — fall back to lazy-loading r.checkins".
+_UNSET = object()
+
+
+def _bulk_active_checkins(db: Session, lodge_id: int):
+    """One query → {room_id: [active Checkins]} for a lodge, with customers
+    eager-loaded. Kills the per-room r.checkins N+1 in list endpoints."""
+    rows = (db.query(Checkin)
+              .options(joinedload(Checkin.customer))
+              .filter(Checkin.lodge_id == lodge_id,
+                      Checkin.status == CheckinStatus.active)
+              .order_by(Checkin.checkin_id)
+              .all())
+    by_room = {}
+    for ch in rows:
+        by_room.setdefault(ch.room_id, []).append(ch)
+    return by_room
+
+
+def room_to_dict(r: Room, include_active_checkin: bool = True,
+                 active_checkin=_UNSET):
+    active_checkin_out = None
     ac = None
     if include_active_checkin:
-        ac = next((ch for ch in r.checkins if ch.status == CheckinStatus.active), None)
+        if active_checkin is not _UNSET:
+            # Pre-fetched by the caller (bulk query) — avoids iterating the
+            # room's FULL check-in history per room (N+1).
+            ac = active_checkin
+        else:
+            # Backward-compatible fallback for single-room callers.
+            ac = next((ch for ch in r.checkins if ch.status == CheckinStatus.active), None)
         if ac:
-            active_checkin = {
+            active_checkin_out = {
                 "checkin_id": ac.checkin_id,
                 "customer_id": ac.customer_id,
                 "customer_name": f"{ac.customer.first_name} {ac.customer.last_name}" if ac.customer else "Unknown",
@@ -56,7 +84,7 @@ def room_to_dict(r: Room, include_active_checkin: bool = True):
         "status": effective_status,
         "is_active": r.is_active,
         "description": r.description,
-        "active_checkin": active_checkin,
+        "active_checkin": active_checkin_out,
     }
 
 
@@ -85,9 +113,21 @@ def list_rooms(
                 Room.status == RoomStatus.occupied,
                 Room.is_active == True,
             ).all()
-            return [room_to_dict(r) for r in rooms
-                    if any(ch.status == CheckinStatus.active and ch.expected_checkout
-                           and (datetime.combine(ch.expected_checkout, datetime.min.time()) if isinstance(ch.expected_checkout, date) and not isinstance(ch.expected_checkout, datetime) else ch.expected_checkout) <= now for ch in r.checkins)]
+            # Bulk-fetch active check-ins (one query) instead of lazily
+            # iterating each room's full check-in history.
+            active_by_room = _bulk_active_checkins(db, lodge_id)
+
+            def _due(ch):
+                exp = ch.expected_checkout
+                if not exp:
+                    return False
+                if isinstance(exp, date) and not isinstance(exp, datetime):
+                    exp = datetime.combine(exp, datetime.min.time())
+                return exp <= now
+
+            return [room_to_dict(r, active_checkin=next(iter(active_by_room.get(r.room_id, [])), None))
+                    for r in rooms
+                    if any(_due(ch) for ch in active_by_room.get(r.room_id, []))]
         else:
             query = query.filter(Room.status == status)
 
@@ -95,7 +135,12 @@ def list_rooms(
         query = query.filter(Room.floor == floor)
 
     rooms = query.order_by(Room.room_number).all()
-    return [room_to_dict(r) for r in rooms]
+    # ONE query for all active check-ins of this lodge (customer eager-loaded),
+    # passed into room_to_dict — previously each room lazily loaded its entire
+    # check-in HISTORY just to find the active one (~2 queries per row).
+    active_by_room = _bulk_active_checkins(db, lodge_id)
+    return [room_to_dict(r, active_checkin=next(iter(active_by_room.get(r.room_id, [])), None))
+            for r in rooms]
 
 
 @router.get("/available")

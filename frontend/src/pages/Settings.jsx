@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Save, Upload, Eye, EyeOff, Hotel, Bell, IndianRupee, Settings as SettingsIcon, RefreshCw, CheckCircle, AlertTriangle, Wifi, Sparkles, X } from "lucide-react";
+import { Save, Upload, Eye, EyeOff, Hotel, Bell, IndianRupee, Settings as SettingsIcon, RefreshCw, CheckCircle, AlertTriangle, Wifi, Sparkles, X, Shield } from "lucide-react";
 import { api } from "../services/api";
 import { toast } from "react-toastify";
 import { useSettings } from "../context/SettingsContext";
@@ -12,6 +12,7 @@ const SETTING_GROUPS = [
   { id: "modules", label: "Features & Modules",   icon: <SettingsIcon size={16} /> },
   { id: "tariff",  label: "Tariff & GST",          icon: <IndianRupee size={16} /> },
   { id: "alerts",  label: "Alerts & Notifications",icon: <Bell size={16} /> },
+  { id: "security",label: "Security",              icon: <Shield size={16} /> },
   { id: "agent",   label: "AI Agent",              icon: <Sparkles size={16} /> },
   { id: "system",  label: "System",                icon: <SettingsIcon size={16} /> },
 ];
@@ -395,6 +396,17 @@ export default function Settings() {
                     <SettingInput label="Suite / Villa / Special Room (₹/night)" type="number" value={s("tariff_house")} onChange={v => updateSetting("tariff_house", v)} disabled={!isAdmin} />
                     <SettingInput label="Executive Suite Rate (₹/night)" type="number" value={s("tariff_suite")} onChange={v => updateSetting("tariff_suite", v)} disabled={!isAdmin} />
                     <SettingInput label="Extra Bed / Cot Charge (₹)" type="number" value={s("extra_bed_charge")} onChange={v => updateSetting("extra_bed_charge", v)} disabled={!isAdmin} />
+                    <SettingInput label="Default Deposit at Check-in (₹)" type="number" value={s("default_deposit")} onChange={v => updateSetting("default_deposit", v)} disabled={!isAdmin} />
+                    <SettingInput label="Late Checkout Charge (₹/hour)" type="number" value={s("late_checkout_charge")} onChange={v => updateSetting("late_checkout_charge", v)} disabled={!isAdmin} />
+                  </div>
+                  <div className="border-t border-ink-100 pt-5 space-y-4">
+                    <SectionHeader title="Digital Collection" desc="UPI / wallet details shown to guests when collecting payments digitally" />
+                    <div className="grid grid-cols-1 xs:grid-cols-2 gap-4 sm:gap-5">
+                      <SettingInput label="UPI ID" value={s("collection_upi_id")} onChange={v => updateSetting("collection_upi_id", v)} disabled={!isAdmin} placeholder="yourlodge@upi" />
+                      <SettingInput label="PhonePe Number" value={s("collection_phonepe")} onChange={v => updateSetting("collection_phonepe", v)} disabled={!isAdmin} placeholder="9XXXXXXXXX" />
+                      <SettingInput label="Google Pay Number" value={s("collection_gpay")} onChange={v => updateSetting("collection_gpay", v)} disabled={!isAdmin} placeholder="9XXXXXXXXX" />
+                      <SettingInput label="Paytm Number" value={s("collection_paytm")} onChange={v => updateSetting("collection_paytm", v)} disabled={!isAdmin} placeholder="9XXXXXXXXX" />
+                    </div>
                   </div>
                   <div className="border-t border-ink-100 pt-5 space-y-4">
                     <SectionHeader title="GST Settings" desc="Goods and Services Tax configuration" />
@@ -629,6 +641,79 @@ export default function Settings() {
                 </div>
               )}
 
+              {/* Security */}
+              {activeGroup === "security" && (
+                <div className="p-6 space-y-6">
+                  <SectionHeader title="Security" desc="Remote staff access and check-in security controls" />
+
+                  {/* Remote Staff Login Security */}
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-semibold text-ink-800">Remote Staff Login Security</h4>
+                      <p className="text-xs text-ink-400">Restrict staff logins to your lodge's network. Admins are never affected.</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-ink-500 mb-1.5">Trusted Network CIDRs</label>
+                      <textarea
+                        value={s("trusted_network_cidrs")}
+                        onChange={e => updateSetting("trusted_network_cidrs", e.target.value)}
+                        disabled={!isAdmin}
+                        rows={2}
+                        placeholder="e.g. 192.168.1.0/24, 10.0.0.0/8"
+                        className="w-full border border-ink-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold resize-none disabled:bg-ink-50 disabled:text-ink-400"
+                      />
+                      <p className="text-xs text-ink-400 mt-1">
+                        Comma-separated CIDR ranges of your lodge's network(s). Leave <strong>empty to disable</strong> this feature —
+                        all logins are then treated as on-network. Malformed entries are ignored.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-xs font-medium text-ink-500 mb-1.5">Remote Login Policy</label>
+                        <select
+                          value={s("remote_login_policy") || "allow"}
+                          onChange={e => updateSetting("remote_login_policy", e.target.value)}
+                          disabled={!isAdmin}
+                          className="w-full px-3 py-2 text-sm border border-ink-200 rounded-xl focus:outline-none focus:border-gold bg-white disabled:bg-ink-50"
+                        >
+                          <option value="allow">Allow — staff can log in from anywhere</option>
+                          <option value="otp">Force OTP — require OTP challenge when outside trusted network</option>
+                          <option value="block">Block — deny staff logins outside trusted network</option>
+                        </select>
+                        <p className="text-xs text-ink-400 mt-1">Applied when a staff member logs in from an IP outside the trusted CIDRs above.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Customer Check-in Security */}
+                  <div className="border-t border-ink-100 pt-5 space-y-4">
+                    <div>
+                      <h4 className="text-sm font-semibold text-ink-800">Customer Check-in Security</h4>
+                      <p className="text-xs text-ink-400">Guest declaration and signature capture at check-in</p>
+                    </div>
+                    <ToggleSetting
+                      label="Require Customer Signature"
+                      desc="Guests must sign digitally on the signature pad before check-in is completed"
+                      value={bool("require_customer_signature")}
+                      onChange={v => updateSetting("require_customer_signature", String(v))}
+                      disabled={!isAdmin}
+                    />
+                    <div>
+                      <label className="block text-xs font-medium text-ink-500 mb-1.5">Guest Declaration / House Rules</label>
+                      <textarea
+                        value={s("guest_declaration_text")}
+                        onChange={e => updateSetting("guest_declaration_text", e.target.value)}
+                        disabled={!isAdmin}
+                        rows={4}
+                        placeholder="I hereby declare that the details provided are true. I agree to abide by the lodge's house rules..."
+                        className="w-full border border-ink-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold resize-none disabled:bg-ink-50 disabled:text-ink-400"
+                      />
+                      <p className="text-xs text-ink-400 mt-1">Guest Declaration / House Rules shown above the signature pad at check-in.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* AI Agent */}
               {activeGroup === "agent" && (
                 <AIAgentSection
@@ -828,8 +913,9 @@ function ChangePasswordSection() {
     }
     setChanging(true);
     try {
-      await api.post("/auth/change-password", {
-        current_password: form.current_password,
+      // Backend endpoint is PUT /auth/change-password with {old_password, new_password}
+      await api.put("/auth/change-password", {
+        old_password: form.current_password,
         new_password: form.new_password,
       });
       toast.success("Password changed successfully!");
