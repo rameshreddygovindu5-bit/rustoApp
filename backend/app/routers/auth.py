@@ -1,4 +1,4 @@
-﻿"""
+"""
 Auth router â€” v10.0
 
 Login flow:
