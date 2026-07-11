@@ -232,7 +232,10 @@ def seed_initial_data():
                 ("session_timeout_min", "480", "system", "Session timeout in minutes", False),
                 ("max_login_attempts", "5", "system", "Max failed logins before lockout", False),
                 ("lockout_duration_minutes", "15", "system", "Minutes an account stays locked after too many failed logins", False),
+<<<<<<< HEAD
                 ("ip_tracking_enabled", "no", "system", "Track per-user IP presence (last seen + cumulative time per IP). Default off; platform owner can enable later.", False),
+=======
+>>>>>>> f425c3a72e94ad080fb969a60f1cc4b3ecea4b3b
                 ("admin_session_hours", "8", "system", "Admin JWT/session expiry in hours", False),
                 ("staff_session_hours", "8", "system", "Staff JWT/session expiry in hours", False),
                 ("backup_enabled", "true", "system", "Enable automatic daily DB backup", False),

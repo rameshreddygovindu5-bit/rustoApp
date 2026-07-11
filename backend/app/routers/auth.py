@@ -30,8 +30,12 @@ from ..database import get_db
 from ..models import User, LoginAttempt
 from ..auth import (verify_password, get_password_hash, create_access_token,
                     get_current_user, ACCESS_TOKEN_EXPIRE_HOURS)
+<<<<<<< HEAD
 from ..services.audit_service import log_audit, log_login_event
 from ..net_utils import get_client_ip
+=======
+from ..services.audit_service import log_audit
+>>>>>>> f425c3a72e94ad080fb969a60f1cc4b3ecea4b3b
 import os, secrets, logging, ipaddress
 
 logger = logging.getLogger(__name__)
@@ -107,6 +111,7 @@ def _session_expiry(db: Session, user: User) -> timedelta:
     return timedelta(hours=hours)
 
 
+<<<<<<< HEAD
 # Thin alias kept for backwards compatibility — the canonical implementation
 # lives in app/net_utils.py (XFF honoured only behind a trusted proxy).
 _client_ip = get_client_ip
@@ -117,6 +122,20 @@ def _user_agent(request: Request) -> str:
         return (request.headers.get("user-agent") or "")[:400]
     except Exception:
         return ""
+=======
+def _client_ip(request: Request) -> str:
+    """Client IP, honouring the first X-Forwarded-For entry when present
+    (we may sit behind a reverse proxy)."""
+    try:
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            first = xff.split(",")[0].strip()
+            if first:
+                return first
+    except Exception:
+        pass
+    return request.client.host if request.client else "unknown"
+>>>>>>> f425c3a72e94ad080fb969a60f1cc4b3ecea4b3b
 
 
 def _remote_login_policy(db: Session, lodge_id, ip: str) -> tuple:
@@ -342,9 +361,12 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
                           ip_address=ip)
             except Exception:
                 pass
+<<<<<<< HEAD
             log_login_event(db, "user", actor_id=user.user_id, username=user.username,
                             lodge_id=user.lodge_id, success=False, method="password",
                             ip_address=ip, user_agent=_user_agent(request))
+=======
+>>>>>>> f425c3a72e94ad080fb969a60f1cc4b3ecea4b3b
             raise HTTPException(
                 status_code=403,
                 detail=("Remote login is blocked by your lodge's security policy. "
