@@ -1,20 +1,20 @@
-"""
-Auth router — v10.0
+﻿"""
+Auth router â€” v10.0
 
 Login flow:
   1. Username + password (existing).
-  2. TOTP (if totp_enabled — existing).
+  2. TOTP (if totp_enabled â€” existing).
   3. Staff OTP (if role == staff and lodge has require_login_otp OR user.require_login_otp):
-       POST /login    → returns {"otp_required": true, "otp_token": "<short-lived token>"}
-       POST /login/verify-otp  → {"otp_token": "...", "otp": "123456"} → full JWT
+       POST /login    â†’ returns {"otp_required": true, "otp_token": "<short-lived token>"}
+       POST /login/verify-otp  â†’ {"otp_token": "...", "otp": "123456"} â†’ full JWT
 
 Roles (v10.0):
-  super_admin  — cross-tenant Rusto platform admin.
-  app_owner    — Tygonix application owner (same rights + deeper audit access).
-  admin        — lodge-scoped full rights.
-  lodge_owner  — lodge-scoped: billing/analytics/reports only (no staff edit, no checkins).
-  staff        — lodge-scoped: operational modules; permissions list gates access.
-  vendor       — integration partner; logs in via API key, not this endpoint.
+  super_admin  â€” cross-tenant Rusto platform admin.
+  app_owner    â€” Tygonix application owner (same rights + deeper audit access).
+  admin        â€” lodge-scoped full rights.
+  lodge_owner  â€” lodge-scoped: billing/analytics/reports only (no staff edit, no checkins).
+  staff        â€” lodge-scoped: operational modules; permissions list gates access.
+  vendor       â€” integration partner; logs in via API key, not this endpoint.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
@@ -30,12 +30,8 @@ from ..database import get_db
 from ..models import User, LoginAttempt
 from ..auth import (verify_password, get_password_hash, create_access_token,
                     get_current_user, ACCESS_TOKEN_EXPIRE_HOURS)
-<<<<<<< HEAD
 from ..services.audit_service import log_audit, log_login_event
 from ..net_utils import get_client_ip
-=======
-from ..services.audit_service import log_audit
->>>>>>> f425c3a72e94ad080fb969a60f1cc4b3ecea4b3b
 import os, secrets, logging, ipaddress
 
 logger = logging.getLogger(__name__)
@@ -46,7 +42,7 @@ LOCKOUT_MINUTES = 15
 OTP_TTL_MINUTES = 5
 OTP_MAX_TRIES   = 3
 
-# ── Role helpers ───────────────────────────────────────────────────────────
+# â”€â”€ Role helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 SUPER_ROLES  = {"super_admin", "app_owner"}
 ADMIN_ROLES  = {"admin", "lodge_owner"} | SUPER_ROLES
@@ -64,7 +60,7 @@ def _is_admin_or_super(u: User) -> bool:
 def _is_staff(u: User) -> bool:
     return _role(u) == "staff"
 
-# ── Lodge-configurable security settings ──────────────────────────────────
+# â”€â”€ Lodge-configurable security settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _get_lodge_setting(db: Session, key: str, default: str, lodge_id) -> str:
     """Read a Setting for this lodge, falling back to `default` on any
@@ -78,7 +74,7 @@ def _get_lodge_setting(db: Session, key: str, default: str, lodge_id) -> str:
 
 
 def _lockout_config(db: Session, lodge_id) -> tuple:
-    """(max_attempts, lockout_minutes) — from the lodge's Setting rows,
+    """(max_attempts, lockout_minutes) â€” from the lodge's Setting rows,
     falling back to the env/module defaults on any error."""
     max_attempts, lockout_minutes = MAX_ATTEMPTS, LOCKOUT_MINUTES
     try:
@@ -111,8 +107,7 @@ def _session_expiry(db: Session, user: User) -> timedelta:
     return timedelta(hours=hours)
 
 
-<<<<<<< HEAD
-# Thin alias kept for backwards compatibility — the canonical implementation
+# Thin alias kept for backwards compatibility â€” the canonical implementation
 # lives in app/net_utils.py (XFF honoured only behind a trusted proxy).
 _client_ip = get_client_ip
 
@@ -122,30 +117,16 @@ def _user_agent(request: Request) -> str:
         return (request.headers.get("user-agent") or "")[:400]
     except Exception:
         return ""
-=======
-def _client_ip(request: Request) -> str:
-    """Client IP, honouring the first X-Forwarded-For entry when present
-    (we may sit behind a reverse proxy)."""
-    try:
-        xff = request.headers.get("x-forwarded-for")
-        if xff:
-            first = xff.split(",")[0].strip()
-            if first:
-                return first
-    except Exception:
-        pass
-    return request.client.host if request.client else "unknown"
->>>>>>> f425c3a72e94ad080fb969a60f1cc4b3ecea4b3b
 
 
 def _remote_login_policy(db: Session, lodge_id, ip: str) -> tuple:
     """Evaluate the remote-staff-login policy for this lodge and client IP.
 
     Returns (is_remote, policy):
-      - trusted_network_cidrs empty / all-malformed → feature off →
+      - trusted_network_cidrs empty / all-malformed â†’ feature off â†’
         (False, "allow").
-      - IP inside any trusted CIDR → (False, "allow").
-      - Otherwise → (True, remote_login_policy) where policy is one of
+      - IP inside any trusted CIDR â†’ (False, "allow").
+      - Otherwise â†’ (True, remote_login_policy) where policy is one of
         "allow" | "otp" | "block" (defaults to "allow" on bad values).
     """
     cidrs_raw = _get_lodge_setting(db, "trusted_network_cidrs", "", lodge_id) or ""
@@ -166,7 +147,7 @@ def _remote_login_policy(db: Session, lodge_id, ip: str) -> tuple:
         if any(addr in net for net in networks):
             return False, "allow"
     except ValueError:
-        # Unparseable client IP (e.g. "unknown") — treat as remote so the
+        # Unparseable client IP (e.g. "unknown") â€” treat as remote so the
         # policy still applies rather than silently bypassing it.
         pass
 
@@ -176,7 +157,7 @@ def _remote_login_policy(db: Session, lodge_id, ip: str) -> tuple:
     return True, policy
 
 
-# ── OTP helpers ────────────────────────────────────────────────────────────
+# â”€â”€ OTP helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _generate_otp() -> str:
     """6-digit zero-padded OTP."""
@@ -229,7 +210,7 @@ def _send_otp_to_admin(db: Session, otp: str, lodge_id: int, staff_username: str
                 admin_phone = admin_user.phone
 
         if not admin_phone:
-            # No phone to send to — log warning and ALLOW login (fail-open for
+            # No phone to send to â€” log warning and ALLOW login (fail-open for
             # lodges that haven't configured SMS yet so they don't get locked out)
             logger.warning("Lodge %s: require_staff_otp=true but no admin_phone configured; "
                            "allowing login without OTP", lodge_id)
@@ -245,7 +226,7 @@ def _send_otp_to_admin(db: Session, otp: str, lodge_id: int, staff_username: str
         return False
 
 
-# ── Pydantic schemas ───────────────────────────────────────────────────────
+# â”€â”€ Pydantic schemas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class LoginRequest(BaseModel):
     username: str
@@ -264,7 +245,7 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
-# ── Login ──────────────────────────────────────────────────────────────────
+# â”€â”€ Login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.post("/login")
 def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
@@ -318,7 +299,7 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
                         ip_address=ip, user_agent=_user_agent(request))
         raise HTTPException(status_code=403, detail="Account is inactive")
 
-    # ── TOTP check (existing v2.4) ─────────────────────────────────────────
+    # â”€â”€ TOTP check (existing v2.4) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if user.totp_enabled and user.totp_secret:
         from ..services.totp import verify_totp
         if not body.totp_code:
@@ -343,7 +324,7 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
 
     role_val = _role(user)
 
-    # ── v10.6: Remote staff login security ───────────────────────────────
+    # â”€â”€ v10.6: Remote staff login security â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     # If the lodge has trusted_network_cidrs configured and this staff
     # member is logging in from outside those networks, apply the lodge's
     # remote_login_policy: allow (default), otp (force OTP challenge) or
@@ -361,12 +342,9 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
                           ip_address=ip)
             except Exception:
                 pass
-<<<<<<< HEAD
             log_login_event(db, "user", actor_id=user.user_id, username=user.username,
                             lodge_id=user.lodge_id, success=False, method="password",
                             ip_address=ip, user_agent=_user_agent(request))
-=======
->>>>>>> f425c3a72e94ad080fb969a60f1cc4b3ecea4b3b
             raise HTTPException(
                 status_code=403,
                 detail=("Remote login is blocked by your lodge's security policy. "
@@ -374,7 +352,7 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
         if is_remote and remote_policy == "otp":
             remote_forces_otp = True
 
-    # ── v10.0: Staff OTP check ────────────────────────────────────────────
+    # â”€â”€ v10.0: Staff OTP check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     # Trigger OTP flow if:
     #   (a) role == staff  AND
     #   (b) user.require_login_otp is True  OR  lodge setting require_staff_otp
@@ -426,11 +404,11 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
                 ("OTP sent to your registered phone." if own_phone else
                  "OTP sent to lodge admin's phone. Ask your admin for the code.")
                 if sms_sent else
-                "OTP generated. SMS not configured — ask your admin for the code."
+                "OTP generated. SMS not configured â€” ask your admin for the code."
             ),
         }
 
-    # ── All checks passed → issue full JWT ───────────────────────────────
+    # â”€â”€ All checks passed â†’ issue full JWT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     method = "totp" if (user.totp_enabled and user.totp_secret) else "password"
     return _issue_token(user, ip, attempt, db, method=method,
                         user_agent=_user_agent(request))
@@ -458,7 +436,7 @@ def verify_otp_login(request: Request, body: OtpVerifyRequest, db: Session = Dep
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Lockout check — a locked account can't finish the OTP flow either.
+    # Lockout check â€” a locked account can't finish the OTP flow either.
     if user.locked_until and user.locked_until > _now():
         raise HTTPException(status_code=429,
             detail=f"Account locked until {user.locked_until.strftime('%H:%M:%S UTC')}")
@@ -474,7 +452,7 @@ def verify_otp_login(request: Request, body: OtpVerifyRequest, db: Session = Dep
         raise HTTPException(status_code=429,
                             detail="Too many OTP attempts. Please log in again.")
 
-    # Constant-time compare — accept EITHER:
+    # Constant-time compare â€” accept EITHER:
     #   (a) The live SMS OTP (if not expired), OR
     #   (b) The static admin-set PIN (static_login_pin column, if set)
     import hmac as _hmac
@@ -517,7 +495,7 @@ def verify_otp_login(request: Request, body: OtpVerifyRequest, db: Session = Dep
         raise HTTPException(status_code=401,
                             detail=f"Wrong OTP. {remaining} attempt(s) remaining.")
 
-    # OTP correct — clear OTP fields, record IP, issue token
+    # OTP correct â€” clear OTP fields, record IP, issue token
     user.login_otp          = None
     user.login_otp_expires  = None
     user.login_otp_attempts = 0
@@ -582,7 +560,7 @@ def _issue_token(user: User, ip: str, attempt, db: Session, via_otp: bool = Fals
     }
 
 
-# ── Existing endpoints (unchanged) ────────────────────────────────────────
+# â”€â”€ Existing endpoints (unchanged) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.post("/logout")
 def logout(current_user: User = Depends(get_current_user)):
@@ -833,7 +811,7 @@ def toggle_user(user_id: int, request: Request,
     return {"success": True, "is_active": user.is_active}
 
 
-# ── v10.0: Staff OTP management ───────────────────────────────────────────
+# â”€â”€ v10.0: Staff OTP management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class OtpSettingRequest(BaseModel):
     require_login_otp: bool
@@ -867,7 +845,7 @@ def set_user_otp_requirement(user_id: int, body: OtpSettingRequest, request: Req
     return {"success": True, "require_login_otp": body.require_login_otp}
 
 
-# ── v2.4: TOTP (existing, unchanged) ─────────────────────────────────────
+# â”€â”€ v2.4: TOTP (existing, unchanged) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TotpVerifyRequest(BaseModel):
     code: str
@@ -941,7 +919,7 @@ def totp_status(current_user=Depends(get_current_user)):
     }
 
 
-# ── v10.1: Static admin-set PIN ───────────────────────────────────────────────
+# â”€â”€ v10.1: Static admin-set PIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class StaticPinRequest(BaseModel):
     pin: Optional[str] = None

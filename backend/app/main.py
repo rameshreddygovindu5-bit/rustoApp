@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Depends
+﻿from fastapi import FastAPI, Request, Depends
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -14,7 +14,7 @@ from decimal import Decimal
 from dotenv import load_dotenv
 
 
-# ─── Custom JSON encoder that handles Enums and Decimals globally ─────
+# â”€â”€â”€ Custom JSON encoder that handles Enums and Decimals globally â”€â”€â”€â”€â”€
 class EnumSafeJSONResponse(JSONResponse):
     """JSONResponse subclass that properly serializes Enum and Decimal types."""
     def render(self, content) -> bytes:
@@ -74,7 +74,7 @@ from .routers import (auth, customers, rooms, checkins, alerts, reports,
                       ip_presence)
 from .services.scheduler import start_scheduler, stop_scheduler
 
-# ─── Logging ──────────────────────────────────────────────────────────
+# â”€â”€â”€ Logging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
@@ -104,7 +104,7 @@ async def lifespan(app: FastAPI):
     try:
         Base.metadata.create_all(bind=engine)
         # Add any columns introduced by a new release to pre-existing tables.
-        # Safe (additive-only) and idempotent — see app/auto_migrate.py.
+        # Safe (additive-only) and idempotent â€” see app/auto_migrate.py.
         try:
             from .auto_migrate import run_additive_migrations
             run_additive_migrations(engine)
@@ -120,7 +120,7 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning("Failed to release Postgres advisory lock: %s", e)
 
-    # v2.6 — seed default email templates for every lodge (idempotent).
+    # v2.6 â€” seed default email templates for every lodge (idempotent).
     try:
         from .database import SessionLocal
         from .models import Lodge
@@ -206,12 +206,12 @@ def seed_initial_data():
                 ("collection_gpay", "", "tariff", "Google Pay collection number", False),
                 ("collection_paytm", "", "tariff", "Paytm collection number", False),
 
-                # Security — customer check-in
+                # Security â€” customer check-in
                 ("require_customer_signature", "false", "security", "Require guest digital signature at check-in", False),
                 ("guest_declaration_text",
                  "I hereby declare that the details provided by me are true. I agree to abide by the lodge house rules: valid ID for every guest, no smoking inside rooms, visitors allowed only in the lobby, and checkout by the notified time. I accept that the lodge is not responsible for loss of personal valuables.",
                  "security", "Guest declaration / house rules text shown at check-in", False),
-                # Security — remote staff login
+                # Security â€” remote staff login
                 ("trusted_network_cidrs", "", "security", "Comma-separated trusted lodge network CIDRs (e.g. 192.168.1.0/24)", False),
                 ("remote_login_policy", "allow", "security", "Policy for staff logins outside trusted network: allow | otp | block", False),
 
@@ -232,10 +232,7 @@ def seed_initial_data():
                 ("session_timeout_min", "480", "system", "Session timeout in minutes", False),
                 ("max_login_attempts", "5", "system", "Max failed logins before lockout", False),
                 ("lockout_duration_minutes", "15", "system", "Minutes an account stays locked after too many failed logins", False),
-<<<<<<< HEAD
                 ("ip_tracking_enabled", "no", "system", "Track per-user IP presence (last seen + cumulative time per IP). Default off; platform owner can enable later.", False),
-=======
->>>>>>> f425c3a72e94ad080fb969a60f1cc4b3ecea4b3b
                 ("admin_session_hours", "8", "system", "Admin JWT/session expiry in hours", False),
                 ("staff_session_hours", "8", "system", "Staff JWT/session expiry in hours", False),
                 ("backup_enabled", "true", "system", "Enable automatic daily DB backup", False),
@@ -271,15 +268,15 @@ def seed_initial_data():
                                setting_group=group, description=desc, is_sensitive=sensitive))
             logger.info(f"Seeded {len(settings_data)} settings")
 
-        # ── Override settings from environment variables ──────────────────
+        # â”€â”€ Override settings from environment variables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         # This lets production deployments configure integrations via env vars
         # without manual database edits. Only updates if the env var is set.
         env_settings = [
-            # SMS — Twilio
+            # SMS â€” Twilio
             ("twilio_account_sid",  os.getenv("TWILIO_ACCOUNT_SID",  "")),
             ("twilio_auth_token",   os.getenv("TWILIO_AUTH_TOKEN",   "")),
             ("sms_from_number",     os.getenv("TWILIO_FROM_NUMBER",  "")),
-            # SMS — MSG91
+            # SMS â€” MSG91
             ("msg91_auth_key",      os.getenv("MSG91_AUTH_KEY",      "")),
             ("msg91_sender_id",     os.getenv("MSG91_SENDER_ID",     "")),
             # Email
@@ -365,7 +362,7 @@ def seed_initial_data():
         db.close()
 
 
-# ─── Rate limiter ─────────────────────────────────────────────────────
+# â”€â”€â”€ Rate limiter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 app = FastAPI(
@@ -376,7 +373,7 @@ app = FastAPI(
     default_response_class=EnumSafeJSONResponse,
 )
 
-# ─── CORS ─────────────────────────────────────────────────────────────
+# â”€â”€â”€ CORS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Default: localhost dev + any private network IP (lodge LANs need to call
 # the backend directly from the browser for portal detection to work).
 _default_origins = (
@@ -384,36 +381,36 @@ _default_origins = (
     "http://127.0.0.1:3000,http://127.0.0.1:5173"
 )
 cors_origins = os.getenv("CORS_ORIGINS", _default_origins).split(",")
-# Detect-portal is a public endpoint — allow all origins so the browser
+# Detect-portal is a public endpoint â€” allow all origins so the browser
 # can call the backend directly (not via proxy) to get the real client IP.
 # We use allow_origins=["*"] but restrict credentials to False for safety.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # ← allow any origin; detect-portal is public
-    allow_credentials=False,      # ← False required when allow_origins=["*"]
+    allow_origins=["*"],          # â† allow any origin; detect-portal is public
+    allow_credentials=False,      # â† False required when allow_origins=["*"]
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
     max_age=86400,                # cache preflight responses for a day
 )
 
-# ─── GZip compression (large JSON list responses) ─────────────────────
+# â”€â”€â”€ GZip compression (large JSON list responses) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 from fastapi.middleware.gzip import GZipMiddleware
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 # Note: authenticated endpoints use the Authorization header (Bearer token),
 # not cookies, so allow_credentials=False does not affect auth behaviour.
 
-# ─── Rate limiting middleware ──────────────────────────────────────────
+# â”€â”€â”€ Rate limiting middleware â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-# ─── Static / uploads ─────────────────────────────────────────────────
+# â”€â”€â”€ Static / uploads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 os.makedirs("uploads/id_proofs", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
-# ─── Request-id middleware (helps debug partner integrations) ─────────
+# â”€â”€â”€ Request-id middleware (helps debug partner integrations) â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
     rid = request.headers.get("X-Request-Id") or str(uuid.uuid4())
@@ -438,7 +435,7 @@ async def limit_request_size(request: Request, call_next):
 
 @app.middleware("http")
 async def ip_presence_tracker(request: Request, call_next):
-    """Flag-gated IP presence sampling (default OFF → one cached check).
+    """Flag-gated IP presence sampling (default OFF â†’ one cached check).
 
     All the heavy lifting (flag cache, cheap token decode, write-behind
     buffer) lives in routers/ip_presence.py; observe_request never raises
@@ -465,7 +462,7 @@ async def security_headers(request: Request, call_next):
     return response
 
 
-# ─── Routers ──────────────────────────────────────────────────────────
+# â”€â”€â”€ Routers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.include_router(portal_detection.router)
 app.include_router(auth.router)
 app.include_router(lodges.router)
@@ -481,26 +478,26 @@ app.include_router(agencies.router)
 app.include_router(audit.router)
 app.include_router(partner_api.router)
 app.include_router(agent.router)
-# v2.1 additions — operational PMS modules
+# v2.1 additions â€” operational PMS modules
 app.include_router(housekeeping.router)
 app.include_router(folio.router)
 app.include_router(expenses.router)
 app.include_router(shifts.router)
 app.include_router(notifications.router)
-# v2.2 additions — advanced PMS modules
+# v2.2 additions â€” advanced PMS modules
 app.include_router(maintenance.router)
 app.include_router(inventory.router)
 app.include_router(rate_plans.router)
 app.include_router(feedback.router)
-# v2.3 additions — revenue/loyalty/compliance/marketing
+# v2.3 additions â€” revenue/loyalty/compliance/marketing
 app.include_router(promos.router)
 app.include_router(loyalty.router)
 app.include_router(foreign_guests.router)
 app.include_router(campaigns.router)
 app.include_router(backup.router)
-# v2.4 additions — TOTP 2FA (lives in auth.py) + GST returns export
+# v2.4 additions â€” TOTP 2FA (lives in auth.py) + GST returns export
 app.include_router(gst.router)
-# v2.5 additions — industry-standard PMS gap-fills
+# v2.5 additions â€” industry-standard PMS gap-fills
 app.include_router(tape_chart.router)
 app.include_router(night_audit.router)
 app.include_router(public_booking.router)
@@ -508,36 +505,36 @@ app.include_router(group_bookings.router)
 app.include_router(guest_documents.router)
 app.include_router(guest_preferences.router)
 app.include_router(ota.router)
-# v2.6 additions — email infrastructure
+# v2.6 additions â€” email infrastructure
 app.include_router(email.router)
 
-# Rusto v3.0 — multi-sided marketplace
+# Rusto v3.0 â€” multi-sided marketplace
 app.include_router(lodge_registration.public_router)
 app.include_router(lodge_registration.admin_router)
 app.include_router(support.router)
 
-# Rusto v3.1 — customer-facing site
+# Rusto v3.1 â€” customer-facing site
 app.include_router(rusto_customer_auth.router)
 app.include_router(rusto_public.router)
 app.include_router(rusto_bookings.router)
 app.include_router(rusto_listing.router)
 
-# v3.2 — staff management with granular permissions
+# v3.2 â€” staff management with granular permissions
 app.include_router(staff.router)
 
-# v6.0 — customer reviews + lodge responses
+# v6.0 â€” customer reviews + lodge responses
 app.include_router(rusto_reviews.router)
 
-# v7.0 — WhatsApp Business API (admin config, message log, webhook)
+# v7.0 â€” WhatsApp Business API (admin config, message log, webhook)
 app.include_router(whatsapp.router)
 
-# v7.1 — public pricing endpoints for the onboarding wizard
+# v7.1 â€” public pricing endpoints for the onboarding wizard
 app.include_router(public_pricing.router)
 
-# v8.0 — lodge subscriptions, invoices, Razorpay billing webhook
+# v8.0 â€” lodge subscriptions, invoices, Razorpay billing webhook
 app.include_router(billing.router)
 
-# v8.4 — per-lodge operational analytics dashboard
+# v8.4 â€” per-lodge operational analytics dashboard
 app.include_router(analytics.router)
 app.include_router(plan_features.router)
 # v9.0 enhanced RUSTO marketplace
@@ -550,7 +547,7 @@ app.include_router(platform_analytics.router)
 app.include_router(rusto_membership.router)
 app.include_router(global_partner_api.partner_router)
 app.include_router(global_partner_api.admin_router)
-# v11.2 — IP presence tracker (flag-gated; see routers/ip_presence.py)
+# v11.2 â€” IP presence tracker (flag-gated; see routers/ip_presence.py)
 app.include_router(ip_presence.router)
 
 
